@@ -57,6 +57,10 @@ static int yt8511_config_init(struct phy_device *phydev)
 	if (oldpage < 0)
 		goto err_restore_page;
 
+	ret = __phy_modify(phydev, YT8511_PAGE, 0, YT8511_CLK_125M);
+	if (ret < 0)
+		goto err_restore_page;
+
 	/* set rgmii delay mode */
 	switch (phydev->interface) {
 	case PHY_INTERFACE_MODE_RGMII:
