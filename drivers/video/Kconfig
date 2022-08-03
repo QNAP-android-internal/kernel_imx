@@ -68,5 +68,6 @@ if FB_CORE || SGI_NEWPORT_CONSOLE
 
 endif
 
+source "drivers/video/lt8911exb/Kconfig"
 
 endmenu
