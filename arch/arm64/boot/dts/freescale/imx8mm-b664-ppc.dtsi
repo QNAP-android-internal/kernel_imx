@@ -87,6 +87,18 @@
 		enable-active-high;
 	};
 
+	reg_dp_backlight_pwr: regulator_dpblpwr {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_dp_backlight_pwr>;
+		compatible = "regulator-fixed";
+		regulator-name = "dp_bl_en";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-always-on;
+	};
+
 	bt_sco_codec: bt_sco_codec {
 		#sound-dai-cells = <1>;
 		compatible = "linux,bt-sco";
@@ -174,6 +186,24 @@
 		cpu-dai = <&micfil>;
 	};
 
+	dp_backlight: dp_backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm1 0 100000>;
+		status = "okay";
+
+		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
+				     10 11 12 13 14 15 16 17 18 19
+				     20 21 22 23 24 25 26 27 28 29
+				     30 31 32 33 34 35 36 37 38 39
+				     40 41 42 43 44 45 46 47 48 49
+				     50 51 52 53 54 55 56 57 58 59
+				     60 61 62 63 64 65 66 67 68 69
+				     70 71 72 73 74 75 76 77 78 79
+				     80 81 82 83 84 85 86 87 88 89
+				     90 91 92 93 94 95 96 97 98 99
+				    100>;
+		default-brightness-level = <80>;
+	};
 };
 
 &A53_0 {
@@ -192,14 +222,10 @@
 	cpu-supply = <&buck2_reg>;
 };
 
-&csi1_bridge {
-	fsl,mipi-mode;
+&pwm1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm1_dp>;
 	status = "okay";
-	port {
-		csi1_ep: endpoint {
-			remote-endpoint = <&csi1_mipi_ep>;
-		};
-	};
 };
 
 &ecspi2 {
@@ -348,28 +374,31 @@
 };
 
 &i2c2 {
-	clock-frequency = <400000>;
+	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
-	adv_bridge: adv7535@3d {
-		compatible = "adi,adv7535";
-		reg = <0x3d>;
-		adi,addr-cec = <0x3b>;
-		adi,dsi-lanes = <4>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_i2c2_synaptics_dsx_io>;
-		interrupt-parent = <&gpio1>;
-		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
+	lt8911exb@2d {
+		compatible = "lontium,lt8911exb";
+		reg = <0x2d>;
+
+		lontium,pclk = <60400000>;
+		lontium,hact = <1280>;
+		lontium,vact = <800>;
+		lontium,hbp = <40>;
+		lontium,hfp = <40>;
+		lontium,vbp = <10>;
+		lontium,vfp = <3>;
+		lontium,hs = <80>;
+		lontium,vs = <10>;
+
+		lontium,mipi_lane = <1>;
+		lontium,lane_cnt = <1>;
+		lontium,color = <1>; //Color Depth 0:6bit 1:8bit
+		lontium,test = <0>;
 
 		status = "okay";
-
-		port {
-			adv7535_from_dsim: endpoint {
-				remote-endpoint = <&dsim_to_adv7535>;
-			};
-		};
 	};
 };
 
@@ -417,51 +446,10 @@
 		DVDD-supply = <&reg_audio_board>;
 		dsd-path = <1>;
 	};
-
-	ov5640_mipi: ov5640_mipi@3c {
-		compatible = "ovti,ov5640_mipi";
-		reg = <0x3c>;
-		status = "okay";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_csi_pwn>, <&pinctrl_csi_rst>;
-		clocks = <&clk IMX8MM_CLK_CLKO1>;
-		clock-names = "csi_mclk";
-		assigned-clocks = <&clk IMX8MM_CLK_CLKO1>;
-		assigned-clock-parents = <&clk IMX8MM_CLK_24M>;
-		assigned-clock-rates = <24000000>;
-		csi_id = <0>;
-		pwn-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-		mclk = <24000000>;
-		mclk_source = <0>;
-		port {
-			ov5640_mipi1_ep: endpoint {
-				remote-endpoint = <&mipi1_sensor_ep>;
-			};
-		};
-	};
 };
 
 &lcdif {
        status = "okay";
-};
-
-&mipi_csi_1 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	status = "okay";
-	port {
-		mipi1_sensor_ep: endpoint@1 {
-			remote-endpoint = <&ov5640_mipi1_ep>;
-			data-lanes = <2>;
-			csis-hs-settle = <13>;
-			csis-clk-settle = <2>;
-			csis-wclk;
-		};
-
-		csi1_mipi_ep: endpoint@2 {
-			remote-endpoint = <&csi1_ep>;
-		};
-	};
 };
 
 &micfil {
@@ -474,14 +462,40 @@
 };
 
 &mipi_dsi {
-       status = "okay";
+    status = "okay";
+    #address-cells = <1>;
+    #size-cells = <0>;
 
-       port@1 {
-               dsim_to_adv7535: endpoint {
-                       remote-endpoint = <&adv7535_from_dsim>;
-			attach-bridge;
-               };
-       };
+    panel@0 {
+		reg = <0>;
+		compatible = "iei,dsi2dp-panel";
+		power-supply = <&reg_dp_backlight_pwr>;
+
+        dsi,flags = <0x0007>;
+        dsi,format = <0>;
+        dsi,lanes = <1>;
+        panel-width-mm  = <217>;
+        panel-height-mm = <135>;
+        bus-format = <0x100a>;  /* MEDIA_BUS_FMT_RGB888_1X24 */
+        bus-flags = <1>;
+        refresh-rate = <60>;
+        rotate = <0>;
+
+		panel-timing {
+			clock-frequency = <60400000>;
+			hactive = <1280>;
+			vactive = <800>;
+			hfront-porch = <40>;
+			hsync-len = <80>;
+			hback-porch = <40>;
+			vfront-porch = <3>;
+			vsync-len = <10>;
+			vback-porch = <10>;
+			/* flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH */
+			vsync-active = <1>;
+			hsync-active = <1>;
+		};
+	};
 };
 
 &pcie0{
@@ -671,16 +685,22 @@
 		>;
 	};
 
-	pinctrl_csi_pwn: csi_pwn_grp {
-		fsl,pins = <
-			MX8MM_IOMUXC_GPIO1_IO07_GPIO1_IO7		0x19
-		>;
-	};
-
 	pinctrl_csi_rst: csi_rst_grp {
 		fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO06_GPIO1_IO6		0x19
 			MX8MM_IOMUXC_GPIO1_IO14_CCMSRCGPCMIX_CLKO1	0x59
+		>;
+	};
+
+	pinctrl_dp_backlight_pwr: dp_bl_pwrgrp  {
+		fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO07_GPIO1_IO7		0x19 // backlight power
+		>;
+	};
+
+	pinctrl_pwm1_dp: pwm1_dpgrp  {
+		fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO01_PWM1_OUT		0x16 // backlight pwm
 		>;
 	};
 
@@ -754,12 +774,6 @@
 		fsl,pins = <
 			MX8MM_IOMUXC_I2C3_SCL_I2C3_SCL			0x400001c3
 			MX8MM_IOMUXC_I2C3_SDA_I2C3_SDA			0x400001c3
-		>;
-	};
-
-	pinctrl_mipi_dsi_en: mipi_dsi_en {
-		fsl,pins = <
-			MX8MM_IOMUXC_GPIO1_IO08_GPIO1_IO8		0x16
 		>;
 	};
 
