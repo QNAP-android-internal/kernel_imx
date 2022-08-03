@@ -171,6 +171,11 @@ struct panel_desc {
 
 	/** @connector_type: LVDS, eDP, DSI, DPI, etc. */
 	int connector_type;
+	/* additional device tree settings for this panel */
+	u32 refresh_rate;
+	u32 rotate;
+	bool hflip;
+	bool vflip;
 };
 
 struct panel_simple {
@@ -259,6 +264,8 @@ static unsigned int panel_simple_get_display_modes(struct panel_simple *panel,
 			mode->type |= DRM_MODE_TYPE_PREFERRED;
 
 		drm_mode_set_name(mode);
+
+		drm_mode_debug_printmodeline(mode);
 
 		drm_mode_probed_add(connector, mode);
 		num++;
@@ -643,16 +650,21 @@ static void panel_simple_parse_panel_timing_node(struct device *dev,
 		    !PANEL_SIMPLE_BOUNDS_CHECK(ot, dt, vactive) ||
 		    !PANEL_SIMPLE_BOUNDS_CHECK(ot, dt, vfront_porch) ||
 		    !PANEL_SIMPLE_BOUNDS_CHECK(ot, dt, vback_porch) ||
-		    !PANEL_SIMPLE_BOUNDS_CHECK(ot, dt, vsync_len))
+		    !PANEL_SIMPLE_BOUNDS_CHECK(ot, dt, vsync_len)) {
+		        dev_warn(dev, "BOUNDS CHECK failed\n");
 			continue;
+		}
 
-		if (ot->flags != dt->flags)
+		if (ot->flags != dt->flags) {
+			dev_warn(dev, "FLAGS CHECK failed. ot: 0x%x dt:0x%x\n", ot->flags, dt->flags);
 			continue;
+		}
 
 		videomode_from_timing(ot, &vm);
 		drm_display_mode_from_videomode(&vm, &panel->override_mode);
 		panel->override_mode.type |= DRM_MODE_TYPE_DRIVER |
 					     DRM_MODE_TYPE_PREFERRED;
+		dev_warn(dev, "Found suitable override.\n");
 		break;
 	}
 
@@ -5090,6 +5102,35 @@ static const struct panel_desc_dsi boe_tv080wum_nl0 = {
 	.lanes = 4,
 };
 
+static const struct display_timing dsi2dp_panel_timing = {
+	.pixelclock = { 60400000, 71100000, 74700000 },
+	.hactive = { 1280, 1280, 1280 },
+	.hfront_porch = { 40, 80, 100 },
+	.hback_porch = { 40, 79, 99 },
+	.hsync_len = { 80, 80, 80 },
+	.vactive = { 800, 800, 800 },
+	.vfront_porch = { 3, 11, 14 },
+	.vback_porch = { 4, 11, 14 },
+	.vsync_len = { 1, 1, 10 },
+	.flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH,
+};
+
+static const struct panel_desc_dsi dsi2dp_panel = {
+	.desc = {
+		.timings = &dsi2dp_panel_timing,
+		.num_timings = 1,
+		.bpc = 8,
+		.size = {
+			.width = 165,
+			.height = 105,
+		},
+		.bus_flags = DRM_BUS_FLAG_DE_LOW,
+	},
+	.flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_CLOCK_NON_CONTINUOUS,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 1,
+};
+
 static const struct drm_display_mode lg_ld070wx3_sl01_mode = {
 	.clock = 71000,
 	.hdisplay = 800,
@@ -5241,6 +5282,9 @@ static const struct of_device_id dsi_of_match[] = {
 	}, {
 		.compatible = "boe,tv080wum-nl0",
 		.data = &boe_tv080wum_nl0
+        }, {
+		.compatible = "iei,dsi2dp-panel",
+		.data = &dsi2dp_panel
 	}, {
 		.compatible = "lg,ld070wx3-sl01",
 		.data = &lg_ld070wx3_sl01
@@ -5264,11 +5308,18 @@ MODULE_DEVICE_TABLE(of, dsi_of_match);
 
 static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 {
+	struct device_node *np;
 	const struct panel_desc_dsi *desc;
 	const struct of_device_id *id;
 	int err;
+	u32 dsi_flags;
+	u32 dsi_format;
+	u32 dsi_lanes;
 
 	id = of_match_node(dsi_of_match, dsi->dev.of_node);
+	np = dsi->dev.of_node;
+	id = of_match_node(dsi_of_match, np);
+
 	if (!id)
 		return -ENODEV;
 
@@ -5278,9 +5329,9 @@ static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 	if (err < 0)
 		return err;
 
-	dsi->mode_flags = desc->flags;
-	dsi->format = desc->format;
-	dsi->lanes = desc->lanes;
+	dsi->mode_flags = dsi_flags;
+	dsi->format = dsi_format;
+	dsi->lanes = dsi_lanes;
 
 	err = mipi_dsi_attach(dsi);
 	if (err) {
