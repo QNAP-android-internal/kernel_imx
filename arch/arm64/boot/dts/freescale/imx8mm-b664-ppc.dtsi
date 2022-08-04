@@ -83,7 +83,6 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
-		off-on-delay-us = <20000>;
 		enable-active-high;
 	};
 
@@ -668,14 +667,14 @@
 };
 &usdhc2 {
 	assigned-clocks = <&clk IMX8MM_CLK_USDHC2>;
-	assigned-clock-rates = <200000000>;
+	assigned-clock-rates = <400000000>;
 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
 	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
 	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
 	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
-	cd-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-	bus-width = <4>;
+	cd-gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
 	vmmc-supply = <&reg_usdhc2_vmmc>;
+	bus-width = <4>;
 	status = "okay";
 };
 
@@ -957,7 +956,7 @@
 		>;
 	};
 
-	pinctrl_usdhc1: usdhc1grp {
+       pinctrl_usdhc1: usdhc1grp {
 		fsl,pins = <
 			MX8MM_IOMUXC_SD1_CLK_USDHC1_CLK		0x190
 			MX8MM_IOMUXC_SD1_CMD_USDHC1_CMD		0x1d0
@@ -990,12 +989,6 @@
 		>;
 	};
 
-	pinctrl_usdhc2_gpio: usdhc2grpgpiogrp {
-		fsl,pins = <
-			MX8MM_IOMUXC_GPIO1_IO15_GPIO1_IO15	0x1c4
-		>;
-	};
-
 	pinctrl_usdhc2: usdhc2grp {
 		fsl,pins = <
 			MX8MM_IOMUXC_SD2_CLK_USDHC2_CLK		0x190
@@ -1004,19 +997,19 @@
 			MX8MM_IOMUXC_SD2_DATA1_USDHC2_DATA1	0x1d0
 			MX8MM_IOMUXC_SD2_DATA2_USDHC2_DATA2	0x1d0
 			MX8MM_IOMUXC_SD2_DATA3_USDHC2_DATA3	0x1d0
-			MX8MM_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0x1d0
+			MX8MM_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0xc1
 		>;
 	};
 
 	pinctrl_usdhc2_100mhz: usdhc2-100mhzgrp {
 		fsl,pins = <
-			MX8MM_IOMUXC_SD2_CLK_USDHC2_CLK		0x194
-			MX8MM_IOMUXC_SD2_CMD_USDHC2_CMD		0x1d4
+			MX8MM_IOMUXC_SD2_CLK_USDHC2_CLK	       0x194
+			MX8MM_IOMUXC_SD2_CMD_USDHC2_CMD	       0x1d4
 			MX8MM_IOMUXC_SD2_DATA0_USDHC2_DATA0	0x1d4
 			MX8MM_IOMUXC_SD2_DATA1_USDHC2_DATA1	0x1d4
 			MX8MM_IOMUXC_SD2_DATA2_USDHC2_DATA2	0x1d4
 			MX8MM_IOMUXC_SD2_DATA3_USDHC2_DATA3	0x1d4
-			MX8MM_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0x1d0
+			MX8MM_IOMUXC_GPIO1_IO04_USDHC2_VSELECT    0xc1
 		>;
 	};
 
@@ -1028,9 +1021,16 @@
 			MX8MM_IOMUXC_SD2_DATA1_USDHC2_DATA1	0x1d6
 			MX8MM_IOMUXC_SD2_DATA2_USDHC2_DATA2	0x1d6
 			MX8MM_IOMUXC_SD2_DATA3_USDHC2_DATA3	0x1d6
-			MX8MM_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0x1d0
+			MX8MM_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0xc1
 		>;
 	};
+
+	pinctrl_usdhc2_gpio: usdhc2grpgpiogrp {
+		fsl,pins = <
+			MX8MM_IOMUXC_SD2_CD_B_GPIO2_IO12	0x1c4
+		>;
+	};
+
 
 	pinctrl_wdog: wdoggrp {
 		fsl,pins = <
