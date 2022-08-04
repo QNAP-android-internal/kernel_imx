@@ -87,6 +87,18 @@
 		enable-active-high;
 	};
 
+       reg_usb2_a: regulator_usb2_a {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usb2_a>;
+		regulator-name = "USB2_A";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+		//off-on-delay-us = <20000>;
+		enable-active-high;
+	};
+
 	reg_dp_backlight_pwr: regulator_dpblpwr {
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_dp_backlight_pwr>;
@@ -637,7 +649,23 @@
 	dr_mode = "peripheral";
 	status = "okay";
 };
-
+/* USB Host port */
+&usbotg2{
+	dr_mode = "host";
+	over-current-active-low;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb2_b>;
+	power-active-high;
+	/*
+	 * FIXME: having USB2 enabled hangs the boot just after:
+	 *[    1.655941] ci_hdrc ci_hdrc.1: EHCI Host Controller
+	 *[    1.660880] ci_hdrc ci_hdrc.1: new USB bus registered, assigned bus number 2
+	 *[    1.681505] ci_hdrc ci_hdrc.1: USB 2.0 started, EHCI 1.00
+	 *[    1.687730] hub 2-0:1.0: USB hub found
+	 *[    1.691528] hub 2-0:1.0: 1 port detected
+	 */
+	status = "okay";
+};
 &usdhc2 {
 	assigned-clocks = <&clk IMX8MM_CLK_USDHC2>;
 	assigned-clock-rates = <200000000>;
@@ -679,6 +707,19 @@
 };
 
 &iomuxc {
+	pinctrl_usb2_a:usb2_a_grp{
+	       fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO06_GPIO1_IO6		0x140
+		>;	
+	};
+
+	pinctrl_usb2_b:usb2_b_grp{
+	       fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO14_USB2_OTG_PWR	0x16
+			MX8MM_IOMUXC_GPIO1_IO15_USB2_OTG_OC	0x15
+		>;	
+	};
+
 	pinctrl_ir_recv: ir-recv {
 		fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO13_GPIO1_IO13		0x4f
