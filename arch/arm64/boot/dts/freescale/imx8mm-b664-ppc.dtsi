@@ -457,6 +457,11 @@
 		DVDD-supply = <&reg_audio_board>;
 		dsd-path = <1>;
 	};
+
+	rtc: rtc@68 {
+		compatible = "dallas,ds1337";
+		reg = <0x68>;
+	};
 };
 
 &lcdif {
