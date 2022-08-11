@@ -86,6 +86,39 @@
 		enable-active-high;
 	};
 
+	reg_usb_serial_sai_rxd0: usb_serial_sai_rxd0 {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usb_serial_sai_rxd0>;
+		regulator-name = "VSD_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio3 21 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+	reg_usb_serial_sai_rxd1: usb_serial_sai_rxd1 {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usb_serial_sai_rxd1>;
+		regulator-name = "VSD_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+	reg_usb_serial_sai_rxd2: usb_serial_sai_rxd2 {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usb_serial_sai_rxd2>;
+		regulator-name = "VSD_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio3 23 GPIO_ACTIVE_HIGH>;
+		
+	};
+
        reg_usb2_a: regulator_usb2_a {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -711,6 +744,24 @@
 };
 
 &iomuxc {
+	pinctrl_usb_serial_sai_rxd0:usb_serial_sai_rxd0_grp{
+		fsl,pins = <
+			MX8MM_IOMUXC_SAI5_RXD0_GPIO3_IO21	0x19
+		>;	
+	};
+
+	pinctrl_usb_serial_sai_rxd1:usb_serial_sai_rxd1_grp{
+		fsl,pins = <
+			MX8MM_IOMUXC_SAI5_RXD1_GPIO3_IO22	0x19
+		>;	
+	};
+
+	pinctrl_usb_serial_sai_rxd2:usb_serial_sai_rxd2_grp{
+		fsl,pins = <
+			MX8MM_IOMUXC_SAI5_RXD2_GPIO3_IO23	0x19
+		>;	
+	};
+
 	pinctrl_usb2_a:usb2_a_grp{
 	       fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO06_GPIO1_IO6		0x140
