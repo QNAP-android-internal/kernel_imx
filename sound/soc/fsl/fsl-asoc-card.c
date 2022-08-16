@@ -46,8 +46,7 @@ enum fsl_asoc_card_type {
 	CARD_TLV320AIC32X4,
 	CARD_MQS,
 	CARD_WM8524,
-	CARD_SI476X,
-	CARD_WM8958,
+	CARD_MAX98090,
 };
 
 /**
@@ -368,8 +367,7 @@ static int fsl_asoc_card_startup(struct snd_pcm_substream *substream)
 	}
 
 	if ((priv->card_type == CARD_WM8960 ||
-	     priv->card_type == CARD_WM8962 ||
-	     priv->card_type == CARD_WM8958)
+	     priv->card_type == CARD_WM8962)
 	    && !priv->is_codec_master) {
 		support_rates[0] = 8000;
 		support_rates[1] = 16000;
@@ -838,22 +836,14 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 		priv->card.dapm_routes = audio_map_tx;
 		priv->card.num_dapm_routes = ARRAY_SIZE(audio_map_tx);
 		priv->card_type = CARD_WM8524;
-	} else if (of_device_is_compatible(np, "fsl,imx-audio-si476x")) {
-		codec_dai_name = "si476x-codec";
-		priv->dai_fmt |= SND_SOC_DAIFMT_CBS_CFS;
-		priv->card.dapm_routes = audio_map_rx;
-		priv->card.num_dapm_routes = ARRAY_SIZE(audio_map_rx);
-		priv->card_type = CARD_SI476X;
-	} else if (of_device_is_compatible(np, "fsl,imx-audio-wm8958")) {
-		codec_dai_name = "wm8994-aif1";
-		priv->dai_fmt |= SND_SOC_DAIFMT_CBM_CFM;
-		priv->codec_priv.mclk_id = WM8994_FLL_SRC_MCLK1;
-		priv->codec_priv.fll_id = WM8994_SYSCLK_FLL1;
-		priv->codec_priv.pll_id = WM8994_FLL1;
-		priv->codec_priv.free_freq = priv->codec_priv.mclk_freq;
+	} else if (of_device_is_compatible(np, "fsl,imx-audio-max98090")) {
+		codec_dai_name = "max98090-HiFi";
+		priv->codec_priv.fll_id = 0;
+		priv->codec_priv.pll_id = 0;
+		priv->dai_fmt |= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS;
 		priv->card.dapm_routes = NULL;
 		priv->card.num_dapm_routes = 0;
-		priv->card_type = CARD_WM8958;
+		priv->card_type = CARD_MAX98090;
 	} else {
 		dev_err(&pdev->dev, "unknown Device Tree compatible\n");
 		ret = -EINVAL;
@@ -1169,8 +1159,7 @@ static const struct of_device_id fsl_asoc_card_dt_ids[] = {
 	{ .compatible = "fsl,imx-audio-wm8960", },
 	{ .compatible = "fsl,imx-audio-mqs", },
 	{ .compatible = "fsl,imx-audio-wm8524", },
-	{ .compatible = "fsl,imx-audio-si476x", },
-	{ .compatible = "fsl,imx-audio-wm8958", },
+	{ .compatible = "fsl,imx-audio-max98090", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, fsl_asoc_card_dt_ids);
