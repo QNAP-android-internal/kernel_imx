@@ -2355,7 +2355,7 @@ static const struct snd_soc_dai_ops max98090_dai_ops = {
 
 static struct snd_soc_dai_driver max98090_dai[] = {
 {
-	.name = "HiFi",
+	.name = "max98090-HiFi",
 	.playback = {
 		.stream_name = "HiFi Playback",
 		.channels_min = 2,
