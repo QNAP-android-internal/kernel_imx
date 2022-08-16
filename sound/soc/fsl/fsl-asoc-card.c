@@ -51,8 +51,7 @@ enum fsl_asoc_card_type {
 	CARD_TLV320AIC32X4,
 	CARD_MQS,
 	CARD_WM8524,
-	CARD_SI476X,
-	CARD_WM8958,
+	CARD_MAX98090,
 	CARD_WM8904,
 };
 
@@ -405,8 +404,7 @@ static int fsl_asoc_card_startup(struct snd_pcm_substream *substream)
 	}
 
 	if ((priv->card_type == CARD_WM8960 ||
-	     priv->card_type == CARD_WM8962 ||
-	     priv->card_type == CARD_WM8958)
+	     priv->card_type == CARD_WM8962)
 	    && !priv->is_codec_master) {
 		support_rates[0] = 8000;
 		support_rates[1] = 16000;
@@ -971,22 +969,14 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 		priv->card.dapm_routes = audio_map_tx;
 		priv->card.num_dapm_routes = ARRAY_SIZE(audio_map_tx);
 		priv->card_type = CARD_WM8524;
-	} else if (of_device_is_compatible(np, "fsl,imx-audio-si476x")) {
-		codec_dai_name[0] = "si476x-codec";
-		priv->dai_fmt |= SND_SOC_DAIFMT_CBC_CFC;
-		priv->card.dapm_routes = audio_map_rx;
-		priv->card.num_dapm_routes = ARRAY_SIZE(audio_map_rx);
-		priv->card_type = CARD_SI476X;
-	} else if (of_device_is_compatible(np, "fsl,imx-audio-wm8958")) {
-		codec_dai_name[0] = "wm8994-aif1";
-		priv->dai_fmt |= SND_SOC_DAIFMT_CBP_CFP;
-		priv->codec_priv[0].mclk_id = WM8994_FLL_SRC_MCLK1;
-		priv->codec_priv[0].fll_id = WM8994_SYSCLK_FLL1;
-		priv->codec_priv[0].pll_id = WM8994_FLL1;
-		priv->codec_priv[0].free_freq = priv->codec_priv[0].mclk_freq;
+	} else if (of_device_is_compatible(np, "fsl,imx-audio-max98090")) {
+		codec_dai_name[0] = "max98090-HiFi";
+		priv->dai_fmt |= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS;
+		priv->codec_priv[0].fll_id = 0;
+		priv->codec_priv[0].pll_id = 0;
 		priv->card.dapm_routes = NULL;
 		priv->card.num_dapm_routes = 0;
-		priv->card_type = CARD_WM8958;
+		priv->card_type = CARD_MAX98090;
 	} else if (of_device_is_compatible(np, "fsl,imx-audio-nau8822")) {
 		codec_dai_name[0] = "nau8822-hifi";
 		priv->codec_priv[0].mclk_id = NAU8822_CLK_MCLK;
@@ -1278,8 +1268,7 @@ static const struct of_device_id fsl_asoc_card_dt_ids[] = {
 	{ .compatible = "fsl,imx-audio-wm8960", },
 	{ .compatible = "fsl,imx-audio-mqs", },
 	{ .compatible = "fsl,imx-audio-wm8524", },
-	{ .compatible = "fsl,imx-audio-si476x", },
-	{ .compatible = "fsl,imx-audio-wm8958", },
+	{ .compatible = "fsl,imx-audio-max98090", },
 	{ .compatible = "fsl,imx-audio-nau8822", },
 	{ .compatible = "fsl,imx-audio-wm8904", },
 	{ .compatible = "fsl,imx-audio-spdif", },
