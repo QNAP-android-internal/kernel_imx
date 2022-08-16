@@ -351,15 +351,6 @@
        status = "okay";
 };
 
-&micfil {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pdm>;
-	assigned-clocks = <&clk IMX8MM_CLK_PDM>;
-	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
-	assigned-clock-rates = <196608000>;
-	status = "okay";
-};
-
 &mipi_dsi {
     status = "okay";
     #address-cells = <1>;
@@ -469,25 +460,10 @@
 &sai3 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sai3>;
-	assigned-clocks = <&clk IMX8MM_CLK_SAI3>;
-	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
-	assigned-clock-rates = <24576000>;
+	assigned-clocks = <&clk IMX8MM_AUDIO_PLL1>, <&clk IMX8MM_AUDIO_PLL2>, <&clk IMX8MM_CLK_SAI3>;
+	assigned-clock-parents = <0>, <0>, <&clk IMX8MM_AUDIO_PLL1_OUT>;
+	assigned-clock-rates = <786432000>, <722534400>, <12288000>;
 	status = "okay";
-};
-
-&sai5 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sai5>;
-	assigned-clocks = <&clk IMX8MM_CLK_SAI5>;
-	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
-	assigned-clock-rates = <49152000>;
-	clocks = <&clk IMX8MM_CLK_SAI5_IPG>, <&clk IMX8MM_CLK_DUMMY>,
-		<&clk IMX8MM_CLK_SAI5_ROOT>, <&clk IMX8MM_CLK_DUMMY>,
-		<&clk IMX8MM_CLK_DUMMY>, <&clk IMX8MM_AUDIO_PLL1_OUT>,
-		<&clk IMX8MM_AUDIO_PLL2_OUT>;
-	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
-	fsl,sai-asynchronous;
-	status = "disabled";
 };
 
 &sai6 {
@@ -731,18 +707,6 @@
 		>;
 	};
 
-	pinctrl_pdm: pdmgrp {
-		fsl,pins = <
-			MX8MM_IOMUXC_SAI5_MCLK_SAI5_MCLK	0xd6
-			MX8MM_IOMUXC_SAI5_RXC_PDM_CLK		0xd6
-			MX8MM_IOMUXC_SAI5_RXFS_SAI5_RX_SYNC	0xd6
-			MX8MM_IOMUXC_SAI5_RXD0_PDM_DATA0	0xd6
-			MX8MM_IOMUXC_SAI5_RXD1_PDM_DATA1	0xd6
-			MX8MM_IOMUXC_SAI5_RXD2_PDM_DATA2	0xd6
-			MX8MM_IOMUXC_SAI5_RXD3_PDM_DATA3	0xd6
-		>;
-	};
-
 	pinctrl_pmic: pmicirqgrp {
 		fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO03_GPIO1_IO3		0x141
@@ -804,18 +768,8 @@
 			MX8MM_IOMUXC_SAI3_TXC_SAI3_TX_BCLK      0xd6
 			MX8MM_IOMUXC_SAI3_MCLK_SAI3_MCLK        0xd6
 			MX8MM_IOMUXC_SAI3_TXD_SAI3_TX_DATA0     0xd6
-		>;
-	};
-
-	pinctrl_sai5: sai5grp {
-		fsl,pins = <
-			MX8MM_IOMUXC_SAI5_MCLK_SAI5_MCLK	0xd6
-			MX8MM_IOMUXC_SAI5_RXC_SAI5_RX_BCLK	0xd6
-			MX8MM_IOMUXC_SAI5_RXFS_SAI5_RX_SYNC	0xd6
-			MX8MM_IOMUXC_SAI5_RXD0_SAI5_RX_DATA0	0xd6
-			MX8MM_IOMUXC_SAI5_RXD1_SAI5_RX_DATA1    0xd6
-			MX8MM_IOMUXC_SAI5_RXD2_SAI5_RX_DATA2    0xd6
-			MX8MM_IOMUXC_SAI5_RXD3_SAI5_RX_DATA3    0xd6
+			MX8MM_IOMUXC_SAI3_RXD_SAI3_RX_DATA0     0xd6
+			MX8MM_IOMUXC_SAI3_RXFS_GPIO4_IO28       0x41
 		>;
 	};
 
