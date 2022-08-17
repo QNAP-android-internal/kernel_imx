@@ -318,6 +318,88 @@
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
+	lightbar: tlc59116@60 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "ti,tlc59116";
+		reg = <0x60>;
+		status = "okay";
+		out0@0 {
+			label = "led_red_00";
+			reg = <0x0>;
+		};
+
+		out1@1 {
+			label = "led_green_00";
+			reg = <0x1>;
+		};
+	
+		out2@2 {
+			label = "led_blue_00";
+			reg = <0x2>;
+		};
+
+		out3@3 {
+			label = "led_red_01";
+			reg = <0x3>;
+		};
+
+		out4@4{
+			label = "led_green_01";
+			reg = <0x4>;
+		};
+
+		out5@5 {
+			label = "led_blue_01";
+			reg = <0x5>;
+		};
+
+		out6@6 {
+			label = "led_red_02";
+			reg = <0x6>;
+		};
+
+		out7@7 {
+			label = "led_green_02";
+			reg = <0x7>;
+		};
+
+	       out8@8 {
+			label = "led_blue_02";
+			reg = <0x8>;
+		};
+
+		out9@9 {
+			label = "led_red_03";
+			reg = <0x9>;
+		};
+
+		out10@a {
+			label = "led_green_03";
+			reg = <0xa>;
+		};
+
+		out11@b {
+			label = "led_blue_03";
+			reg = <0xb>;
+		};
+
+		out12@c {
+			label = "led_red_04";
+			reg = <0xc>;
+		};
+
+		out13@d {
+			label = "led_green_04";
+			reg = <0xd>;
+		};
+
+		out14@e {
+			label = "led_blue_04";
+			reg = <0xe>;
+		};
+	};
+
 	lt8911exb@2d {
 		compatible = "lontium,lt8911exb";
 		reg = <0x2d>;
@@ -339,6 +421,8 @@
 
 		status = "okay";
 	};
+
+	
 };
 
 &i2c3 {
@@ -370,6 +454,12 @@
 		reg = <0x68>;
 	};
 };
+&i2c4 {
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c4>;
+	status = "okay";
+	};
 
 &lcdif {
        status = "okay";
@@ -720,6 +810,13 @@
 		fsl,pins = <
 			MX8MM_IOMUXC_I2C3_SCL_I2C3_SCL			0x400001c3
 			MX8MM_IOMUXC_I2C3_SDA_I2C3_SDA			0x400001c3
+		>;
+	};
+
+	pinctrl_i2c4: i2c4grp {
+		fsl,pins = <
+			MX8MM_IOMUXC_I2C4_SCL_I2C4_SCL			0x400001c3
+			MX8MM_IOMUXC_I2C4_SDA_I2C4_SDA			0x400001c3
 		>;
 	};
 
