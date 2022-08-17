@@ -318,84 +318,84 @@
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
-	lightbar: tlc59116@60 {
+	lightbarsdcardside: tlc59116_left@60 {
 		#address-cells = <1>;
 		#size-cells = <0>;
 		compatible = "ti,tlc59116";
 		reg = <0x60>;
 		status = "okay";
 		out0@0 {
-			label = "led_red_00";
+			label = "i2c2_led_red_00";
 			reg = <0x0>;
 		};
 
 		out1@1 {
-			label = "led_green_00";
+			label = "i2c2_led_green_00";
 			reg = <0x1>;
 		};
 	
 		out2@2 {
-			label = "led_blue_00";
+			label = "i2c2_led_blue_00";
 			reg = <0x2>;
 		};
 
 		out3@3 {
-			label = "led_red_01";
+			label = "i2c2_led_red_01";
 			reg = <0x3>;
 		};
 
 		out4@4{
-			label = "led_green_01";
+			label = "i2c2_led_green_01";
 			reg = <0x4>;
 		};
 
 		out5@5 {
-			label = "led_blue_01";
+			label = "i2c2_led_blue_01";
 			reg = <0x5>;
 		};
 
 		out6@6 {
-			label = "led_red_02";
+			label = "i2c2_led_red_02";
 			reg = <0x6>;
 		};
 
 		out7@7 {
-			label = "led_green_02";
+			label = "i2c2_led_green_02";
 			reg = <0x7>;
 		};
 
 	       out8@8 {
-			label = "led_blue_02";
+			label = "i2c2_led_blue_02";
 			reg = <0x8>;
 		};
 
 		out9@9 {
-			label = "led_red_03";
+			label = "i2c2_led_red_03";
 			reg = <0x9>;
 		};
 
 		out10@a {
-			label = "led_green_03";
+			label = "i2c2_led_green_03";
 			reg = <0xa>;
 		};
 
 		out11@b {
-			label = "led_blue_03";
+			label = "i2c2_led_blue_03";
 			reg = <0xb>;
 		};
 
 		out12@c {
-			label = "led_red_04";
+			label = "i2c2_led_red_04";
 			reg = <0xc>;
 		};
 
 		out13@d {
-			label = "led_green_04";
+			label = "i2c2_led_green_04";
 			reg = <0xd>;
 		};
 
 		out14@e {
-			label = "led_blue_04";
+			label = "i2c2_led_blue_04";
 			reg = <0xe>;
 		};
 	};
@@ -454,12 +454,95 @@
 		reg = <0x68>;
 	};
 };
+
 &i2c4 {
-	clock-frequency = <400000>;
+	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c4>;
 	status = "okay";
+
+	lightbarleftside: tlc59116@60 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "ti,tlc59116";
+		reg = <0x60>;
+		status = "okay";
+		out0@0 {
+			label = "i2c4_led_red_00";
+			reg = <0x0>;
+		};
+
+		out1@1 {
+			label = "i2c4_led_green_00";
+			reg = <0x1>;
+		};
+	
+		out2@2 {
+			label = "i2c4_led_blue_00";
+			reg = <0x2>;
+		};
+
+		out3@3 {
+			label = "i2c4_led_red_01";
+			reg = <0x3>;
+		};
+
+		out4@4{
+			label = "i2c4_led_green_01";
+			reg = <0x4>;
+		};
+
+		out5@5 {
+			label = "i2c4_led_blue_01";
+			reg = <0x5>;
+		};
+
+		out6@6 {
+			label = "i2c4_led_red_02";
+			reg = <0x6>;
+		};
+
+		out7@7 {
+			label = "i2c4_led_green_02";
+			reg = <0x7>;
+		};
+
+	       out8@8 {
+			label = "i2c4_led_blue_02";
+			reg = <0x8>;
+		};
+
+		out9@9 {
+			label = "i2c4_led_red_03";
+			reg = <0x9>;
+		};
+
+		out10@a {
+			label = "i2c4_led_green_03";
+			reg = <0xa>;
+		};
+
+		out11@b {
+			label = "i2c4_led_blue_03";
+			reg = <0xb>;
+		};
+
+		out12@c {
+			label = "i2c4_led_red_04";
+			reg = <0xc>;
+		};
+
+		out13@d {
+			label = "i2c4_led_green_04";
+			reg = <0xd>;
+		};
+
+		out14@e {
+			label = "i2c4_led_blue_04";
+			reg = <0xe>;
+		};
 	};
+};
 
 &lcdif {
        status = "okay";
