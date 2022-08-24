@@ -387,6 +387,8 @@ static const struct dsim_hblank_par *sec_mipi_dsim_get_hblank_par(const char *na
 		return NULL;
 
 	switch (lanes) {
+	case 1:
+		return NULL;
 	case 2:
 		hblank = hblank_2lanes;
 		size   = ARRAY_SIZE(hblank_2lanes);
