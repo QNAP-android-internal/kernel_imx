@@ -9,25 +9,24 @@
 #include "imx8mm.dtsi"
 
 / {
+	buzzer_pwm: buzzer_pwm {
+		compatible = "pwm-backlight";
+		pwms = <&pwm2 0 100000>;
+		status = "okay";
 
-       buzzer_pwm: buzzer_pwm {
-                compatible = "pwm-backlight";
-                pwms = <&pwm2 0 100000>;
-                status = "okay";
-
-                brightness-levels = < 0  1  2  3  4  5  6  7  8  9
-                                     10 11 12 13 14 15 16 17 18 19
-                                     20 21 22 23 24 25 26 27 28 29
-                                     30 31 32 33 34 35 36 37 38 39
-                                     40 41 42 43 44 45 46 47 48 49
-                                     50 51 52 53 54 55 56 57 58 59
-                                     60 61 62 63 64 65 66 67 68 69
-                                     70 71 72 73 74 75 76 77 78 79
-                                     80 81 82 83 84 85 86 87 88 89
-                                     90 91 92 93 94 95 96 97 98 99
-                                    100>;
-                default-brightness-level = <0>;
-       };
+		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
+			10 11 12 13 14 15 16 17 18 19
+			20 21 22 23 24 25 26 27 28 29
+			30 31 32 33 34 35 36 37 38 39
+			40 41 42 43 44 45 46 47 48 49
+			50 51 52 53 54 55 56 57 58 59
+			60 61 62 63 64 65 66 67 68 69
+			70 71 72 73 74 75 76 77 78 79
+			80 81 82 83 84 85 86 87 88 89
+			90 91 92 93 94 95 96 97 98 99
+		100>;
+		default-brightness-level = <0>;
+};
 
 	chosen {
 		stdout-path = &uart2;
@@ -125,16 +124,16 @@
 		status = "okay";
 
 		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
-				     10 11 12 13 14 15 16 17 18 19
-				     20 21 22 23 24 25 26 27 28 29
-				     30 31 32 33 34 35 36 37 38 39
-				     40 41 42 43 44 45 46 47 48 49
-				     50 51 52 53 54 55 56 57 58 59
-				     60 61 62 63 64 65 66 67 68 69
-				     70 71 72 73 74 75 76 77 78 79
-				     80 81 82 83 84 85 86 87 88 89
-				     90 91 92 93 94 95 96 97 98 99
-				    100>;
+			10 11 12 13 14 15 16 17 18 19
+			20 21 22 23 24 25 26 27 28 29
+			30 31 32 33 34 35 36 37 38 39
+			40 41 42 43 44 45 46 47 48 49
+			50 51 52 53 54 55 56 57 58 59
+			60 61 62 63 64 65 66 67 68 69
+			70 71 72 73 74 75 76 77 78 79
+			80 81 82 83 84 85 86 87 88 89
+			90 91 92 93 94 95 96 97 98 99
+		100>;
 		default-brightness-level = <80>;
 	};
 
@@ -545,28 +544,28 @@
 };
 
 &lcdif {
-       status = "okay";
+	status = "okay";
 };
 
 &mipi_dsi {
-    status = "okay";
-    #address-cells = <1>;
-    #size-cells = <0>;
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
 
-    panel@0 {
+	panel@0 {
 		reg = <0>;
 		compatible = "iei,dsi2dp-panel";
 		power-supply = <&reg_dp_backlight_pwr>;
 
-        dsi,flags = <0x0007>;
-        dsi,format = <0>;
-        dsi,lanes = <1>;
-        panel-width-mm  = <217>;
-        panel-height-mm = <135>;
-        bus-format = <0x100a>;  /* MEDIA_BUS_FMT_RGB888_1X24 */
-        bus-flags = <1>;
-        refresh-rate = <60>;
-        rotate = <0>;
+		dsi,flags = <0x0007>;
+		dsi,format = <0>;
+		dsi,lanes = <1>;
+		panel-width-mm  = <217>;
+		panel-height-mm = <135>;
+		bus-format = <0x100a>;  /* MEDIA_BUS_FMT_RGB888_1X24 */
+		bus-flags = <1>;
+		refresh-rate = <60>;
+		rotate = <0>;
 
 		panel-timing {
 			clock-frequency = <60400000>;
@@ -586,43 +585,10 @@
 };
 
 &pcie0{
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pcie0>;
-	disable-gpio = <&gpio1 5 GPIO_ACTIVE_LOW>;
-	reset-gpio = <&gpio4 21 GPIO_ACTIVE_LOW>;
-	clocks = <&clk IMX8MM_CLK_PCIE1_ROOT>,
-		 <&clk IMX8MM_CLK_PCIE1_AUX>,
-		 <&clk IMX8MM_CLK_PCIE1_PHY>,
-		 <&pcie0_refclk>;
-	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
-	assigned-clocks = <&clk IMX8MM_CLK_PCIE1_AUX>,
-			  <&clk IMX8MM_CLK_PCIE1_PHY>,
-			  <&clk IMX8MM_CLK_PCIE1_CTRL>;
-	assigned-clock-rates = <10000000>, <100000000>, <250000000>;
-	assigned-clock-parents = <&clk IMX8MM_SYS_PLL2_50M>,
-				 <&clk IMX8MM_SYS_PLL2_100M>,
-				 <&clk IMX8MM_SYS_PLL2_250M>;
-	ext_osc = <1>;
 	status = "disabled";
 };
 
 &pcie0_ep{
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pcie0>;
-	clocks = <&clk IMX8MM_CLK_PCIE1_ROOT>,
-		 <&clk IMX8MM_CLK_PCIE1_AUX>,
-		 <&clk IMX8MM_CLK_PCIE1_PHY>,
-		 <&pcie0_refclk>;
-	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
-	assigned-clocks = <&clk IMX8MM_CLK_PCIE1_AUX>,
-			  <&clk IMX8MM_CLK_PCIE1_PHY>,
-			  <&clk IMX8MM_CLK_PCIE1_CTRL>;
-	assigned-clock-rates = <10000000>, <100000000>, <250000000>;
-	assigned-clock-parents = <&clk IMX8MM_SYS_PLL2_50M>,
-				 <&clk IMX8MM_SYS_PLL2_100M>,
-				 <&clk IMX8MM_SYS_PLL2_250M>;
-	ext_osc = <1>;
-	l1ss-disabled;
 	status = "disabled";
 };
 
@@ -676,9 +642,9 @@
 
 
 &pwm2 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_pwm_buzzer>;
-        status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm_buzzer>;
+	status = "okay";
 };
 
 &uart1 { /* BT */
@@ -977,11 +943,11 @@
 		>;
 	};
 
-       pinctrl_pwm_buzzer: pwm_buzzer_grp {
-                fsl,pins = <
-                        MX8MM_IOMUXC_SPDIF_RX_PWM2_OUT        0x16
-                >;
-       };
+	pinctrl_pwm_buzzer: pwm_buzzer_grp {
+		fsl,pins = <
+			MX8MM_IOMUXC_SPDIF_RX_PWM2_OUT	0x16
+		>;
+	};
 
 	pinctrl_typec1: typec1grp {
 		fsl,pins = <
