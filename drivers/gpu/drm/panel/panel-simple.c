@@ -5147,6 +5147,7 @@ static const struct panel_desc_dsi dsi2dp_panel = {
 			.height = 105,
 		},
 		.bus_flags = DRM_BUS_FLAG_DE_LOW,
+		.connector_type = DRM_MODE_CONNECTOR_eDP,
 	},
 	.flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_CLOCK_NON_CONTINUOUS,
 	.format = MIPI_DSI_FMT_RGB888,
