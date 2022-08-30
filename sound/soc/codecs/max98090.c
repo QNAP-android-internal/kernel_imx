@@ -2444,7 +2444,7 @@ static int max98090_probe(struct snd_soc_component *component)
 
 	/* Enable jack detection */
 	snd_soc_component_write(component, M98090_REG_JACK_DETECT,
-		M98090_JDETEN_MASK | M98090_JDEB_25MS);
+		M98090_JDETEN_MASK | M98090_JDWK_MASK | M98090_JDEB_25MS);
 
 	/*
 	 * Clear any old interrupts.
