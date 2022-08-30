@@ -147,7 +147,8 @@
 			"Headphone Jack", "HPR",
 			"Ext Spk", "SPKL",
 			"Ext Spk", "SPKR",
-			"IN3", "Mic Jack";
+			"AMIC", "MICBIAS",
+			"IN5", "AMIC";
 
 		status = "okay";
 	};
