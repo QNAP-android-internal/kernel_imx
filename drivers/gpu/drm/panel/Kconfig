@@ -650,4 +650,14 @@ config DRM_PANEL_WKS_101WX001
 	  Say Y here if you want to enable support for the WKS
 	  101WX001 controller for 1280x800 LCD panel
 
+config DRM_PANEL_TQ101AJ02
+	tristate "TQ101AJ02 panel driver"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for the TQ101AJ02
+	  controller for 1280X800 LCD panels with MIPI
+	  system interfaces.
+
 endmenu
