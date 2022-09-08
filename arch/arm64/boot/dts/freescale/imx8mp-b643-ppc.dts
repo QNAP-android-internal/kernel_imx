@@ -182,6 +182,26 @@
 	status = "okay";
 };
 
+&gpio2 {
+	lte_disable {
+		gpio-hog;
+		gpios = <6 GPIO_ACTIVE_HIGH>;
+		line-name = "lte_disable";
+		output-high;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_lte_dis_en>;
+	};
+
+	lte_reset {
+		gpio-hog;
+		gpios = <7 GPIO_ACTIVE_HIGH>;
+		line-name = "lte_reset";
+		output-high;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_lte_rst_en>;
+	};
+};
+
 &ecspi2 {
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -498,48 +518,6 @@
 	status = "okay";
 };
 
-&pcie{
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pcie>;
-	disable-gpio = <&gpio2 6 GPIO_ACTIVE_LOW>;
-	reset-gpio = <&gpio2 7 GPIO_ACTIVE_LOW>;
-	ext_osc = <1>;
-	clocks = <&clk IMX8MP_CLK_HSIO_ROOT>,
-		 <&clk IMX8MP_CLK_PCIE_AUX>,
-		 <&clk IMX8MP_CLK_HSIO_AXI>,
-		 <&clk IMX8MP_CLK_PCIE_ROOT>;
-	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
-	assigned-clocks = <&clk IMX8MP_CLK_HSIO_AXI>,
-			  <&clk IMX8MP_CLK_PCIE_AUX>;
-	assigned-clock-rates = <500000000>, <10000000>;
-	assigned-clock-parents = <&clk IMX8MP_SYS_PLL2_500M>,
-				 <&clk IMX8MP_SYS_PLL2_50M>;
-	l1ss-disabled;
-	status = "okay";
-};
-
-&pcie_ep{
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pcie>;
-	ext_osc = <1>;
-	clocks = <&clk IMX8MP_CLK_HSIO_ROOT>,
-		 <&clk IMX8MP_CLK_PCIE_AUX>,
-		 <&clk IMX8MP_CLK_HSIO_AXI>,
-		 <&clk IMX8MP_CLK_PCIE_ROOT>;
-	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
-	assigned-clocks = <&clk IMX8MP_CLK_HSIO_AXI>,
-			  <&clk IMX8MP_CLK_PCIE_AUX>;
-	assigned-clock-rates = <500000000>, <10000000>;
-	assigned-clock-parents = <&clk IMX8MP_SYS_PLL2_500M>,
-				 <&clk IMX8MP_SYS_PLL2_50M>;
-	status = "disabled";
-};
-
-&pcie_phy{
-	ext_osc = <1>;
-	status = "okay";
-};
-
 &sai2 {
 	#sound-dai-cells = <0>;
 	pinctrl-names = "default";
@@ -816,12 +794,15 @@
 		>;
 	};
 
-	pinctrl_pcie: pciegrp {
+	pinctrl_lte_dis_en: ltedisengrp {
 		fsl,pins = <
-			MX8MP_IOMUXC_I2C4_SCL__PCIE_CLKREQ_B		0x61 /* open drain, pull up */
-			MX8MP_IOMUXC_SD1_DATA4__GPIO2_IO06		0x41
-			MX8MP_IOMUXC_SD1_DATA5__GPIO2_IO07		0x41
-			MX8MP_IOMUXC_I2C4_SDA__GPIO5_IO21		0x1c4
+			MX8MP_IOMUXC_SD1_DATA4__GPIO2_IO06		0x41 // disable pin
+		>;
+	};
+
+	pinctrl_lte_rst_en: lterstengrp {
+		fsl,pins = <
+			MX8MP_IOMUXC_SD1_DATA5__GPIO2_IO07		0x41 // reset pin
 		>;
 	};
 
