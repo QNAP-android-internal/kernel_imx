@@ -5348,7 +5348,29 @@ static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 
 	desc = id->data;
 
-	err = panel_simple_probe(&dsi->dev, &desc->desc, NULL);
+	dsi_flags = desc->flags;
+	dsi_format = desc->format;
+	dsi_lanes = desc->lanes;
+
+	/* parse the dsi,flags, format, and lanes setting if set in dt */
+	/* and force override the const static panel_desc_dsi data struct */
+	if (of_property_read_bool(np, "dsi,flags"))
+		of_property_read_u32(np, "dsi,flags", &dsi_flags);
+	if (of_property_read_bool(np, "dsi,format"))
+		of_property_read_u32(np, "dsi,format", &dsi_format);
+	if (of_property_read_bool(np, "dsi,lanes"))
+		of_property_read_u32(np, "dsi,lanes", &dsi_lanes);
+
+	if (dsi_flags != desc->flags || \
+		dsi_format != desc->format || \
+		dsi_lanes !=  desc->lanes) {
+			((struct panel_desc_dsi*)desc)->flags = dsi_flags;
+				((struct panel_desc_dsi*)desc)->format = dsi_format;
+				((struct panel_desc_dsi*)desc)->lanes = dsi_lanes;
+			dev_warn(&dsi->dev, "panel-desc-dsi setting overridden from dt\n");
+			}
+
+	err = panel_simple_probe(&dsi->dev, &desc->desc,NULL);
 	if (err < 0)
 		return err;
 
