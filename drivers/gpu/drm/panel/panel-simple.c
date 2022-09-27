@@ -4927,12 +4927,40 @@ MODULE_DEVICE_TABLE(of, dsi_of_match);
 
 static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 {
+	struct device_node *np;
 	const struct panel_desc_dsi *desc;
 	int err;
+	u32 dsi_flags;
+	u32 dsi_format;
+	u32 dsi_lanes;
+
+    np = dsi->dev.of_node;
 
 	desc = of_device_get_match_data(&dsi->dev);
 	if (!desc)
 		return -ENODEV;
+
+    dsi_flags = desc->flags;
+    dsi_format = desc->format;
+    dsi_lanes = desc->lanes;
+
+    /* parse the dsi,flags, format, and lanes setting if set in dt */
+    /* and force override the const static panel_desc_dsi data struct */
+    if (of_property_read_bool(np, "dsi,flags"))
+        of_property_read_u32(np, "dsi,flags", &dsi_flags);
+    if (of_property_read_bool(np, "dsi,format"))
+        of_property_read_u32(np, "dsi,format", &dsi_format);
+    if (of_property_read_bool(np, "dsi,lanes"))
+        of_property_read_u32(np, "dsi,lanes", &dsi_lanes);
+
+    if (dsi_flags != desc->flags || \
+        dsi_format != desc->format || \
+        dsi_lanes !=  desc->lanes) {
+            ((struct panel_desc_dsi*)desc)->flags = dsi_flags;
+                ((struct panel_desc_dsi*)desc)->format = dsi_format;
+                ((struct panel_desc_dsi*)desc)->lanes = dsi_lanes;
+            dev_warn(&dsi->dev, "panel-desc-dsi setting overridden from dt\n");
+    }
 
 	err = panel_simple_probe(&dsi->dev, &desc->desc);
 	if (err < 0)
