@@ -50,6 +50,19 @@
 		clock-frequency = <100000000>;
 	};
 
+	wlan_pen: wlan_pen {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_wlan_pen>;
+		regulator-name = "WLAN_PEN";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio1 11 GPIO_ACTIVE_LOW>;
+		off-on-delay = <20000>;
+		startup-delay-us = <100>;
+		enable-active-high;
+	};
+
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -151,6 +164,15 @@
 			"IN5", "AMIC";
 
 		status = "okay";
+	};
+
+	bt_rfkill {
+		compatible = "fsl,mxc_bt_rfkill";
+		pinctrl-0 = <&pinctrl_uart1_btctrl>;
+		bt-power-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+		reset-delay-us = <100>;
+		reset-post-delay-ms = <150>;
+		status ="okay";
 	};
 };
 
@@ -745,12 +767,6 @@
 		>;	
 	};
 
-	pinctrl_ir_recv: ir-recv {
-		fsl,pins = <
-			MX8MM_IOMUXC_GPIO1_IO13_GPIO1_IO13		0x4f
-		>;
-	};
-
 	pinctrl_csi_rst: csi_rst_grp {
 		fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO06_GPIO1_IO6		0x19
@@ -942,6 +958,20 @@
 		>;
 	};
 
+	pinctrl_uart1_btctrl: uart1btctrlgrp {
+		fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO13_GPIO1_IO13      0x41 /* REG_ON */
+			MX8MM_IOMUXC_SD1_DATA6_GPIO2_IO8        0x41 /* HOST_WAKE*/
+			MX8MM_IOMUXC_GPIO1_IO15_GPIO1_IO15      0x41 /* WAKE */
+		>;
+	};
+
+	pinctrl_gpio1: gpio1grp {
+		fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO13_GPIO1_IO13      0x41 /* REG_ON */
+		>;
+	};
+
 	pinctrl_uart1: uart1grp {
 		fsl,pins = <
 			MX8MM_IOMUXC_UART1_RXD_UART1_DCE_RX     0x140
@@ -967,13 +997,7 @@
 		>;
 	};
 
-	pinctrl_usdhc1_gpio: usdhc1grpgpio {
-		fsl,pins = <
-			MX8MM_IOMUXC_SD1_RESET_B_GPIO2_IO10	0x41
-		>;
-	};
-
-       pinctrl_usdhc1: usdhc1grp {
+	pinctrl_usdhc1: usdhc1grp {
 		fsl,pins = <
 			MX8MM_IOMUXC_SD1_CLK_USDHC1_CLK		0x190
 			MX8MM_IOMUXC_SD1_CMD_USDHC1_CMD		0x1d0
@@ -1052,6 +1076,12 @@
 	pinctrl_wdog: wdoggrp {
 		fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B	0xc6
+		>;
+	};
+
+	pinctrl_wlan_pen: wlan_pen_ctrlgrp {
+		fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO11_GPIO1_IO11	0x41 /* WLAN_PEN */
 		>;
 	};
 };

@@ -15,13 +15,6 @@
 	aliases {
 		spi0 = &flexspi;
 	};
-
-	usdhc1_pwrseq: usdhc1_pwrseq {
-		compatible = "mmc-pwrseq-simple";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_usdhc1_gpio>;
-		reset-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
-	};
 };
 
 &flexspi {
@@ -46,19 +39,11 @@
 	pinctrl-1 = <&pinctrl_usdhc1_100mhz>, <&pinctrl_wlan>;
 	pinctrl-2 = <&pinctrl_usdhc1_200mhz>, <&pinctrl_wlan>;
 	bus-width = <4>;
+	vmmc-supply = <&wlan_pen>;
+	pm-ignore-notify;
 	keep-power-in-suspend;
 	non-removable;
-	wakeup-source;
-	mmc-pwrseq = <&usdhc1_pwrseq>;
-	fsl,sdio-interrupt-enabled;
 	status = "okay";
-
-	wifi_wake_host {
-		compatible = "nxp,wifi-wake-host";
-		interrupt-parent = <&gpio2>;
-		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
-		interrupt-names = "host-wake";
-	};
 };
 
 &usdhc3 {
