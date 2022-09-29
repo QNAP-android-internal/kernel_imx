@@ -53,19 +53,6 @@
 	};
 };
 
-&usdhc1 {
-	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-	pinctrl-0 = <&pinctrl_usdhc1>, <&pinctrl_wlan>;
-	pinctrl-1 = <&pinctrl_usdhc1_100mhz>, <&pinctrl_wlan>;
-	pinctrl-2 = <&pinctrl_usdhc1_200mhz>, <&pinctrl_wlan>;
-	bus-width = <4>;
-	vmmc-supply = <&wlan_pen>;
-	pm-ignore-notify;
-	keep-power-in-suspend;
-	non-removable;
-	status = "okay";
-};
-
 &usdhc3 {
 	assigned-clocks = <&clk IMX8MM_CLK_USDHC3_ROOT>;
 	assigned-clock-rates = <400000000>;
