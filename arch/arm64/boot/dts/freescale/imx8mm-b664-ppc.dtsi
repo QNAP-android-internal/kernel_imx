@@ -26,7 +26,7 @@
 			90 91 92 93 94 95 96 97 98 99
 		100>;
 		default-brightness-level = <0>;
-};
+	};
 
 	chosen {
 		stdout-path = &uart2;
@@ -148,6 +148,20 @@
 			90 91 92 93 94 95 96 97 98 99
 		100>;
 		default-brightness-level = <80>;
+	};
+
+
+	usdhc1_pwrseq: usdhc1_pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		reset-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
+		gpio_wlan_pen = <&gpio1 11 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+
+	bcmdhd: bcmdhd {
+		status = "okay";
+		compatible = "android,bcmdhd_wlan";
+		gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
 	};
 
 	sound-max98090 {
@@ -695,6 +709,23 @@
 	 */
 	status = "okay";
 };
+
+&usdhc1 {
+	assigned-clocks = <&clk IMX8MM_CLK_USDHC1>;
+	assigned-clock-rates = <400000000>;
+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+	pinctrl-0 = <&pinctrl_usdhc1>, <&pinctrl_usdhc1_gpio>;
+	pinctrl-1 = <&pinctrl_usdhc1_100mhz>, <&pinctrl_usdhc1_gpio>;
+	pinctrl-2 = <&pinctrl_usdhc1_200mhz>, <&pinctrl_usdhc1_gpio>;
+	bus-width = <4>;
+	keep-power-in-suspend;
+	non-removable;
+	wakeup-source;
+	mmc-pwrseq = <&usdhc1_pwrseq>;
+	fsl,sdio-interrupt-enabled;
+	status = "okay";
+};
+
 &usdhc2 {
 	assigned-clocks = <&clk IMX8MM_CLK_USDHC2>;
 	assigned-clock-rates = <400000000>;
@@ -1027,6 +1058,13 @@
 			MX8MM_IOMUXC_SD1_DATA1_USDHC1_DATA1	0x1d6
 			MX8MM_IOMUXC_SD1_DATA2_USDHC1_DATA2	0x1d6
 			MX8MM_IOMUXC_SD1_DATA3_USDHC1_DATA3	0x1d6
+		>;
+	};
+
+	pinctrl_usdhc1_gpio: usdhc1gpiogrp {
+		fsl,pins = <
+			MX8MM_IOMUXC_SD1_RESET_B_GPIO2_IO10	0x19
+			MX8MM_IOMUXC_SD1_DATA7_GPIO2_IO9	0x1c4
 		>;
 	};
 
