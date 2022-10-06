@@ -23,6 +23,8 @@
 #include <sound/max98090.h>
 #include "max98090.h"
 
+static unsigned int headset_det = 0, headset_det_pre = 0;
+
 /* Allows for sparsely populated register maps */
 static const struct reg_default max98090_reg[] = {
 	{ 0x00, 0x00 }, /* 00 Software Reset */
@@ -2263,8 +2265,36 @@ static irqreturn_t max98090_interrupt(int irq, void *data)
 
 	active &= mask;
 
-	if (!active)
+	/* read JDET status */
+	ret = regmap_read(max98090->regmap, M98090_REG_JACK_STATUS, &headset_det);
+	if (ret != 0) {
+		dev_err(component->dev,
+			"failed to read M98090_REG_JACK_STATUS: %d\n",
+			ret);
 		return IRQ_NONE;
+	}
+
+	if (!active && (headset_det == headset_det_pre))
+		return IRQ_NONE;
+	else {
+		if(headset_det == 0x02) {
+			regmap_update_bits(max98090->regmap, M98090_REG_DIGITAL_MIC_ENABLE,
+			   M98090_DIGMICL_MASK,
+			   0 << M98090_DIGMICL_SHIFT);
+			regmap_update_bits(max98090->regmap, M98090_REG_DIGITAL_MIC_ENABLE,
+			   M98090_DIGMICR_MASK,
+			   0 << M98090_DIGMICR_SHIFT);
+		} else {
+			regmap_update_bits(max98090->regmap, M98090_REG_DIGITAL_MIC_ENABLE,
+			   M98090_DIGMICL_MASK,
+			   1 << M98090_DIGMICL_SHIFT);
+			regmap_update_bits(max98090->regmap, M98090_REG_DIGITAL_MIC_ENABLE,
+			   M98090_DIGMICR_MASK,
+			   1 << M98090_DIGMICR_SHIFT);
+		}
+	}
+
+	headset_det_pre = headset_det;
 
 	if (active & M98090_CLD_MASK)
 		dev_err(component->dev, "M98090_CLD_MASK\n");
