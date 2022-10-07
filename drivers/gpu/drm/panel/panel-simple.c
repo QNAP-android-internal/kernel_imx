@@ -4511,6 +4511,42 @@ static const struct panel_desc_dsi dsi2dp_panel = {
 	.lanes = 1,
 };
 
+static const struct display_timing dsi2dp_g133han020_timings = {
+	.pixelclock = { 68000000, 72000000, 76000000 },
+	.hactive = { 1920, 1920, 1920 },
+	.hfront_porch = { 30, 40, 85 },
+	.hback_porch = { 30, 40, 85 },
+	.hsync_len = { 10, 12, 20 },
+	.vactive = { 1080, 1080, 1080 },
+	.vfront_porch = { 8, 15, 70 },
+	.vback_porch = { 8, 15, 70 },
+	.vsync_len = { 4, 6, 8 },
+	.flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH,
+};
+
+static const struct panel_desc_dsi dsi2dp_g133han020 = {
+	.desc = {
+		.timings = &dsi2dp_g133han020_timings,
+		.num_timings = 1,
+		.bpc = 8,
+		.size = {
+			.width = 293,
+			.height = 165,
+		},
+		.delay = {
+			.prepare = 105,
+			.enable = 20,
+			.unprepare = 50,
+	},
+
+		.bus_flags = DRM_BUS_FLAG_DE_LOW,
+		.connector_type = DRM_MODE_CONNECTOR_eDP,
+	},
+	.flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_CLOCK_NON_CONTINUOUS,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+};
+
 static const struct drm_display_mode lg_ld070wx3_sl01_mode = {
 	.clock = 71000,
 	.hdisplay = 800,
@@ -4662,7 +4698,10 @@ static const struct of_device_id dsi_of_match[] = {
 	}, {
 		.compatible = "boe,tv080wum-nl0",
 		.data = &boe_tv080wum_nl0
-        }, {
+	}, {
+		.compatible = "iei,dsi2dp-g133han020",
+		.data = &dsi2dp_g133han020
+	}, {
 		.compatible = "iei,dsi2dp-panel",
 		.data = &dsi2dp_panel
 	}, {
