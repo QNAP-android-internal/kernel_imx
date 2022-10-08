@@ -1,0 +1,80 @@
+/*
+ * Copyright 2022 IEI-World Corp.
+ * Copyright 2018 NXP
+ *
+ * Author: Wig Cheng <wigcheng@ieiworld.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "imx8mm-b664-ppc.dts"
+
+
+&mipi_dsi {
+	status = "okay";
+
+	panel@0 {
+		reg = <0>;
+		compatible = "iei,dsi2dp-g133han020";
+		power-supply = <&reg_dp_backlight_pwr>;
+
+		dsi,flags = <0x0007>;
+		dsi,format = <0>;
+		dsi,lanes = <4>;
+		panel-width-mm  = <217>;
+		panel-height-mm = <135>;
+		bus-format = <0x100a>;  /* MEDIA_BUS_FMT_RGB888_1X24 */
+		bus-flags = <1>;
+		refresh-rate = <60>;
+		rotate = <0>;
+
+		panel-timing {
+			clock-frequency = <165000000>;
+			hactive = <1920>;
+			vactive = <1080>;
+			hfront-porch = <85>;
+			hsync-len = <20>;
+			hback-porch = <85>;
+			vfront-porch = <70>;
+			vsync-len = <8>;
+			vback-porch = <70>;
+			/* flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH */
+			vsync-active = <1>;
+			hsync-active = <1>;
+		};
+	};
+};
+
+&i2c2 {
+	lt8911exb@2d {
+		compatible = "lontium,lt8911exb";
+		reg = <0x2d>;
+
+		lontium,pclk = <152000000>;
+		lontium,hact = <1920>;
+		lontium,vact = <1080>;
+		lontium,hbp = <85>;
+		lontium,hfp = <85>;
+		lontium,vbp = <70>;
+		lontium,vfp = <70>;
+		lontium,hs = <20>;
+		lontium,vs = <8>;
+
+		lontium,mipi_lane = <4>;
+		lontium,lane_cnt = <2>;
+		lontium,color = <1>; //Color Depth 0:6bit 1:8bit
+		lontium,test = <0>;
+
+		status = "okay";
+	};
+};
