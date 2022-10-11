@@ -458,7 +458,7 @@
 		compatible = "lontium,lt8911exb";
 		reg = <0x2d>;
 
-		lontium,pclk = <60400000>;
+		lontium,pclk = <62500000>;
 		lontium,hact = <1280>;
 		lontium,vact = <800>;
 		lontium,hbp = <40>;
@@ -604,7 +604,7 @@
 
 	panel@0 {
 		reg = <0>;
-		compatible = "iei,dsi2dp-panel";
+		compatible = "iei,dsi2dp-g101ean024";
 		power-supply = <&reg_dp_backlight_pwr>;
 
 		dsi,flags = <0x0007>;
@@ -618,7 +618,7 @@
 		rotate = <0>;
 
 		panel-timing {
-			clock-frequency = <60400000>;
+			clock-frequency = <62500000>;
 			hactive = <1280>;
 			vactive = <800>;
 			hfront-porch = <40>;
