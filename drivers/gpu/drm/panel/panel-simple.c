@@ -204,11 +204,6 @@ struct panel_simple {
 	enum drm_panel_orientation orientation;
 };
 
-#ifdef CONFIG_ANDROID
-	static int enable_cnt = 0;
-	static int prepare_cnt = 0;
-#endif
-
 static inline struct panel_simple *to_panel_simple(struct drm_panel *panel)
 {
 	return container_of(panel, struct panel_simple, base);
@@ -342,9 +337,7 @@ static void panel_simple_wait(ktime_t start_ktime, unsigned int min_ms)
 static int panel_simple_disable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
-#ifdef CONFIG_ANDROID
-	return 0;
-#endif
+
 	if (!p->enabled)
 		return 0;
 
@@ -375,9 +368,6 @@ static int panel_simple_unprepare(struct drm_panel *panel)
 	struct panel_simple *p = to_panel_simple(panel);
 	int ret;
 
-#ifdef CONFIG_ANDROID
-	return 0;
-#endif
 	if (!p->prepared)
 		return 0;
 
@@ -415,12 +405,6 @@ static int panel_simple_prepare_once(struct panel_simple *p)
 	int hpd_asserted;
 	unsigned long hpd_wait_us;
 
-#ifdef CONFIG_ANDROID
-	if(prepare_cnt < 1)
-		prepare_cnt += 1;
-	else
-		return 0;
-#endif
 	if (p->prepared)
 		return 0;
 
@@ -520,12 +504,6 @@ static int panel_simple_enable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 
-#ifdef CONFIG_ANDROID
-	if(enable_cnt < 1)
-		enable_cnt += 1;
-	else
-		return 0;
-#endif
 	if (p->enabled)
 		return 0;
 
