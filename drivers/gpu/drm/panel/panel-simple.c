@@ -4481,8 +4481,8 @@ static const struct panel_desc_dsi boe_tv080wum_nl0 = {
 	.lanes = 4,
 };
 
-static const struct display_timing dsi2dp_panel_timing = {
-	.pixelclock = { 60400000, 71100000, 74700000 },
+static const struct display_timing dsi2dp_g101ean024_timing = {
+	.pixelclock = { 62500000, 71100000, 74700000 },
 	.hactive = { 1280, 1280, 1280 },
 	.hfront_porch = { 40, 80, 100 },
 	.hback_porch = { 40, 79, 99 },
@@ -4494,14 +4494,19 @@ static const struct display_timing dsi2dp_panel_timing = {
 	.flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH,
 };
 
-static const struct panel_desc_dsi dsi2dp_panel = {
+static const struct panel_desc_dsi dsi2dp_g101ean024 = {
 	.desc = {
-		.timings = &dsi2dp_panel_timing,
+		.timings = &dsi2dp_g101ean024_timing,
 		.num_timings = 1,
 		.bpc = 8,
 		.size = {
 			.width = 165,
 			.height = 105,
+		},
+		.delay = {
+			.prepare = 500,
+			.enable = 1000,
+			.unprepare = 500,
 		},
 		.bus_flags = DRM_BUS_FLAG_DE_LOW,
 		.connector_type = DRM_MODE_CONNECTOR_eDP,
@@ -4702,8 +4707,8 @@ static const struct of_device_id dsi_of_match[] = {
 		.compatible = "iei,dsi2dp-g133han020",
 		.data = &dsi2dp_g133han020
 	}, {
-		.compatible = "iei,dsi2dp-panel",
-		.data = &dsi2dp_panel
+		.compatible = "iei,dsi2dp-g101ean024",
+		.data = &dsi2dp_g101ean024
 	}, {
 		.compatible = "lg,ld070wx3-sl01",
 		.data = &lg_ld070wx3_sl01
