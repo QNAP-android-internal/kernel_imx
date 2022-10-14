@@ -34,6 +34,18 @@
 		      <0x1 0x00000000 0 0xc0000000>;
 	};
 
+	reg_touch_rst: regulator_touch_rst {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_touch_rst>;
+		regulator-name = "TOUCH_RST";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio1 10 GPIO_ACTIVE_HIGH>;
+		off-on-delay-us = <50000>;
+		enable-active-high;
+	};
+
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -371,17 +383,16 @@
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
-        i2c-hid-dev@2c {
-                compatible = "hid-over-i2c";
-                reg = <0x2c>;//for Hi-Tech WDT8913A touch
-                hid-descr-addr = <0x0020>;
-                pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_i2c2_synaptics_dsx_io>;
-                interrupt-parent = <&gpio1>;
-                interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
-                touch_reset_gpio = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-                status = "okay";
-        };
+	i2c-hid-dev@2c {
+		compatible = "hid-over-i2c";
+		reg = <0x2c>;
+		hid-descr-addr = <0x0020>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_touch_irq>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
+		status = "okay";
+	};
 
 	ov5640_0: ov5640_mipi@3c {
 		compatible = "ovti,ov5640";
@@ -847,9 +858,14 @@
 		>;
 	};
 
-	pinctrl_i2c2_synaptics_dsx_io: synaptics_dsx_iogrp {
+	pinctrl_touch_irq: touch_irqgrp {
 		fsl,pins = <
 			MX8MP_IOMUXC_GPIO1_IO09__GPIO1_IO09		0x16
+		>;
+	};
+
+	pinctrl_touch_rst: touch_rst_iogrp {
+		fsl,pins = <
 			MX8MP_IOMUXC_GPIO1_IO10__GPIO1_IO10		0x16
 		>;
 	};
