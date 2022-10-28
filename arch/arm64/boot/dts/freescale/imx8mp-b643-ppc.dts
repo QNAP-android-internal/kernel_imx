@@ -433,6 +433,64 @@
                                         //4 = active high level-sensitive, 8 = active low level-sensitive
         };
 
+        pca9555_a21: pca9555@21 {
+                compatible = "nxp,pca9555";
+                //pinctrl-names = "default";
+                //pinctrl-0 = <&pinctrl_pca9555_a21_irq>;
+                reg = <0x21>;
+                gpio-controller;
+                #gpio-cells = <2>;
+                //interrupt-controller;
+                //#interrupt-cells = <2>;
+                //interrupt-parent = <&gpio1>;
+                //interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
+                status = "okay";
+                gpio-line-names = "A_UR_SW0", "A_UR_SW1", "A_UR_SW2", "B_UR_SW0", "B_UR_SW1", "B_UR_SW2", "LCD_RST_H", "Reserved_LED",
+                                  "EXT_GPIO1", "EXT_GPIO2", "EXT_GPIO3", "EXT_GPIO4", "EXT_GPIO5", "EXT_GPIO6", 
+		                  "EXT_GPIO7", "EXT_GPIO8";
+
+                a_ur_sw0 {
+                        gpio-hog;
+                        gpios = <0 GPIO_ACTIVE_HIGH>;
+                        output-low;
+                        line-name = "A_UR_SW0";
+                };
+
+                a_ur_sw1 {
+                        gpio-hog;
+                        gpios = <1 GPIO_ACTIVE_HIGH>;
+                        output-low;
+                        line-name = "A_UR_SW1";
+                };
+
+                a_ur_sw2 {
+                        gpio-hog;
+                        gpios = <2 GPIO_ACTIVE_HIGH>;
+                        output-high;
+                        line-name = "A_UR_SW2";
+                };
+
+                b_ur_sw0 {
+                        gpio-hog;
+                        gpios = <3 GPIO_ACTIVE_HIGH>;
+                        output-low;
+                        line-name = "B_UR_SW0";
+                };
+
+                b_ur_sw1 {
+                        gpio-hog;
+                        gpios = <4 GPIO_ACTIVE_HIGH>;
+                        output-low;
+                        line-name = "B_UR_SW1";
+                };
+
+                b_ur_sw2 {
+                        gpio-hog;
+                        gpios = <5 GPIO_ACTIVE_HIGH>;
+                        output-high;
+                        line-name = "B_UR_SW2";
+                };
+        };
 };
 
 &irqsteer_hdmi {
@@ -982,6 +1040,14 @@
 			MX8MP_IOMUXC_GPIO1_IO15__CCM_CLKO2	0x59
 		>;
 	};
+
+	/*
+        pinctrl_pca9555_a21_irq: pca9555_a21_irqgrp {
+                fsl,pins = <
+                        MX8MP_IOMUXC_GPIO1_IO12__GPIO1_IO12     0x140
+                >;
+        };
+	*/
 };
 
 &vpu_g1 {
