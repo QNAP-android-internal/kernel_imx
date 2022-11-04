@@ -162,6 +162,8 @@
 		status = "okay";
 		compatible = "android,bcmdhd_wlan";
 		gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_wlan_irq>;
 	};
 
 	sound-max98090 {
@@ -720,9 +722,8 @@
 	bus-width = <4>;
 	keep-power-in-suspend;
 	non-removable;
-	wakeup-source;
+	no-1-8-v;
 	mmc-pwrseq = <&usdhc1_pwrseq>;
-	fsl,sdio-interrupt-enabled;
 	status = "okay";
 };
 
@@ -1064,7 +1065,12 @@
 	pinctrl_usdhc1_gpio: usdhc1gpiogrp {
 		fsl,pins = <
 			MX8MM_IOMUXC_SD1_RESET_B_GPIO2_IO10	0x19
-			MX8MM_IOMUXC_SD1_DATA7_GPIO2_IO9	0x1c4
+		>;
+	};
+
+	pinctrl_wlan_irq: wlanirqgrp {
+		fsl,pins = <
+			MX8MM_IOMUXC_SD1_DATA7_GPIO2_IO9	0x141
 		>;
 	};
 
