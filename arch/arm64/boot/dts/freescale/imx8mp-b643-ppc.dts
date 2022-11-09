@@ -34,18 +34,6 @@
 		      <0x1 0x00000000 0 0xc0000000>;
 	};
 
-	reg_touch_rst: regulator_touch_rst {
-		compatible = "regulator-fixed";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_touch_rst>;
-		regulator-name = "TOUCH_RST";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-		off-on-delay-us = <50000>;
-		enable-active-high;
-	};
-
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -835,12 +823,6 @@
 	pinctrl_touch_irq: touch_irqgrp {
 		fsl,pins = <
 			MX8MP_IOMUXC_GPIO1_IO09__GPIO1_IO09		0x16
-		>;
-	};
-
-	pinctrl_touch_rst: touch_rst_iogrp {
-		fsl,pins = <
-			MX8MP_IOMUXC_GPIO1_IO10__GPIO1_IO10		0x16
 		>;
 	};
 
