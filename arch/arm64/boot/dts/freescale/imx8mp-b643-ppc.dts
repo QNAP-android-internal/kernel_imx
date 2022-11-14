@@ -507,11 +507,6 @@
                         line-name = "B_UR_SW2";
                 };
         };
-	 rtc: rtc@68 {
-                compatible = "ti,bq32000";
-                reg = <0x68>;
-        };
-
 };
 
 &irqsteer_hdmi {
