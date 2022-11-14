@@ -34,6 +34,19 @@
 		      <0x1 0x00000000 0 0xc0000000>;
 	};
 
+        wlan_pen: wlan_pen {
+                compatible = "regulator-fixed";
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_wlan_pen>;
+                regulator-name = "WLAN_PEN";
+                regulator-min-microvolt = <3300000>;
+                regulator-max-microvolt = <3300000>;
+                gpio = <&gpio1 11 GPIO_ACTIVE_LOW>;
+                off-on-delay = <20000>;
+                startup-delay-us = <100>;
+                enable-active-high;
+        };
+
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -124,6 +137,15 @@
 			248 249 250 251 252 253 254 255>;
 		default-brightness-level = <200>;
 	};
+
+        bt_rfkill {
+                compatible = "fsl,mxc_bt_rfkill";
+                pinctrl-0 = <&pinctrl_uart1_btctrl>;
+                bt-power-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+                reset-delay-us = <100>;
+                reset-post-delay-ms = <150>;
+                status ="okay";
+        };
 };
 
 &A53_0 {
@@ -149,12 +171,6 @@
 &pwm1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm1>;
-	status = "okay";
-};
-
-&pwm2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pwm2>;
 	status = "okay";
 };
 
@@ -701,12 +717,6 @@
 		>;
 	};
 
-	pinctrl_pwm2: pwm2grp {
-		fsl,pins = <
-			MX8MP_IOMUXC_GPIO1_IO11__PWM2_OUT	0x116
-		>;
-	};
-
 	pinctrl_pwm4: pwm4grp {
 		fsl,pins = <
 			MX8MP_IOMUXC_SAI5_RXFS__PWM4_OUT	0x116
@@ -889,6 +899,20 @@
 		>;
 	};
 
+        pinctrl_uart1_btctrl: uart1btctrlgrp {
+                fsl,pins = <
+                        MX8MP_IOMUXC_GPIO1_IO13__GPIO1_IO13     0x41 /* REG_ON */
+                        MX8MP_IOMUXC_SD1_DATA6__GPIO2_IO08      0x41 /* HOST_WAKE*/
+                        MX8MP_IOMUXC_GPIO1_IO15__GPIO1_IO15     0x41 /* WAKE */
+                >;
+        };
+
+        pinctrl_gpio1: gpio1grp {
+                fsl,pins = <
+                        MX8MP_IOMUXC_GPIO1_IO13__GPIO1_IO13     0x41 /* REG_ON */
+                >;
+        };
+
 	pinctrl_uart1: uart1grp {
 		fsl,pins = <
 			MX8MP_IOMUXC_UART1_RXD__UART1_DCE_RX	0x140
@@ -1027,6 +1051,12 @@
 			MX8MP_IOMUXC_GPIO1_IO02__WDOG1_WDOG_B	0xc6
 		>;
 	};
+
+        pinctrl_wlan_pen: wlan_pen_ctrlgrp {
+                fsl,pins = <
+                        MX8MP_IOMUXC_GPIO1_IO11__GPIO1_IO11    0x41 /* WLAN_PEN */
+                >;
+        };
 
 	pinctrl_csi0_pwn: csi0_pwn_grp {
 		fsl,pins = <
