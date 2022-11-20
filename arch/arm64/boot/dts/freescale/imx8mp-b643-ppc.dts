@@ -388,17 +388,6 @@
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
-	i2c-hid-dev@2c {
-		compatible = "hid-over-i2c";
-		reg = <0x2c>;
-		hid-descr-addr = <0x0020>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_touch_irq>;
-		interrupt-parent = <&gpio1>;
-		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
-		status = "disabled";
-	};
-
 	ov5640_0: ov5640_mipi@3c {
 		compatible = "ovti,ov5640";
 		reg = <0x3c>;
@@ -540,26 +529,6 @@
 
 	thres-low  = <1 2>;             /* (FIFO * 1 / 2) */
 	thres-high = <3 4>;             /* (FIFO * 3 / 4) */
-};
-
-&mipi_dsi {
-	status = "disabled";
-
-	panel@0 {
-		compatible = "panel,tq101aj02";
-		reg = <0>;
-		backlight = <&dsi_backlight>;
-		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
-		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
-		dsi-lanes = <4>;
-		video-mode = <2>;	/* 0: burst mode
-					 * 1: non-burst mode with sync event
-					 * 2: non-burst mode with sync pulse
-					 */
-		panel-width-mm = <135>;
-		panel-height-mm = <216>;
-		status = "okay";
-	};
 };
 
 &snvs_pwrkey {

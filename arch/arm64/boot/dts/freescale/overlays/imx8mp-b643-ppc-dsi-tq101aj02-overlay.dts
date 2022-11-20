@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2022 IEI
+ *
+ * Author: Wig Cheng <wigcheng@ieiworld.com>
+ *
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			dsi_backlight: dsi_backlight {
+				status = "okay";
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&mipi_dsi>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+			panel@0 {
+				compatible = "panel,tq101aj02";
+				reg = <0>;
+				backlight = <&dsi_backlight>;
+				pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+				reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
+				dsi-lanes = <4>;
+				video-mode = <2>;
+				panel-width-mm = <135>;
+				panel-height-mm = <216>;
+				status = "okay";
+			};
+		};
+	};
+
+	fragment@2 {
+		target = <&i2c2>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+			i2c_hid_dev: i2c-hid-dev@2c {
+				compatible = "hid-over-i2c";
+				reg = <0x2c>;
+				hid-descr-addr = <0x0020>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_touch_irq>;
+				interrupt-parent = <&gpio1>;
+				interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
+				status = "okay";
+			};
+		};
+	};
+};
+

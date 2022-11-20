@@ -32,3 +32,5 @@ subdir-y += tesla
 subdir-y += ti
 subdir-y += toshiba
 subdir-y += xilinx
+
+DTC_FLAGS_imx8mp-b643-ppc := -@
