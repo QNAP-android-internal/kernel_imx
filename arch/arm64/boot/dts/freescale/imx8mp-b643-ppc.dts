@@ -34,19 +34,6 @@
 		      <0x1 0x00000000 0 0xc0000000>;
 	};
 
-        wlan_pen: wlan_pen {
-                compatible = "regulator-fixed";
-                pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_wlan_pen>;
-                regulator-name = "WLAN_PEN";
-                regulator-min-microvolt = <3300000>;
-                regulator-max-microvolt = <3300000>;
-                gpio = <&gpio1 11 GPIO_ACTIVE_LOW>;
-                off-on-delay = <20000>;
-                startup-delay-us = <100>;
-                enable-active-high;
-        };
-
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
