@@ -1,0 +1,79 @@
+/*
+ * Copyright 2022 IEI-World Corp.
+ * Copyright 2018 NXP
+ *
+ * Author: Wig Cheng <wigcheng@ieiworld.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "imx8mp-b643-ppc.dts"
+
+&i2c3 {
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3>;
+	status = "okay";
+
+	/delete-node/pca9555@21;
+	pca9555_rs422: pca9555@21 {
+		compatible = "nxp,pca9555";
+		reg = <0x21>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		status = "okay";
+		gpio-line-names = "A_UR_SW0", "A_UR_SW1", "A_UR_SW2", "B_UR_SW0", "B_UR_SW1", "B_UR_SW2", "LCD_RST_H", "Reserved_LED",
+							"EXT_GPIO1", "EXT_GPIO2", "EXT_GPIO3", "EXT_GPIO4", "EXT_GPIO5", "EXT_GPIO6",
+							"EXT_GPIO7", "EXT_GPIO8";
+
+		a_ur_sw0 {
+			gpio-hog;
+			gpios = <0 GPIO_ACTIVE_HIGH>;
+			output-low;
+			line-name = "A_UR_SW0";
+		};
+
+		a_ur_sw1 {
+			gpio-hog;
+			gpios = <1 GPIO_ACTIVE_HIGH>;
+			output-low;
+			line-name = "A_UR_SW1";
+		};
+
+		a_ur_sw2 {
+			gpio-hog;
+			gpios = <2 GPIO_ACTIVE_HIGH>;
+			output-low;
+			line-name = "A_UR_SW2";
+		};
+
+		b_ur_sw0 {
+			gpio-hog;
+				gpios = <3 GPIO_ACTIVE_HIGH>;
+				output-low;
+				line-name = "B_UR_SW0";
+		};
+
+		b_ur_sw1 {
+			gpio-hog;
+				gpios = <4 GPIO_ACTIVE_HIGH>;
+				output-low;
+				line-name = "B_UR_SW1";
+		};
+
+		b_ur_sw2 {
+			gpio-hog;
+			gpios = <5 GPIO_ACTIVE_HIGH>;
+			output-low;
+			line-name = "B_UR_SW2";
+		};
+    };
+};
