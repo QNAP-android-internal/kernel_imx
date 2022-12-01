@@ -58,16 +58,6 @@
 		enable-active-high;
 	};
 
-	reg_audio_pwr: regulator-audio-pwr {
-		compatible = "regulator-fixed";
-		regulator-name = "audio-pwr";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		regulator-always-on;
-	};
-
 	sound-hdmi {
 		compatible = "fsl,imx-audio-cdnhdmi";
 		model = "audio-hdmi";
@@ -103,6 +93,14 @@
                 model = "max98090-audio";
                 audio-cpu = <&sai3>;
                 audio-codec = <&codec>;
+		audio-routing =
+			"Headphone Jack", "HPL",
+			"Headphone Jack", "HPR",
+			"Ext Spk", "SPKL",
+			"Ext Spk", "SPKR",
+			"AMIC", "MICBIAS",
+			"IN5", "AMIC";
+
                 status = "okay";
         };
 
@@ -453,15 +451,9 @@
                 reg = <0x10>;
                 clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIO_BLK_CTRL_SAI3_MCLK1>;
                 clock-names = "mclk";
-                wlf,shared-lrclk;
-                wlf,hp-cfg = <3 2 3>;
-                wlf,gpio-cfg = <1 3>;
-                SPKVDD1-supply = <&reg_audio_pwr>;
-                SPK_AMP_EN_GPIO = <&gpio4 20 0>;
-//              hp-det-gpio = <&gpio4 28 0>;
+                hp-det-gpio = <&gpio4 28 GPIO_ACTIVE_LOW>;
                 interrupt-parent = <&gpio4>;
-                interrupts = <28 8>;	//1 = low-to-high edge triggered,  2 = high-to-low edge triggered
-                                        //4 = active high level-sensitive, 8 = active low level-sensitive
+                interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
         };
 
         pca9555_a21: pca9555@21 {
@@ -920,7 +912,6 @@
 			MX8MP_IOMUXC_SAI3_TXD__AUDIOMIX_SAI3_TX_DATA00	0xd6
 			MX8MP_IOMUXC_SAI3_MCLK__AUDIOMIX_SAI3_MCLK	0xd6
 			MX8MP_IOMUXC_SAI3_RXFS__GPIO4_IO28		0xd6
-			MX8MP_IOMUXC_SAI3_RXC__GPIO4_IO29		0xd6
 		>;
 	};
 
@@ -959,9 +950,15 @@
 		>;
 	};
 
-	pinctrl_typec_mux: typec1muxgrp {
+	pinctrl_amp_enable: ampenablegrp {
 		fsl,pins = <
-			MX8MP_IOMUXC_SAI1_MCLK__GPIO4_IO20	0x16
+			MX8MP_IOMUXC_SAI1_MCLK__GPIO4_IO20	0xd6 /* AMP_EN */
+		>;
+	};
+
+	pinctrl_audio_pwr: audiopwrgrp {
+		fsl,pins = <
+			MX8MP_IOMUXC_SAI3_RXC__GPIO4_IO29	0xd6 /* AUDIO_PWR_EN */
 		>;
 	};
 
@@ -1231,5 +1228,25 @@
 
 	cap_device {
 		status = "okay";
+	};
+};
+
+&gpio4 {
+	amp_en {
+		gpio-hog;
+		gpios = <20 GPIO_ACTIVE_HIGH>;
+		line-name = "AMPLIFIER_ENABLE";
+		output-high;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_amp_enable>;
+	};
+
+	audio_pwr_en {
+		gpio-hog;
+		gpios = <29 GPIO_ACTIVE_HIGH>;
+		line-name = "AUDIO_POWER_ENABLE";
+		output-high;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_audio_pwr>;
 	};
 };
