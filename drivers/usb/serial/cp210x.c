@@ -597,10 +597,10 @@ struct cp210x_quad_port_config {
 #define CP2102N_QFN20_GPIO1_RS485_MODE		BIT(4)
 #define CP2102N_QFN20_GPIO0_CLK_MODE		BIT(6)
 
-/*
- * CP210X_VENDOR_SPECIFIC, CP210X_WRITE_LATCH call writes these 0x02 bytes
- * for CP2102N, CP2103, CP2104 and CP2105.
- */
+static u8 cp2102n_rs485_active = 0;
+static u8 cp2102n_rs485_direction = 0;
+
+/* CP210X_VENDOR_SPECIFIC, CP210X_WRITE_LATCH call writes these 0x2 bytes. */
 struct cp210x_gpio_write {
 	u8	mask;
 	u8	state;
@@ -1388,6 +1388,18 @@ static int cp210x_tiocmset_port(struct usb_serial_port *port,
 		control &= ~CONTROL_DTR;
 		control |= CONTROL_WRITE_DTR;
 	}
+	/* setting rs485 RTS direction */
+	if(cp2102n_rs485_active) {
+		if(!cp2102n_rs485_direction) {
+			control |= CONTROL_RTS;
+			control |= CONTROL_WRITE_RTS;
+		} else {
+			control ^= CONTROL_RTS;
+			control ^= CONTROL_WRITE_RTS;
+		}
+	}
+
+	dev_dbg(&port->dev, "%s - control = 0x%.4x\n", __func__, control);
 
 	/*
 	 * Use SET_FLOW to set DTR and enable/disable auto-RTS when hardware
@@ -1529,6 +1541,12 @@ static void cp210x_gpio_set(struct gpio_chip *gc, unsigned int gpio, int value)
 	u16 mask, state;
 	u16 wIndex;
 	int result;
+
+	/* detect rs485 mode */
+	if(gpio == 2 ) {
+		cp2102n_rs485_active = 1;
+		cp2102n_rs485_direction = value;
+	}
 
 	if (value == 1)
 		state = BIT(gpio);
