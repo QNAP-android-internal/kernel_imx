@@ -19,7 +19,7 @@ CONFIG_BCMDHD_DEBUG := y
 #CONFIG_BCMDHD_RANDOM_MAC := y
 
 CONFIG_MACH_PLATFORM := y
-#CONFIG_BCMDHD_DTS := y
+CONFIG_BCMDHD_DTS := y
 
 DHDCFLAGS = -Wall -Wstrict-prototypes -Wno-date-time                      \
 	-Dlinux -DLINUX -DBCMDRIVER                                           \
