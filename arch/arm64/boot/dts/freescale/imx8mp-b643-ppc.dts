@@ -91,12 +91,6 @@
                 status = "okay";
         };
 
-	sound-xcvr {
-		compatible = "fsl,imx-audio-xcvr";
-		model = "imx-audio-xcvr";
-		cpu-dai = <&xcvr>;
-	};
-
         bt_rfkill {
                 compatible = "fsl,mxc_bt_rfkill";
                 pinctrl-0 = <&pinctrl_uart1_btctrl>;
@@ -525,11 +519,6 @@
 		 <&clk IMX8MP_CLK_DUMMY>;
 	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 	fsl,sai-mclk-direction-output;
-	status = "okay";
-};
-
-&xcvr {
-	#sound-dai-cells = <0>;
 	status = "okay";
 };
 
