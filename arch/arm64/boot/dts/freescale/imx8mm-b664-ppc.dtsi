@@ -50,19 +50,6 @@
 		clock-frequency = <100000000>;
 	};
 
-	wlan_pen: wlan_pen {
-		compatible = "regulator-fixed";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_wlan_pen>;
-		regulator-name = "WLAN_PEN";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio1 11 GPIO_ACTIVE_LOW>;
-		off-on-delay = <20000>;
-		startup-delay-us = <100>;
-		enable-active-high;
-	};
-
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -150,18 +137,10 @@
 		default-brightness-level = <80>;
 	};
 
-
-	usdhc1_pwrseq: usdhc1_pwrseq {
-		compatible = "mmc-pwrseq-simple";
-		reset-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
-		gpio_wlan_pen = <&gpio1 11 GPIO_ACTIVE_LOW>;
-		status = "okay";
-	};
-
 	bcmdhd: bcmdhd {
 		status = "okay";
 		compatible = "android,bcmdhd_wlan";
-		gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
+		gpio_wl_reg_on = <&gpio2 10 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_wlan_irq>;
 	};
@@ -722,8 +701,9 @@
 	bus-width = <4>;
 	keep-power-in-suspend;
 	non-removable;
-	no-1-8-v;
-	mmc-pwrseq = <&usdhc1_pwrseq>;
+	vqmmc-1-8-v;
+	pm-ignore-notify;
+	no-sd-uhs-sdr104;
 	status = "okay";
 };
 
@@ -1120,12 +1100,6 @@
 	pinctrl_wdog: wdoggrp {
 		fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B	0xc6
-		>;
-	};
-
-	pinctrl_wlan_pen: wlan_pen_ctrlgrp {
-		fsl,pins = <
-			MX8MM_IOMUXC_GPIO1_IO11_GPIO1_IO11	0x41 /* WLAN_PEN */
 		>;
 	};
 };
