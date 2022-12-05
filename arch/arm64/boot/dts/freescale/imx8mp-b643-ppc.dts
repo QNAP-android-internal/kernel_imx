@@ -60,20 +60,13 @@
 		status = "okay";
 	};
 
-	usdhc1_pwrseq: usdhc1_pwrseq {
-                compatible = "mmc-pwrseq-simple";
-                reset-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
-                gpio_wlan_pen = <&gpio1 11 GPIO_ACTIVE_LOW>;
-                status = "okay";
-        };
-
-        bcmdhd: bcmdhd {
-                status = "okay";
-                compatible = "android,bcmdhd_wlan";
-                gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
-                pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_wlan_irq>;
-        };
+	bcmdhd: bcmdhd {
+		status = "okay";
+		compatible = "android,bcmdhd_wlan";
+		gpio_wl_reg_on = <&gpio2 10 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_wlan_irq>;
+	};
 
         sound-max98090 {
                 compatible = "fsl,imx-audio-max98090";
@@ -659,9 +652,9 @@
 	bus-width = <4>;
 	keep-power-in-suspend;
 	non-removable;
-	no-1-8-v;
-	mmc-pwrseq = <&usdhc1_pwrseq>;
-	//fsl,sdio-interrupt-enabled;
+	vqmmc-1-8-v;
+	pm-ignore-notify;
+	no-sd-uhs-sdr104;
 	status = "okay";
 };
 
