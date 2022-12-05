@@ -2,7 +2,7 @@
 #include <osl.h>
 #include <dhd_linux.h>
 #include <linux/gpio.h>
-
+#include <linux/of_gpio.h>
 #if defined(BUS_POWER_RESTORE) && defined(BCMSDIO)
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
