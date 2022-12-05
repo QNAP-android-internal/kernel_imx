@@ -91,12 +91,6 @@
                 status = "okay";
         };
 
-	sound-xcvr {
-		compatible = "fsl,imx-audio-xcvr";
-		model = "imx-audio-xcvr";
-		cpu-dai = <&xcvr>;
-	};
-
 	dsi_backlight: dsi_backlight {
 		compatible = "pwm-backlight";
 		pwms = <&pwm1 0 66667>;
@@ -593,11 +587,6 @@
 		 <&clk IMX8MP_CLK_DUMMY>;
 	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 	fsl,sai-mclk-direction-output;
-	status = "okay";
-};
-
-&xcvr {
-	#sound-dai-cells = <0>;
 	status = "okay";
 };
 
