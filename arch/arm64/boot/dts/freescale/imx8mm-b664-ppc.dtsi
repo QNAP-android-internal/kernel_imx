@@ -460,7 +460,7 @@
 		compatible = "lontium,lt8911exb";
 		reg = <0x2d>;
 
-		lontium,pclk = <62500000>;
+		lontium,pclk = <75000000>;
 		lontium,hact = <1280>;
 		lontium,vact = <800>;
 		lontium,hbp = <40>;
@@ -470,7 +470,7 @@
 		lontium,hs = <80>;
 		lontium,vs = <10>;
 
-		lontium,mipi_lane = <1>;
+		lontium,mipi_lane = <4>;
 		lontium,lane_cnt = <1>;
 		lontium,color = <1>; //Color Depth 0:6bit 1:8bit
 		lontium,test = <0>;
@@ -611,7 +611,7 @@
 
 		dsi,flags = <0x0007>;
 		dsi,format = <0>;
-		dsi,lanes = <1>;
+		dsi,lanes = <4>;
 		panel-width-mm  = <217>;
 		panel-height-mm = <135>;
 		bus-format = <0x100a>;  /* MEDIA_BUS_FMT_RGB888_1X24 */
@@ -620,7 +620,7 @@
 		rotate = <0>;
 
 		panel-timing {
-			clock-frequency = <62500000>;
+			clock-frequency = <77000000>;
 			hactive = <1280>;
 			vactive = <800>;
 			hfront-porch = <40>;
