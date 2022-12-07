@@ -2287,6 +2287,14 @@ static irqreturn_t max98090_interrupt(int irq, void *data)
 			regmap_update_bits(max98090->regmap, M98090_REG_DIGITAL_MIC_ENABLE,
 			   M98090_DIGMICR_MASK,
 			   0 << M98090_DIGMICR_SHIFT);
+
+			regmap_update_bits(max98090->regmap, M98090_REG_LEFT_SPK_MIXER,
+			   M98090_MIXSPL_DACL_MASK,
+			   0 << M98090_MIXSPL_DACL_SHIFT);
+			regmap_update_bits(max98090->regmap, M98090_REG_RIGHT_SPK_MIXER,
+			   M98090_MIXSPR_DACR_MASK,
+			   0 << M98090_MIXSPR_DACR_SHIFT);
+
 		} else {
 			regmap_update_bits(max98090->regmap, M98090_REG_DIGITAL_MIC_ENABLE,
 			   M98090_DIGMICL_MASK,
@@ -2294,6 +2302,13 @@ static irqreturn_t max98090_interrupt(int irq, void *data)
 			regmap_update_bits(max98090->regmap, M98090_REG_DIGITAL_MIC_ENABLE,
 			   M98090_DIGMICR_MASK,
 			   1 << M98090_DIGMICR_SHIFT);
+
+			regmap_update_bits(max98090->regmap, M98090_REG_LEFT_SPK_MIXER,
+			   M98090_MIXSPL_DACL_MASK,
+			   1 << M98090_MIXSPL_DACL_SHIFT);
+			regmap_update_bits(max98090->regmap, M98090_REG_RIGHT_SPK_MIXER,
+			   M98090_MIXSPR_DACR_MASK,
+			   1 << M98090_MIXSPR_DACR_SHIFT);
 		}
 	}
 
