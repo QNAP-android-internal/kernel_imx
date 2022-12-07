@@ -501,7 +501,7 @@
 	};
 
 	rtc: rtc@68 {
-		compatible = "dallas,ds1337";
+		compatible = "ti,bq32000";
 		reg = <0x68>;
 	};
 };
