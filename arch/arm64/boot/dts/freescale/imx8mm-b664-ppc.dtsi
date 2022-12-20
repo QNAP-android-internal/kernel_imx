@@ -141,6 +141,7 @@
 		status = "okay";
 		compatible = "android,bcmdhd_wlan";
 		gpio_wl_reg_on = <&gpio2 10 GPIO_ACTIVE_HIGH>;
+		gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_wlan_irq>;
 	};
