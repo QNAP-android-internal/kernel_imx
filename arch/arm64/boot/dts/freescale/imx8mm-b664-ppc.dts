@@ -105,11 +105,4 @@
 			MX8MM_IOMUXC_NAND_CE1_B_USDHC3_STROBE           0x196
 		>;
 	};
-
-	pinctrl_wlan: wlangrp {
-		fsl,pins = <
-			MX8MM_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K	0x141
-			MX8MM_IOMUXC_SD1_DATA7_GPIO2_IO9		0x159
-		>;
-	};
 };
