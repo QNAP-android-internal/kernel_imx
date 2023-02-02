@@ -1,0 +1,89 @@
+/*
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2022 IEI
+ *
+ * Author: CM Wang <cmwang@ieiworld.com>
+ *
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/imx8mp-clock.h>
+#include <dt-bindings/gpio/gpio.h>
+#include "../imx8mp-pinfunc.h"
+
+/ {
+
+	fragment@0 {
+		target = <&pca9555_a21>;
+		__overlay__ {
+			a_ur_sw0 {
+				gpio-hog;
+				gpios = <0 GPIO_ACTIVE_HIGH>;
+				output-low;
+				line-name = "A_UR_SW0";
+			};
+
+			a_ur_sw1 {
+				gpio-hog;
+				gpios = <1 GPIO_ACTIVE_HIGH>;
+				output-high;
+				line-name = "A_UR_SW1";
+			};
+
+			a_ur_sw2 {
+				gpio-hog;
+				gpios = <2 GPIO_ACTIVE_HIGH>;
+				output-high;
+				line-name = "A_UR_SW2";
+			};
+
+			b_ur_sw0 {
+				gpio-hog;
+				gpios = <3 GPIO_ACTIVE_HIGH>;
+				output-low;
+				line-name = "B_UR_SW0";
+			};
+
+			b_ur_sw1 {
+				gpio-hog;
+				gpios = <4 GPIO_ACTIVE_HIGH>;
+				output-high;
+				line-name = "B_UR_SW1";
+			};
+
+			b_ur_sw2 {
+				gpio-hog;
+				gpios = <5 GPIO_ACTIVE_HIGH>;
+				output-high;
+				line-name = "B_UR_SW2";
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&uart3>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_uart3>;
+			assigned-clocks = <&clk IMX8MP_CLK_UART3>;
+			assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
+			status = "okay";
+		};
+	};
+
+	fragment@2 {
+		target = <&iomuxc>;
+		__overlay__ {
+			pinctrl_uart3: uart3grp {
+				fsl,pins = <
+					MX8MP_IOMUXC_ECSPI1_SCLK__UART3_DCE_RX          0x140
+					MX8MP_IOMUXC_ECSPI1_MOSI__UART3_DCE_TX          0x140
+					MX8MP_IOMUXC_ECSPI1_MISO__GPIO5_IO08            0x19
+					>;
+			};
+		};
+	};
+};
