@@ -146,18 +146,20 @@
 		pinctrl-0 = <&pinctrl_wlan_irq>;
 	};
 
-	sound-max98090 {
-		compatible = "fsl,imx-audio-max98090";
-		model = "max98090-audio";
+	sound-alc5672 {
+		compatible = "fsl,imx-audio-alc5672";
+		model = "alc5672-audio";
 		audio-cpu = <&sai3>;
 		audio-codec = <&codec>;
 		audio-routing =
-			"Headphone Jack", "HPL",
-			"Headphone Jack", "HPR",
-			"Ext Spk", "SPKL",
-			"Ext Spk", "SPKR",
-			"AMIC", "MICBIAS",
-			"IN5", "AMIC";
+			"Headphone Jack", "HPOL",
+			"Headphone Jack", "HPOR",
+			"Ext Spk", "SPOLP",
+			"Ext Spk", "SPOLN",
+			"Ext Spk", "SPORP",
+			"Ext Spk", "SPORN",
+			"AMIC", "MICBIAS1",
+			"IN1P", "AMIC";
 
 		status = "okay";
 	};
@@ -467,17 +469,16 @@
 	pinctrl-0 = <&pinctrl_i2c3>;
 	status = "okay";
 
-	codec: max98090@10 {
+	codec: alc5672@1c {
 		status = "okay";
-		compatible = "maxim,max98090";
-		reg = <0x10>;
+		compatible = "realtek,alc5672";
+		reg = <0x1c>;
                 clocks = <&clk IMX8MM_CLK_SAI3_ROOT>;
                 clock-names = "xclk";
 		/* 1 = low-to-high edge triggered,  2 = high-to-low edge triggered
 		   4 = active high level-sensitive, 8 = active low level-sensitive */
 		interrupt-parent = <&gpio4>;
 		interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
-		maxim,dmic-freq = <3072000>;
 	};
 
 	rtc: rtc@68 {
