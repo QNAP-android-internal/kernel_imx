@@ -47,6 +47,7 @@ enum fsl_asoc_card_type {
 	CARD_MQS,
 	CARD_WM8524,
 	CARD_MAX98090,
+	CARD_ALC5672,
 };
 
 /**
@@ -844,6 +845,14 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 		priv->card.dapm_routes = NULL;
 		priv->card.num_dapm_routes = 0;
 		priv->card_type = CARD_MAX98090;
+	} else if (of_device_is_compatible(np, "fsl,imx-audio-alc5672")) {
+		codec_dai_name = "rt5670-aif1";
+		priv->codec_priv.fll_id = 0;
+		priv->codec_priv.pll_id = 0;
+		priv->dai_fmt |= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS;
+		priv->card.dapm_routes = NULL;
+		priv->card.num_dapm_routes = 0;
+		priv->card_type = CARD_ALC5672;
 	} else {
 		dev_err(&pdev->dev, "unknown Device Tree compatible\n");
 		ret = -EINVAL;
@@ -1160,6 +1169,7 @@ static const struct of_device_id fsl_asoc_card_dt_ids[] = {
 	{ .compatible = "fsl,imx-audio-mqs", },
 	{ .compatible = "fsl,imx-audio-wm8524", },
 	{ .compatible = "fsl,imx-audio-max98090", },
+	{ .compatible = "fsl,imx-audio-alc5672", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, fsl_asoc_card_dt_ids);
