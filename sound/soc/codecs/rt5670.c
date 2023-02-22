@@ -2777,6 +2777,16 @@ static int rt5670_resume(struct snd_soc_component *component)
 
 	return 0;
 }
+
+static int rt5670_runtime_resume(struct device *dev)
+{
+	return 0;
+}
+
+static int rt5670_runtime_suspend(struct device *dev)
+{
+	return 0;
+}
 #else
 #define rt5670_suspend NULL
 #define rt5670_resume NULL
@@ -2871,6 +2881,12 @@ static const struct regmap_config rt5670_regmap = {
 	.num_ranges = ARRAY_SIZE(rt5670_ranges),
 };
 
+static const struct dev_pm_ops rt5670_pm = {
+	SET_RUNTIME_PM_OPS(rt5670_runtime_suspend,
+		rt5670_runtime_resume, NULL)
+	//SET_SYSTEM_SLEEP_PM_OPS(NULL, rt5670_resume)
+};
+
 static const struct i2c_device_id rt5670_i2c_id[] = {
 	{ "rt5670", 0 },
 	{ "rt5671", 0 },
@@ -2878,6 +2894,12 @@ static const struct i2c_device_id rt5670_i2c_id[] = {
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, rt5670_i2c_id);
+
+static const struct of_device_id rt5670_of_match[] = {
+         { .compatible = "realtek,alc5672", },
+         { }
+};
+MODULE_DEVICE_TABLE(of, rt5670_of_match);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id rt5670_acpi_match[] = {
@@ -3332,6 +3354,8 @@ static int rt5670_i2c_remove(struct i2c_client *i2c)
 static struct i2c_driver rt5670_i2c_driver = {
 	.driver = {
 		.name = "rt5670",
+		.pm = &rt5670_pm,
+		.of_match_table = of_match_ptr(rt5670_of_match),
 		.acpi_match_table = ACPI_PTR(rt5670_acpi_match),
 	},
 	.probe = rt5670_i2c_probe,
