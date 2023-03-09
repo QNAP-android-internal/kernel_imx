@@ -210,6 +210,16 @@ static const struct reg_default rt5670_reg[] = {
 	{ 0xfc, 0x0100 },
 };
 
+static struct snd_soc_jack iei_rt5670_jack;
+
+/* Headset jack detection DAPM pins */
+static struct snd_soc_jack_pin headset_pins[] = {
+	{
+		.pin = "Mic Jack",
+		.mask = SND_JACK_HEADSET,
+	},
+};
+
 static bool rt5670_volatile_register(struct device *dev, unsigned int reg)
 {
 	int i;
@@ -510,6 +520,81 @@ static int rt5670_button_detect(struct snd_soc_component *component)
 	return btn_type;
 }
 
+static int iei_rt5670_headset_detect(struct snd_soc_component *component, int jack_insert)
+{
+	int val;
+	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(component);
+	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
+
+	if (jack_insert) {
+		/* 0x91 0x0200 */
+		snd_soc_component_write(component, RT5670_CHARGE_PUMP, 0x0200);
+		snd_soc_dapm_force_enable_pin(dapm, "Mic Det Power");
+		snd_soc_dapm_sync(dapm);
+		/* 0xFA 0x0161 */
+		snd_soc_component_write(component, RT5670_DIG_MISC, 0x0161);
+		/* Private register index 0x3D */
+		snd_soc_component_write(component, RT5670_PRIV_INDEX, 0x003d);
+		/* Private register data 0x3640 */
+		snd_soc_component_write(component, RT5670_PRIV_DATA, 0x3640);
+		/* 0xF8 0x00F0 */
+		snd_soc_component_write(component, RT5670_JD_CTRL3, 0x00f0);
+		/* 0xFB set bit 10*/
+		snd_soc_component_update_bits(component, RT5670_GEN_CTRL2,
+			1 << 10, 1 << 10);
+		/* 0x0A set bit 2*/
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL1,
+			RT5670_CBJ_BST1_EN, RT5670_CBJ_BST1_EN);
+		/* 0x0B set bit 12*/
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
+			RT5670_CBJ_MN_JD, RT5670_CBJ_MN_JD);
+		/* 0x0B clear bit 12*/
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
+			RT5670_CBJ_MN_JD, 0);
+		/* 0x91 0x0E06 */
+		snd_soc_component_write(component, RT5670_CHARGE_PUMP, 0x0e06);
+		/* Private register index 0x37 */
+		snd_soc_component_write(component, RT5670_PRIV_INDEX, 0x0037);
+		/* Private register data 0xFC00 */
+		snd_soc_component_write(component, RT5670_PRIV_DATA, 0xfc00);
+		/* 0x8E set bit 3*/
+		snd_soc_component_update_bits(component, RT5670_DEPOP_M1,
+			RT5670_HP_CP_PU, RT5670_HP_CP_PU);
+		msleep(300);
+		val = snd_soc_component_read(component, RT5670_CJ_CTRL3) & 0x7;
+		if (val == 0x1 || val == 0x2) {
+			rt5670->jack_type = SND_JACK_HEADSET;
+		} else {
+			rt5670->jack_type = SND_JACK_HEADPHONE;
+			snd_soc_dapm_disable_pin(dapm, "Mic Det Power");
+			snd_soc_dapm_sync(dapm);
+		}
+	} else {
+		rt5670->jack_type = 0;
+		snd_soc_dapm_disable_pin(dapm, "Mic Det Power");
+		snd_soc_dapm_sync(dapm);
+	}
+
+	return rt5670->jack_type;
+}
+
+static int iei_rt5670_irq_detection(void *data)
+{
+	struct rt5670_priv *rt5670 = (struct rt5670_priv *)data;
+	struct snd_soc_jack_gpio *gpio = &rt5670->hp_gpio;
+	struct snd_soc_jack *jack = rt5670->jack;
+	int val, report = jack->status;
+
+	val = snd_soc_component_read(rt5670->component, RT5670_INT_IRQ_ST);
+	if (val & 0x1100) { // Jack port in
+		report = rt5670_headset_detect(rt5670->component, 1);
+	} else { // Jack port out
+		report = rt5670_headset_detect(rt5670->component, 0);
+	}
+
+	return report;
+}
+
 static int rt5670_irq_detection(void *data)
 {
 	struct rt5670_priv *rt5670 = (struct rt5670_priv *)data;
@@ -583,12 +668,11 @@ int rt5670_set_jack_detect(struct snd_soc_component *component,
 	rt5670->jack = jack;
 	rt5670->hp_gpio.gpiod_dev = component->dev;
 	rt5670->hp_gpio.name = "headset";
-	rt5670->hp_gpio.report = SND_JACK_HEADSET |
-		SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2;
+	rt5670->hp_gpio.report = SND_JACK_HEADSET;
 	rt5670->hp_gpio.debounce_time = 150;
 	rt5670->hp_gpio.wake = true;
 	rt5670->hp_gpio.data = (struct rt5670_priv *)rt5670;
-	rt5670->hp_gpio.jack_status_check = rt5670_irq_detection;
+	rt5670->hp_gpio.jack_status_check = iei_rt5670_irq_detection;
 
 	ret = snd_soc_jack_add_gpios(rt5670->jack, 1,
 			&rt5670->hp_gpio);
@@ -2719,6 +2803,7 @@ static int rt5670_set_bias_level(struct snd_soc_component *component,
 
 static int rt5670_probe(struct snd_soc_component *component)
 {
+	int ret;
 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(component);
 	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
 
@@ -2746,6 +2831,16 @@ static int rt5670_probe(struct snd_soc_component *component)
 		return -ENODEV;
 	}
 	rt5670->component = component;
+
+        ret = snd_soc_card_jack_new(component->card, "Headset",
+				    SND_JACK_HEADSET,
+				    &iei_rt5670_jack,
+				    headset_pins,
+				    ARRAY_SIZE(headset_pins));
+        if (ret)
+                return ret;
+
+	rt5670_set_jack_detect(component, &iei_rt5670_jack);
 
 	return 0;
 }
