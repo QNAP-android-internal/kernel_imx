@@ -527,39 +527,22 @@ static int iei_rt5670_headset_detect(struct snd_soc_component *component, int ja
 	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
 
 	if (jack_insert) {
-		/* 0x91 0x0200 */
-		snd_soc_component_write(component, RT5670_CHARGE_PUMP, 0x0200);
 		snd_soc_dapm_force_enable_pin(dapm, "Mic Det Power");
 		snd_soc_dapm_sync(dapm);
-		/* 0xFA 0x0161 */
-		snd_soc_component_write(component, RT5670_DIG_MISC, 0x0161);
-		/* Private register index 0x3D */
-		snd_soc_component_write(component, RT5670_PRIV_INDEX, 0x003d);
-		/* Private register data 0x3640 */
-		snd_soc_component_write(component, RT5670_PRIV_DATA, 0x3640);
-		/* 0xF8 0x00F0 */
-		snd_soc_component_write(component, RT5670_JD_CTRL3, 0x00f0);
-		/* 0xFB set bit 10*/
-		snd_soc_component_update_bits(component, RT5670_GEN_CTRL2,
-			1 << 10, 1 << 10);
-		/* 0x0A set bit 2*/
+		snd_soc_component_update_bits(component, RT5670_GEN_CTRL3, 0x4, 0x0);
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
+			RT5670_CBJ_DET_MODE | RT5670_CBJ_MN_JD,
+			RT5670_CBJ_MN_JD);
+		snd_soc_component_write(component, RT5670_GPIO_CTRL2, 0x0004);
+		snd_soc_component_update_bits(component, RT5670_GPIO_CTRL1,
+			RT5670_GP1_PIN_MASK, RT5670_GP1_PIN_IRQ);
 		snd_soc_component_update_bits(component, RT5670_CJ_CTRL1,
 			RT5670_CBJ_BST1_EN, RT5670_CBJ_BST1_EN);
-		/* 0x0B set bit 12*/
+		snd_soc_component_write(component, RT5670_JD_CTRL3, 0x00f0);
 		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
 			RT5670_CBJ_MN_JD, RT5670_CBJ_MN_JD);
-		/* 0x0B clear bit 12*/
 		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
 			RT5670_CBJ_MN_JD, 0);
-		/* 0x91 0x0E06 */
-		snd_soc_component_write(component, RT5670_CHARGE_PUMP, 0x0e06);
-		/* Private register index 0x37 */
-		snd_soc_component_write(component, RT5670_PRIV_INDEX, 0x0037);
-		/* Private register data 0xFC00 */
-		snd_soc_component_write(component, RT5670_PRIV_DATA, 0xfc00);
-		/* 0x8E set bit 3*/
-		snd_soc_component_update_bits(component, RT5670_DEPOP_M1,
-			RT5670_HP_CP_PU, RT5670_HP_CP_PU);
 		msleep(300);
 		val = snd_soc_component_read(component, RT5670_CJ_CTRL3) & 0x7;
 		if (val == 0x1 || val == 0x2) {
@@ -596,7 +579,7 @@ static int iei_rt5670_irq_detection(void *data)
 	case 0x10: /* 2 port */
 	case 0x20: /* 1 port */
 		if (rt5670->jack_type == 0) {
-			report = rt5670_headset_detect(rt5670->component, 1);
+			report = iei_rt5670_headset_detect(rt5670->component, 1);
 			/* for push button and jack out */
 			gpio->debounce_time = 25;
 			break;
@@ -607,7 +590,7 @@ static int iei_rt5670_irq_detection(void *data)
 	case 0x30: /* 2 port */
 	case 0x0: /* 1 port or 2 port */
 		report = 0;
-		rt5670_headset_detect(rt5670->component, 0);
+		iei_rt5670_headset_detect(rt5670->component, 0);
 		gpio->debounce_time = 150; /* for jack in */
 		break;
 	default:
