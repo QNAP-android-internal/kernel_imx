@@ -69,21 +69,23 @@
 		pinctrl-0 = <&pinctrl_wlan_irq>;
 	};
 
-        sound-max98090 {
-                compatible = "fsl,imx-audio-max98090";
-                model = "max98090-audio";
-                audio-cpu = <&sai3>;
-                audio-codec = <&codec>;
+	sound-alc5672 {
+		compatible = "fsl,imx-audio-alc5672";
+		model = "alc5672-audio";
+		audio-cpu = <&sai3>;
+		audio-codec = <&codec>;
 		audio-routing =
-			"Headphone Jack", "HPL",
-			"Headphone Jack", "HPR",
-			"Ext Spk", "SPKL",
-			"Ext Spk", "SPKR",
-			"AMIC", "MICBIAS",
-			"IN5", "AMIC";
+			"Headphone Jack", "HPOL",
+			"Headphone Jack", "HPOR",
+			"Ext Spk", "SPOLP",
+			"Ext Spk", "SPOLN",
+			"Ext Spk", "SPORP",
+			"Ext Spk", "SPORN",
+			"Mic Jack", "MICBIAS1",
+			"IN1P", "Mic Jack";
 
-                status = "okay";
-        };
+		status = "okay";
+	};
 
 	dsi_backlight: dsi_backlight {
 		compatible = "pwm-backlight";
@@ -426,16 +428,14 @@
 	pinctrl-0 = <&pinctrl_i2c3>;
 	status = "okay";
 
-        codec: max98090@10 {
-                status = "okay";
-                compatible = "maxim,max98090";
-                reg = <0x10>;
-                clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIO_BLK_CTRL_SAI3_MCLK1>;
-                clock-names = "mclk";
-                hp-det-gpio = <&gpio4 28 GPIO_ACTIVE_LOW>;
-                interrupt-parent = <&gpio4>;
-                interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
-        };
+	codec: alc5672@1c {
+		status = "okay";
+		compatible = "realtek,alc5672";
+		reg = <0x1c>;
+		clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIO_BLK_CTRL_SAI3_MCLK1>;
+		clock-names = "mclk";
+		headset-gpio = <&gpio4 28 GPIO_ACTIVE_HIGH>;
+	};
 
         pca9555_a21: pca9555@21 {
                 compatible = "nxp,pca9555";
