@@ -218,6 +218,10 @@ static struct snd_soc_jack_pin headset_pins[] = {
 		.pin = "Mic Jack",
 		.mask = SND_JACK_HEADSET,
 	},
+	{
+		.pin = "Headphone Jack",
+		.mask = SND_JACK_HEADPHONE,
+	},
 };
 
 static bool rt5670_volatile_register(struct device *dev, unsigned int reg)
@@ -582,6 +586,8 @@ static int iei_rt5670_irq_detection(void *data)
 			report = iei_rt5670_headset_detect(rt5670->component, 1);
 			/* for push button and jack out */
 			gpio->debounce_time = 25;
+			snd_soc_dapm_disable_pin(snd_soc_component_get_dapm(rt5670->component), "Ext Spk");
+			snd_soc_dapm_disable_pin(snd_soc_component_get_dapm(rt5670->component), "DMIC");
 			break;
 		}
 
@@ -592,6 +598,8 @@ static int iei_rt5670_irq_detection(void *data)
 		report = 0;
 		iei_rt5670_headset_detect(rt5670->component, 0);
 		gpio->debounce_time = 150; /* for jack in */
+		snd_soc_dapm_enable_pin(snd_soc_component_get_dapm(rt5670->component), "Ext Spk");
+		snd_soc_dapm_enable_pin(snd_soc_component_get_dapm(rt5670->component), "DMIC");
 		break;
 	default:
 		break;
