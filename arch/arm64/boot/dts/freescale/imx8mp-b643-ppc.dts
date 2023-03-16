@@ -82,7 +82,10 @@
 			"Ext Spk", "SPORP",
 			"Ext Spk", "SPORN",
 			"Mic Jack", "MICBIAS1",
-			"IN1P", "Mic Jack";
+			"IN1P", "Mic Jack",
+			"DMIC", "DMIC1 Power",
+			"DMIC L1", "DMIC",
+			"DMIC R1", "DMIC";
 
 		status = "okay";
 	};
