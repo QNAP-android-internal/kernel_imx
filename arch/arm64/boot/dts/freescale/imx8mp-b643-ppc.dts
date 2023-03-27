@@ -664,7 +664,6 @@
 	non-removable;
 	vqmmc-1-8-v;
 	pm-ignore-notify;
-	no-sd-uhs-sdr104;
 	status = "okay";
 };
 
