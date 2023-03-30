@@ -219,6 +219,17 @@ tlc591xx_probe(struct i2c_client *client,
 	return 0;
 }
 
+static void tlc591xx_shutdown(struct i2c_client *client)
+{
+	struct tlc591xx_priv *priv = i2c_get_clientdata(client);
+	int i = TLC591XX_MAX_LEDS;
+
+	while (--i >= 0) {
+		if (priv->leds[i].active)
+			led_classdev_unregister(&priv->leds[i].ldev);
+	}
+}
+
 static const struct i2c_device_id tlc591xx_id[] = {
 	{ "tlc59116" },
 	{ "tlc59108" },
@@ -232,6 +243,7 @@ static struct i2c_driver tlc591xx_driver = {
 		.of_match_table = of_match_ptr(of_tlc591xx_leds_match),
 	},
 	.probe = tlc591xx_probe,
+	.shutdown = tlc591xx_shutdown,
 	.id_table = tlc591xx_id,
 };
 
