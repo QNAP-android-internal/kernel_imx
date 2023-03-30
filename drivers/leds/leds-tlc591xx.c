@@ -215,6 +215,8 @@ tlc591xx_probe(struct i2c_client *client,
 					     "couldn't register LED %s\n",
 					     led->ldev.name);
 		}
+
+		tlc591xx_set_ledout(led->priv, led, LEDOUT_OFF);
 	}
 	return 0;
 }
