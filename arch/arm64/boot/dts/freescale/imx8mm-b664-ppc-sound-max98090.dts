@@ -1,0 +1,52 @@
+/*
+ * Copyright 2023 IEI-World Corp.
+ * Copyright 2018 NXP
+ *
+ * Author: Jason Yang <jasonyang@ieiworld.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "imx8mm-b664-ppc.dtsi"
+/ {
+	sound-max98090 {
+		compatible = "fsl,imx-audio-max98090";
+		model = "max98090-audio";
+		audio-cpu = <&sai3>;
+		audio-codec = <&codec>;
+		audio-routing =
+			"Headphone Jack", "HPL",
+			"Headphone Jack", "HPR",
+			"Ext Spk", "SPKL",
+			"Ext Spk", "SPKR",
+			"AMIC", "MICBIAS",
+			"IN5", "AMIC";
+
+		status = "okay";
+	};
+	sound-alc5672 {
+		status = "disabled";
+	};
+};
+
+&i2c3 {
+	/delete-node/alc5672@1c;
+	codec: max98090@10 {
+		status = "okay";
+		compatible = "maxim,max98090";
+		reg = <0x10>;
+		clocks = <&clk IMX8MM_CLK_SAI3_ROOT>;
+		clock-names = "xclk";
+		interrupt-parent = <&gpio4>;
+		interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
+		maxim,dmic-freq = <3072000>;
+	};
+};
