@@ -11,6 +11,8 @@
 #include <linux/of_device.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #define TLC591XX_MAX_LEDS	16
 #define TLC591XX_MAX_BRIGHTNESS	256
@@ -30,6 +32,7 @@
 
 #define TLC591XX_REG_GRPPWM	0x12
 #define TLC591XX_REG_GRPFREQ	0x13
+#define TLC591XX_REG_LEDOUT3	0x17
 
 /* LED Driver Output State, determine the source that drives LED outputs */
 #define LEDOUT_OFF		0x0	/* Output LOW */
@@ -39,6 +42,20 @@
 #define LEDOUT_MASK		0x3
 
 #define ldev_to_led(c)		container_of(c, struct tlc591xx_led, ldev)
+
+static char *suspend_color_override = (char*)NULL;
+module_param_named(suspend_color, suspend_color_override, charp, 0444);
+MODULE_PARM_DESC(suspend_color, "suspend_color override");
+
+static char *poweroff_state_override = (char*)NULL;
+module_param_named(poweroff_state, poweroff_state_override, charp, 0444);
+MODULE_PARM_DESC(poweroff_state, "poweroff_color override");
+
+enum power_led_type {
+	TYPE_RED = 12,
+	TYPE_GREEN = 13,
+	TYPE_BLUE = 14
+};
 
 struct tlc591xx_led {
 	bool active;
@@ -103,6 +120,20 @@ tlc591xx_set_pwm(struct tlc591xx_priv *priv, struct tlc591xx_led *led,
 	u8 pwm = TLC591XX_REG_PWM(led->led_no);
 
 	return regmap_write(priv->regmap, pwm, brightness);
+}
+
+/* It's only for power LED */
+static int
+tlc591xx_set_blink_freq(struct tlc591xx_priv *priv, struct tlc591xx_led *led,
+		 u8 color_value)
+{
+	regmap_write(priv->regmap, TLC591XX_REG_GRPPWM, 0x55);
+	regmap_write(priv->regmap, TLC591XX_REG_GRPFREQ, 0x10);
+
+	u8 pwm = TLC591XX_REG_PWM(led->led_no);
+	regmap_write(priv->regmap, pwm, 60);
+
+	return regmap_write(priv->regmap, TLC591XX_REG_LEDOUT3, color_value);
 }
 
 static int
@@ -180,7 +211,7 @@ tlc591xx_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, priv);
 
-	err = tlc591xx_set_mode(priv->regmap, MODE2_DIM);
+	err = tlc591xx_set_mode(priv->regmap, MODE2_BLINK);
 	if (err < 0)
 		return err;
 
@@ -227,10 +258,104 @@ static void tlc591xx_shutdown(struct i2c_client *client)
 	int i = TLC591XX_MAX_LEDS;
 
 	while (--i >= 0) {
-		if (priv->leds[i].active)
-			led_classdev_unregister(&priv->leds[i].ldev);
+		if(i == TYPE_RED) {
+			if(strcmp(poweroff_state_override, "on") == 0) {
+				tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_ON);
+				tlc591xx_set_pwm(priv, &priv->leds[i], 20);
+			} else
+				tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_OFF);
+		}
+		else
+			tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_OFF);
 	}
 }
+
+static void tlc591xx_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct tlc591xx_priv *priv = i2c_get_clientdata(client);
+	int i = TLC591XX_MAX_LEDS;
+	int led_red_flag = 0, led_green_flag = 0, led_blue_flag = 1, blink_flag = 0;
+	u8 current_color = 0x30;
+
+	if(strcmp(suspend_color_override, "red") == 0) {
+		led_red_flag = 1;
+		led_green_flag = 0;
+		led_blue_flag = 0;
+		current_color = 0x03;
+	}
+	else if(strcmp(suspend_color_override, "green") == 0) {
+		led_red_flag = 0;
+		led_green_flag = 1;
+		led_blue_flag = 0;
+		current_color = 0x0c;
+	}
+	else if(strcmp(suspend_color_override, "blue") == 0) {
+		led_red_flag = 0;
+		led_green_flag = 0;
+		led_blue_flag = 1;
+		current_color = 0x30;
+	}
+	else if(strcmp(suspend_color_override, "yellow") == 0) {
+		led_red_flag = 1;
+		led_green_flag = 1;
+		led_blue_flag = 0;
+		current_color = 0x0f;
+	}
+	else if(strcmp(suspend_color_override, "magenta") == 0) {
+		led_red_flag = 1;
+		led_green_flag = 0;
+		led_blue_flag = 1;
+		current_color = 0x33;
+	}
+	else if(strcmp(suspend_color_override, "cyan") == 0) {
+		led_red_flag = 0;
+		led_green_flag = 1;
+		led_blue_flag = 1;
+		current_color = 0x3c;
+	}
+	else if(strcmp(suspend_color_override, "white") == 0) {
+		led_red_flag = 1;
+		led_green_flag = 1;
+		led_blue_flag = 1;
+		current_color = 0x3f;
+	}
+	else {
+		led_red_flag = 0;
+		led_green_flag = 0;
+		led_blue_flag = 1;
+		current_color = 0x03;
+	}
+
+	while (--i >= 0) {
+		if(i == TYPE_RED && led_red_flag) {
+			tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_ON);
+			if(!blink_flag)
+				tlc591xx_set_blink_freq(priv, &priv->leds[i], current_color);
+		} else if(i == TYPE_GREEN && led_green_flag) {
+			tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_ON);
+			if(!blink_flag)
+				tlc591xx_set_blink_freq(priv, &priv->leds[i], current_color);
+		}  else if(i == TYPE_BLUE && led_blue_flag) {
+			tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_ON);
+			if(!blink_flag)
+				tlc591xx_set_blink_freq(priv, &priv->leds[i], current_color);
+		} else
+			tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_OFF);
+	}
+}
+
+static void tlc591xx_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct tlc591xx_priv *priv = i2c_get_clientdata(client);
+	int i = TLC591XX_MAX_LEDS;
+
+	while (--i >= 0) {
+		tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_OFF);
+	}
+}
+static SIMPLE_DEV_PM_OPS(tlc591xx_pm_ops, tlc591xx_suspend, tlc591xx_resume);
 
 static const struct i2c_device_id tlc591xx_id[] = {
 	{ "tlc59116" },
@@ -243,6 +368,7 @@ static struct i2c_driver tlc591xx_driver = {
 	.driver = {
 		.name = "tlc591xx",
 		.of_match_table = of_match_ptr(of_tlc591xx_leds_match),
+		.pm = &tlc591xx_pm_ops,
 	},
 	.probe = tlc591xx_probe,
 	.shutdown = tlc591xx_shutdown,
