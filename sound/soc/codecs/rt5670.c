@@ -45,7 +45,7 @@
 #define RT5670_GPIO1_IS_EXT_SPK_EN	BIT(12)
 
 static unsigned long rt5670_quirk;
-static unsigned int quirk_override;
+static unsigned int quirk_override = 0x20d;
 module_param_named(quirk, quirk_override, uint, 0444);
 MODULE_PARM_DESC(quirk, "Board-specific quirk override");
 
