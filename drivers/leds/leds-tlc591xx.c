@@ -127,10 +127,12 @@ static int
 tlc591xx_set_blink_freq(struct tlc591xx_priv *priv, struct tlc591xx_led *led,
 		 u8 color_value)
 {
+	u8 pwm = 0;
+
 	regmap_write(priv->regmap, TLC591XX_REG_GRPPWM, 0x55);
 	regmap_write(priv->regmap, TLC591XX_REG_GRPFREQ, 0x10);
 
-	u8 pwm = TLC591XX_REG_PWM(led->led_no);
+	pwm = TLC591XX_REG_PWM(led->led_no);
 	regmap_write(priv->regmap, pwm, 60);
 
 	return regmap_write(priv->regmap, TLC591XX_REG_LEDOUT3, color_value);
