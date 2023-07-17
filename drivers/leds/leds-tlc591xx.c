@@ -272,7 +272,7 @@ static void tlc591xx_shutdown(struct i2c_client *client)
 	}
 }
 
-static void tlc591xx_suspend(struct device *dev)
+static int __maybe_unused tlc591xx_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct tlc591xx_priv *priv = i2c_get_clientdata(client);
@@ -345,9 +345,11 @@ static void tlc591xx_suspend(struct device *dev)
 		} else
 			tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_OFF);
 	}
+
+	return 0;
 }
 
-static void tlc591xx_resume(struct device *dev)
+static int __maybe_unused tlc591xx_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct tlc591xx_priv *priv = i2c_get_clientdata(client);
@@ -356,7 +358,10 @@ static void tlc591xx_resume(struct device *dev)
 	while (--i >= 0) {
 		tlc591xx_set_ledout(priv, &priv->leds[i], LEDOUT_OFF);
 	}
+
+	return 0;
 }
+
 static SIMPLE_DEV_PM_OPS(tlc591xx_pm_ops, tlc591xx_suspend, tlc591xx_resume);
 
 static const struct i2c_device_id tlc591xx_id[] = {
