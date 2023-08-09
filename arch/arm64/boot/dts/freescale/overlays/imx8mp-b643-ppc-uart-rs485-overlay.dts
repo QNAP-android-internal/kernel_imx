@@ -19,51 +19,18 @@
 	fragment@0 {
 		target = <&pca9555_a21>;
 		__overlay__ {
-			a_ur_sw0 {
-				gpio-hog;
-				gpios = <0 GPIO_ACTIVE_HIGH>;
-				output-low;
-				line-name = "A_UR_SW0";
-			};
-
-			a_ur_sw1 {
-				gpio-hog;
-				gpios = <1 GPIO_ACTIVE_HIGH>;
-				output-high;
-				line-name = "A_UR_SW1";
-			};
-
-			a_ur_sw2 {
-				gpio-hog;
-				gpios = <2 GPIO_ACTIVE_HIGH>;
-				output-high;
-				line-name = "A_UR_SW2";
-			};
-
-			b_ur_sw0 {
-				gpio-hog;
-				gpios = <3 GPIO_ACTIVE_HIGH>;
-				output-low;
-				line-name = "B_UR_SW0";
-			};
-
-			b_ur_sw1 {
-				gpio-hog;
-				gpios = <4 GPIO_ACTIVE_HIGH>;
-				output-high;
-				line-name = "B_UR_SW1";
-			};
-
-			b_ur_sw2 {
-				gpio-hog;
-				gpios = <5 GPIO_ACTIVE_HIGH>;
-				output-high;
-				line-name = "B_UR_SW2";
-			};
+			status = "disabled";
 		};
 	};
 
 	fragment@1 {
+		target = <&pca9555_a21_rs485>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@2 {
 		target = <&uart3>;
 		__overlay__ {
 			pinctrl-names = "default";
@@ -74,7 +41,7 @@
 		};
 	};
 
-	fragment@2 {
+	fragment@3 {
 		target = <&iomuxc>;
 		__overlay__ {
 			pinctrl_uart3: uart3grp {
