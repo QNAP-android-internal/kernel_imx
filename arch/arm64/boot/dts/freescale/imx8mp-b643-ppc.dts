@@ -94,7 +94,7 @@
 		compatible = "pwm-backlight";
 		pwms = <&pwm1 0 66667>;
 		enable-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-		status = "okay";
+		status = "disabled";
 
 		brightness-levels = < 0  1  2  3  4  5  6  7
 			  8   9  10  11  12  13  14  15
@@ -394,7 +394,7 @@
 		pinctrl-0 = <&pinctrl_touch_irq>;
 		interrupt-parent = <&gpio1>;
 		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	ov5640_0: ov5640_mipi@3c {
@@ -541,7 +541,7 @@
 };
 
 &mipi_dsi {
-	status = "okay";
+	status = "disabled";
 
 	panel@0 {
 		compatible = "panel,tq101aj02";
