@@ -1,0 +1,25 @@
+#include "imx8mp-b643-ppc.dts"
+
+/ {
+	dsi_backlight {
+		status = "okay";
+	};
+
+	sound-hdmi {
+		status = "disabled";
+	};
+};
+
+&i2c2 {
+	i2c-hid-dev@2c {
+		status = "okay";
+	};
+};
+
+&mipi_dsi {
+	status = "okay";
+};
+
+&hdmi {
+	status = "disabled";
+};
