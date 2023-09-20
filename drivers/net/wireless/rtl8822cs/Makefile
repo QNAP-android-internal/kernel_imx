@@ -20,7 +20,9 @@ ifeq ($(GCC_VER_49),1)
 EXTRA_CFLAGS += -Wno-date-time	# Fix compile error && warning on gcc 4.9 and later
 endif
 
-EXTRA_CFLAGS += -I$(src)/include
+RTL8822CS_ROOT = $(srctree)/drivers/net/wireless/rtl8822cs
+
+EXTRA_CFLAGS += -I$(RTL8822CS_ROOT)/include
 
 EXTRA_LDFLAGS += --strip-debug
 
@@ -281,10 +283,10 @@ _HAL_INTFS_FILES :=	hal/hal_intf.o \
 			hal/led/hal_$(HCI_NAME)_led.o
 
 
-EXTRA_CFLAGS += -I$(src)/platform
+EXTRA_CFLAGS += -I$(RTL8822CS_ROOT)/platform
 _PLATFORM_FILES := platform/platform_ops.o
 
-EXTRA_CFLAGS += -I$(src)/hal/btc
+EXTRA_CFLAGS += -I$(RTL8822CS_ROOT)/hal/btc
 
 ########### HAL_RTL8188E #################################
 ifeq ($(CONFIG_RTL8188E), y)
@@ -2382,26 +2384,26 @@ endif
 ifneq ($(KERNELRELEASE),)
 
 ########### this part for *.mk ############################
-include $(src)/hal/phydm/phydm.mk
+include $(RTL8822CS_ROOT)/hal/phydm/phydm.mk
 
 ########### HAL_RTL8822B #################################
 ifeq ($(CONFIG_RTL8822B), y)
-include $(src)/rtl8822b.mk
+include $(RTL8822CS_ROOT)/rtl8822b.mk
 endif
 
 ########### HAL_RTL8821C #################################
 ifeq ($(CONFIG_RTL8821C), y)
-include $(src)/rtl8821c.mk
+include $(RTL8822CS_ROOT)/rtl8821c.mk
 endif
 
 ########### HAL_RTL8822C #################################
 ifeq ($(CONFIG_RTL8822C), y)
-include $(src)/rtl8822c.mk
+include $(RTL8822CS_ROOT)/rtl8822c.mk
 endif
 
 ########### HAL_RTL8814B #################################
 ifeq ($(CONFIG_RTL8814B), y)
-include $(src)/rtl8814b.mk
+include $(RTL8822CS_ROOT)/rtl8814b.mk
 endif
 
 ifeq ($(CONFIG_RTL8814C), y)
@@ -2409,7 +2411,7 @@ EXTRA_CFLAGS += -DCONFIG_RTL8814C
 endif
 ########### HAL_RTL8723F #################################
 ifeq ($(CONFIG_RTL8723F), y)
-include $(src)/rtl8723f.mk
+include $(RTL8822CS_ROOT)/rtl8723f.mk
 endif
 
 rtk_core :=	core/rtw_cmd.o \
@@ -2459,7 +2461,7 @@ ifeq ($(CONFIG_SDIO_HCI), y)
 rtk_core += core/rtw_sdio.o
 endif
 
-EXTRA_CFLAGS += -I$(src)/core/crypto
+EXTRA_CFLAGS += -I$(RTL8822CS_ROOT)/core/crypto
 rtk_core += \
 		core/crypto/aes-internal.o \
 		core/crypto/aes-internal-enc.o \
