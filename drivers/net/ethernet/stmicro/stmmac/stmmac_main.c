@@ -143,6 +143,8 @@ static void stmmac_exit_fs(struct net_device *dev);
 
 #define STMMAC_COAL_TIMER(x) (ns_to_ktime((x) * NSEC_PER_USEC))
 
+static int dma_reset_flag = 0;
+
 int stmmac_bus_clks_config(struct stmmac_priv *priv, bool enabled)
 {
 	int ret = 0;
@@ -2903,13 +2905,14 @@ static int stmmac_init_dma_engine(struct stmmac_priv *priv)
 
 	if (priv->extend_desc && (priv->mode == STMMAC_RING_MODE))
 		atds = 1;
-
-	ret = stmmac_reset(priv, priv->ioaddr);
-	if (ret) {
-		dev_err(priv->device, "Failed to reset the dma\n");
-		return ret;
+	if (dma_reset_flag == 0){
+		ret = stmmac_reset(priv, priv->ioaddr);
+		dma_reset_flag = 1;
+		if (ret) {
+			dev_err(priv->device, "Failed to reset the dma\n");
+			return ret;
+		}
 	}
-
 	/* DMA Configuration */
 	stmmac_dma_init(priv, priv->ioaddr, priv->plat->dma_cfg, atds);
 
