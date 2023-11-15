@@ -149,6 +149,8 @@ static void stmmac_exit_fs(struct net_device *dev);
 
 #define STMMAC_COAL_TIMER(x) (ns_to_ktime((x) * NSEC_PER_USEC))
 
+static int dma_reset_flag = 0;
+
 /**
  * stmmac_set_clk_tx_rate() - set the clock rate for the MAC transmit clock
  * @bsp_priv: BSP private data structure (unused)
@@ -759,9 +761,13 @@ static int stmmac_init_timestamping(struct stmmac_priv *priv)
 	}
 
 	ret = stmmac_init_tstamp_counter(priv, STMMAC_HWTS_ACTIVE);
-	if (ret) {
-		netdev_warn(priv->dev, "PTP init failed\n");
-		return ret;
+	if (dma_reset_flag == 0){
+		ret = stmmac_reset(priv, priv->ioaddr);
+		dma_reset_flag = 1;
+		if (ret) {
+			dev_err(priv->device, "Failed to reset the dma\n");
+			return ret;
+		}
 	}
 
 	priv->adv_ts = 0;
