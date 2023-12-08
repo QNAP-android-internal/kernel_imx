@@ -4579,9 +4579,10 @@ static const struct panel_desc_dsi dsi2dp_g101ean024 = {
 			.height = 105,
 		},
 		.delay = {
-			.prepare = 500,
-			.enable = 1000,
-			.unprepare = 500,
+			.prepare = 50,
+			.enable = 30,
+			.unprepare = 50,
+			.disable = 100,
 		},
 		.bus_flags = DRM_BUS_FLAG_DE_LOW,
 		.connector_type = DRM_MODE_CONNECTOR_eDP,
