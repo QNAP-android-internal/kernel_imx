@@ -2308,10 +2308,39 @@ static int rt5670_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_component *component = dai->component;
 	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
 	unsigned int val_len = 0, val_clk, mask_clk;
-	int pre_div, bclk_ms, frame_size;
+	int pre_div, bclk_ms, frame_size, div_ratio;
 
 	rt5670->lrck[dai->id] = params_rate(params);
+
+	switch (rt5670->lrck[dai->id]) {
+		case 8000:
+		case 11025:
+			div_ratio = 16;
+			break;
+		case 16000:
+		case 22050:
+			div_ratio = 8;
+			break;
+		case 32000:
+		case 44100:
+		case 48000:
+			div_ratio = 4;
+			break;
+		case 88200:
+		case 96000:
+			div_ratio = 2;
+			break;
+		case 176400:
+		case 196000:
+		default:
+			div_ratio = 4;
+			break;
+	}
+
+	rt5670->sysclk = rt5670->lrck[dai->id] * 256 * div_ratio;
+
 	pre_div = rl6231_get_clk_info(rt5670->sysclk, rt5670->lrck[dai->id]);
+
 	if (pre_div < 0) {
 		dev_err(component->dev, "Unsupported clock setting %d for DAI %d\n",
 			rt5670->lrck[dai->id], dai->id);
