@@ -37,6 +37,7 @@ static const unsigned int fsl_sai_rates[] = {
 	384000, 705600, 768000, 1411200, 2822400,
 };
 
+static unsigned int pll_max_freq = 300;
 static const struct snd_pcm_hw_constraint_list fsl_sai_rate_constraints = {
 	.count = ARRAY_SIZE(fsl_sai_rates),
 	.list = fsl_sai_rates,
@@ -484,7 +485,7 @@ static int fsl_sai_set_bclk(struct snd_soc_dai *dai, bool tx, u32 freq)
 		 * below 300Mhz, but above stay above lowest ratio
 		 */
 		clk_rate = freq * 512;
-		while (clk_rate >= 300*1000*1000 && clk_rate >= freq*2)
+		while (clk_rate >= pll_max_freq*1000*1000 && clk_rate >= freq*2)
 			clk_rate /= 2;
 
 		ret = clk_set_rate(sai->mclk_clk[id], clk_rate);
@@ -1518,6 +1519,13 @@ static int fsl_sai_probe(struct platform_device *pdev)
 
 		regmap_update_bits(gpr, IOMUXC_GPR1, MCLK_DIR(index),
 				   MCLK_DIR(index));
+	}
+
+	if (of_property_read_u32(np, "pll-max-freq-MHz", &pll_max_freq) == 0) {
+		if ((pll_max_freq < 25) || (pll_max_freq > 300)) {
+			dev_err(&pdev->dev, "value of 'pll_max_freq' property is invaild\n");
+			pll_max_freq = 300;
+		}
 	}
 
 	sai->dma_params_rx.addr = sai->res->start + FSL_SAI_RDR0;
