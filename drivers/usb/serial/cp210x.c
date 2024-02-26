@@ -35,9 +35,9 @@ static void cp210x_get_termios(struct tty_struct *, struct usb_serial_port *);
 static void cp210x_get_termios_port(struct usb_serial_port *port,
 	tcflag_t *cflagp, unsigned int *baudp);
 static void cp210x_change_speed(struct tty_struct *, struct usb_serial_port *,
-							struct ktermios *);
+							const struct ktermios *);
 static void cp210x_set_termios(struct tty_struct *, struct usb_serial_port *,
-							struct ktermios*);
+							const struct ktermios*);
 static bool cp210x_tx_empty(struct usb_serial_port *port);
 static int cp210x_tiocmget(struct tty_struct *);
 static int cp210x_tiocmset(struct tty_struct *, unsigned int, unsigned int);
@@ -1303,7 +1303,7 @@ static speed_t cp210x_get_actual_rate(speed_t baud)
  * otherwise.
  */
 static void cp210x_change_speed(struct tty_struct *tty,
-		struct usb_serial_port *port, struct ktermios *old_termios)
+		struct usb_serial_port *port, const struct ktermios *old_termios)
 {
 	struct usb_serial *serial = port->serial;
 	struct cp210x_serial_private *priv = usb_get_serial_data(serial);
@@ -1374,7 +1374,7 @@ static void cp210x_disable_event_mode(struct usb_serial_port *port)
 }
 
 static void cp210x_set_termios(struct tty_struct *tty,
-		struct usb_serial_port *port, struct ktermios *old_termios)
+		struct usb_serial_port *port, const struct ktermios *old_termios)
 {
 	struct device *dev = &port->dev;
 	unsigned int cflag, old_cflag;
