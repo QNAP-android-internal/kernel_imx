@@ -508,22 +508,6 @@ void rt5670_jack_resume(struct snd_soc_component *component)
 }
 EXPORT_SYMBOL_GPL(rt5670_jack_resume);
 
-static int rt5670_button_detect(struct snd_soc_component *component)
-{
-	int btn_type, val;
-
-	val = snd_soc_component_read(component, RT5670_IL_CMD);
-	btn_type = val & 0xff80;
-	snd_soc_component_write(component, RT5670_IL_CMD, val);
-	if (btn_type != 0) {
-		msleep(20);
-		val = snd_soc_component_read(component, RT5670_IL_CMD);
-		snd_soc_component_write(component, RT5670_IL_CMD, val);
-	}
-
-	return btn_type;
-}
-
 static int iei_rt5670_headset_detect(struct snd_soc_component *component, int jack_insert)
 {
 	int val;
@@ -600,70 +584,6 @@ static int iei_rt5670_irq_detection(void *data)
 		gpio->debounce_time = 150; /* for jack in */
 		snd_soc_dapm_enable_pin(snd_soc_component_get_dapm(rt5670->component), "Ext Spk");
 		snd_soc_dapm_enable_pin(snd_soc_component_get_dapm(rt5670->component), "DMIC");
-		break;
-	default:
-		break;
-	}
-
-	return report;
-}
-
-static int rt5670_irq_detection(void *data)
-{
-	struct rt5670_priv *rt5670 = (struct rt5670_priv *)data;
-	struct snd_soc_jack_gpio *gpio = &rt5670->hp_gpio;
-	struct snd_soc_jack *jack = rt5670->jack;
-	int val, btn_type, report = jack->status;
-
-	if (rt5670->jd_mode == 1) /* 2 port */
-		val = snd_soc_component_read(rt5670->component, RT5670_A_JD_CTRL1) & 0x0070;
-	else
-		val = snd_soc_component_read(rt5670->component, RT5670_A_JD_CTRL1) & 0x0020;
-
-	switch (val) {
-	/* jack in */
-	case 0x30: /* 2 port */
-	case 0x0: /* 1 port or 2 port */
-		if (rt5670->jack_type == 0) {
-			report = rt5670_headset_detect(rt5670->component, 1);
-			/* for push button and jack out */
-			gpio->debounce_time = 25;
-			break;
-		}
-		btn_type = 0;
-		if (snd_soc_component_read(rt5670->component, RT5670_INT_IRQ_ST) & 0x4) {
-			/* button pressed */
-			report = SND_JACK_HEADSET;
-			btn_type = rt5670_button_detect(rt5670->component);
-			switch (btn_type) {
-			case 0x2000: /* up */
-				report |= SND_JACK_BTN_1;
-				break;
-			case 0x0400: /* center */
-				report |= SND_JACK_BTN_0;
-				break;
-			case 0x0080: /* down */
-				report |= SND_JACK_BTN_2;
-				break;
-			default:
-				dev_err(rt5670->component->dev,
-					"Unexpected button code 0x%04x\n",
-					btn_type);
-				break;
-			}
-		}
-		if (btn_type == 0)/* button release */
-			report =  rt5670->jack_type;
-
-		break;
-	/* jack out */
-	case 0x70: /* 2 port */
-	case 0x10: /* 2 port */
-	case 0x20: /* 1 port */
-		report = 0;
-		snd_soc_component_update_bits(rt5670->component, RT5670_INT_IRQ_ST, 0x1, 0x0);
-		rt5670_headset_detect(rt5670->component, 0);
-		gpio->debounce_time = 150; /* for jack in */
 		break;
 	default:
 		break;
@@ -2767,7 +2687,7 @@ static int rt5670_probe(struct snd_soc_component *component)
 	}
 	rt5670->component = component;
 
-        ret = snd_soc_card_jack_new(component->card, "Headset",
+        ret = snd_soc_card_jack_new_pins(component->card, "Headset",
 				    SND_JACK_HEADSET,
 				    &iei_rt5670_jack,
 				    headset_pins,
