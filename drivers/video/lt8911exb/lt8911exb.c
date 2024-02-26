@@ -353,45 +353,6 @@ static int lt8911exb_parse_dt(struct device *dev,
     return 0;
 }
 
-static int lt8911exb_request_io_port(struct lt8911exb_data *lt8911exb)
-{
-    int ret = 0;
-
-    if(gpio_is_valid(lt8911exb->pwr_gpio)) {
-        ret = gpio_request(lt8911exb->pwr_gpio, "lt8911exb_pwr");
-
-        if(ret < 0) {
-            dev_err(&lt8911exb->client->dev,
-                    "Failed to request GPIO:%d, ERRNO:%d\n",
-                    (s32)lt8911exb->pwr_gpio, ret);
-            return -ENODEV;
-        }
-
-        gpio_direction_input(lt8911exb->pwr_gpio);
-        dev_info(&lt8911exb->client->dev, "Success request pwr-gpio\n");
-    }
-
-    if(gpio_is_valid(lt8911exb->rst_gpio)) {
-        ret = gpio_request(lt8911exb->rst_gpio, "lt8911exb_rst");
-
-        if(ret < 0) {
-            dev_err(&lt8911exb->client->dev,
-                    "Failed to request GPIO:%d, ERRNO:%d\n",
-                    (s32)lt8911exb->rst_gpio, ret);
-
-            if(gpio_is_valid(lt8911exb->pwr_gpio))
-                gpio_free(lt8911exb->pwr_gpio);
-
-            return -ENODEV;
-        }
-
-        gpio_direction_input(lt8911exb->rst_gpio);
-        dev_info(&lt8911exb->client->dev,  "Success request rst-gpio\n");
-    }
-
-    return 0;
-}
-
 static int lt8911exb_i2c_test(struct i2c_client *client)
 {
     u8 retry = 0;
@@ -853,7 +814,7 @@ exit_free_client_data:
     return ret;
 }
 
-static int lt8911exb_remove(struct i2c_client * client)
+static void lt8911exb_remove(struct i2c_client * client)
 {
     struct lt8911exb_data *lt8911exb = i2c_get_clientdata(client);
 
@@ -867,8 +828,6 @@ static int lt8911exb_remove(struct i2c_client * client)
     i2c_set_clientdata(client, NULL);
 
     devm_kfree(&client->dev, lt8911exb);
-
-    return 0;
 }
 
 static const struct of_device_id lt8911exb_match_table[] = {
