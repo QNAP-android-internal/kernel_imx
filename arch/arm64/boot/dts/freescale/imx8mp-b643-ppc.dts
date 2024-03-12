@@ -7,10 +7,11 @@
 
 #include <dt-bindings/usb/pd.h>
 #include "imx8mp.dtsi"
+#include "imx8mp-android.dtsi"
 
 / {
-	model = "IEI i.MX8MP B643 Panel PC";
-	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
+	model = "IEI WAFER-IMX8MP Single Board Computer";
+	compatible = "fsl,imx8mp-b643-ppc", "fsl,imx8mp";
 
 	chosen {
 		stdout-path = &uart2;
