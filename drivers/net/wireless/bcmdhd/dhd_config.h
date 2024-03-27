@@ -21,9 +21,13 @@
 #define FW_TYPE_AG      1
 
 #define FW_PATH_AUTO_SELECT 1
+#ifdef BCMDHD_MDRIVER
+#define CONFIG_PATH_AUTO_SELECT
+#else
 //#define CONFIG_PATH_AUTO_SELECT
+#endif
 extern char firmware_path[MOD_PARAM_PATHLEN];
-#if defined(BCMSDIO) || defined(BCMPCIE)
+#if defined(BCMSDIO)
 extern uint dhd_rxbound;
 extern uint dhd_txbound;
 #endif
@@ -63,11 +67,6 @@ typedef struct wl_chip_nv_path_list_ctrl {
 	struct wl_chip_nv_path *m_chip_nv_path_head;
 } wl_chip_nv_path_list_ctrl_t;
 
-typedef struct wl_channel_list {
-	uint32 count;
-	uint32 channel[WL_NUMCHANNELS];
-} wl_channel_list_t;
-
 typedef struct wmes_param {
 	int aifsn[AC_COUNT];
 	int ecwmin[AC_COUNT];
@@ -96,6 +95,13 @@ typedef struct country_list {
 	wl_country_t cspec;
 } country_list_t;
 
+typedef struct wl_ccode_all {
+	wl_country_t cspec;
+	int32 ww_2g_chan_only;
+	int32 disable_5g_band;
+	int32 disable_6g_band;
+} wl_ccode_all_t;
+
 /* mchan_params */
 #define MCHAN_MAX_NUM 4
 #define MIRACAST_SOURCE	1
@@ -118,15 +124,19 @@ enum scan_intput_flags {
 enum war_flags {
 	SET_CHAN_INCONN	= (1 << (0)),
 	FW_REINIT_INCSA	= (1 << (1)),
+	FW_REINIT_EMPTY_SCAN	= (1 << (2)),
+	P2P_AP_MAC_CONFLICT	= (1 << (3)),
+	RESEND_EAPOL_PKT	= (1 << (4)),
+	FW_REINIT_RXF0OVFL	= (1 << (5))
 };
 
 enum in4way_flags {
 	STA_NO_SCAN_IN4WAY	= (1 << (0)),
 	STA_NO_BTC_IN4WAY	= (1 << (1)),
 	STA_WAIT_DISCONNECTED	= (1 << (2)),
-	STA_START_AUTH_DELAY	= (1 << (3)),
-	AP_WAIT_STA_RECONNECT	= (1 << (4)),
-	STA_FAKE_SCAN_IN_CONNECT	= (1 << (5)),
+	AP_WAIT_STA_RECONNECT	= (1 << (3)),
+	STA_FAKE_SCAN_IN_CONNECT	= (1 << (4)),
+	STA_REASSOC_RETRY	= (1 << (5)),
 };
 
 enum in_suspend_flags {
@@ -142,7 +152,8 @@ enum in_suspend_flags {
 
 enum in_suspend_mode {
 	EARLY_SUSPEND = 0,
-	PM_NOTIFIER = 1
+	PM_NOTIFIER = 1,
+	SUSPEND_MODE_2 = 2
 };
 
 #ifdef TPUT_MONITOR
@@ -154,34 +165,41 @@ enum data_drop_mode {
 };
 #endif
 
-enum eapol_status {
-	EAPOL_STATUS_NONE = 0,
-	EAPOL_STATUS_CONNECTING = 1,
-	EAPOL_STATUS_CONNECTED = 2,
-	EAPOL_STATUS_REQID = 3,
-	EAPOL_STATUS_RSPID = 4,
-	EAPOL_STATUS_WSC_START = 5,
-	EAPOL_STATUS_WPS_M1 = 6,
-	EAPOL_STATUS_WPS_M2 = 7,
-	EAPOL_STATUS_WPS_M3 = 8,
-	EAPOL_STATUS_WPS_M4 = 9,
-	EAPOL_STATUS_WPS_M5 = 10,
-	EAPOL_STATUS_WPS_M6 = 11,
-	EAPOL_STATUS_WPS_M7 = 12,
-	EAPOL_STATUS_WPS_M8 = 13,
-	EAPOL_STATUS_WSC_DONE = 14,
-	EAPOL_STATUS_4WAY_START = 15,
-	AUTH_SAE_COMMIT_M1 = 16,
-	AUTH_SAE_COMMIT_M2 = 17,
-	AUTH_SAE_CONFIRM_M3 = 18,
-	AUTH_SAE_CONFIRM_M4 = 19,
-	EAPOL_STATUS_4WAY_M1 = 20,
-	EAPOL_STATUS_4WAY_M2 = 21,
-	EAPOL_STATUS_4WAY_M3 = 22,
-	EAPOL_STATUS_4WAY_M4 = 23,
-	EAPOL_STATUS_GROUPKEY_M1 = 24,
-	EAPOL_STATUS_GROUPKEY_M2 = 25,
-	EAPOL_STATUS_4WAY_DONE = 26
+enum conn_state {
+	CONN_STATE_IDLE = 0,
+	CONN_STATE_CONNECTING = 1,
+	CONN_STATE_AUTH_SAE_M1 = 2,
+	CONN_STATE_AUTH_SAE_M2 = 3,
+	CONN_STATE_AUTH_SAE_M3 = 4,
+	CONN_STATE_AUTH_SAE_M4 = 5,
+	CONN_STATE_ASSOCIATED = 6,
+	CONN_STATE_REQID = 7,
+	CONN_STATE_RSPID = 8,
+	CONN_STATE_WSC_START = 9,
+	CONN_STATE_WPS_M1 = 10,
+	CONN_STATE_WPS_M2 = 11,
+	CONN_STATE_WPS_M3 = 12,
+	CONN_STATE_WPS_M4 = 13,
+	CONN_STATE_WPS_M5 = 14,
+	CONN_STATE_WPS_M6 = 15,
+	CONN_STATE_WPS_M7 = 16,
+	CONN_STATE_WPS_M8 = 17,
+	CONN_STATE_WSC_DONE = 18,
+	CONN_STATE_4WAY_M1 = 19,
+	CONN_STATE_4WAY_M2 = 20,
+	CONN_STATE_4WAY_M3 = 21,
+	CONN_STATE_4WAY_M4 = 22,
+	CONN_STATE_ADD_KEY = 23,
+	CONN_STATE_CONNECTED = 24,
+	CONN_STATE_GROUPKEY_M1 = 25,
+	CONN_STATE_GROUPKEY_M2 = 26,
+};
+
+enum enq_pkt_type {
+	ENQ_PKT_TYPE_EAPOL	= (1 << (0)),
+	ENQ_PKT_TYPE_ARP	= (1 << (1)),
+	ENQ_PKT_TYPE_DHCP	= (1 << (2)),
+	ENQ_PKT_TYPE_ICMP	= (1 << (3)),
 };
 
 typedef struct dhd_conf {
@@ -203,10 +221,14 @@ typedef struct dhd_conf {
 #endif
 	wl_chip_nv_path_list_ctrl_t nv_by_chip;
 	country_list_t *country_head;
+	char *ccode_all_list;
+	wl_ccode_all_t ccode_all;
+	int ioctl_ver;
 	int band;
 	int bw_cap[2];
 	wl_country_t cspec;
-	wl_channel_list_t channels;
+// SPKL SparkLAN drv_acs
+	uint drv_acs;
 	uint roam_off;
 	uint roam_off_suspend;
 	int roam_trigger[2];
@@ -225,6 +247,8 @@ typedef struct dhd_conf {
 	conf_pkt_filter_add_t pkt_filter_add;
 	conf_pkt_filter_del_t pkt_filter_del;
 	char *magic_pkt_filter_add;
+	int magic_pkt_hdr_len;
+	int pkt_filter_cnt_default;
 #endif
 	int srl;
 	int lrl;
@@ -280,6 +304,10 @@ typedef struct dhd_conf {
 	int bus_deepsleep_disable;
 	int flow_ring_queue_threshold;
 	int d2h_intr_method;
+	int d2h_intr_control;
+	int enq_hdr_pkt;
+	int aspm;
+	int l1ss;
 #endif
 	int dpc_cpucore;
 	int rxf_cpucore;
@@ -328,6 +356,9 @@ typedef struct dhd_conf {
 	uint war;
 #ifdef WL_EXT_WOWL
 	uint wowl;
+#ifdef BCMDBUS
+	uint wowl_dngldown;
+#endif
 #endif
 #ifdef GET_CUSTOM_MAC_FROM_CONFIG
 	char hw_ether[62];
@@ -345,6 +376,9 @@ typedef struct dhd_conf {
 	unsigned long last_tx;
 	unsigned long last_rx;
 	unsigned long last_net_tx;
+#ifdef BCMSDIO
+	int32 doflow_tput_thresh;
+#endif
 #endif
 #ifdef SCAN_SUPPRESS
 	uint scan_intput;
@@ -375,23 +409,28 @@ void dhd_conf_get_otp(dhd_pub_t *dhd, bcmsdh_info_t *sdh, si_t *sih);
 void dhd_conf_set_hw_oob_intr(bcmsdh_info_t *sdh, struct si_pub *sih);
 #endif
 void dhd_conf_set_txglom_params(dhd_pub_t *dhd, bool enable);
+bool dhd_conf_legacy_otp_chip(dhd_pub_t *dhd);
 #endif
 #ifdef BCMPCIE
 int dhd_conf_get_otp(dhd_pub_t *dhd, si_t *sih);
 bool dhd_conf_legacy_msi_chip(dhd_pub_t *dhd);
 #endif
+#ifdef WL_CFG80211
+bool dhd_conf_legacy_chip_check(dhd_pub_t *dhd);
+bool dhd_conf_new_chip_check(dhd_pub_t *dhd);
+bool dhd_conf_extsae_chip(dhd_pub_t *dhd);
+#endif
 void dhd_conf_set_path_params(dhd_pub_t *dhd, char *fw_path, char *nv_path);
-int dhd_conf_set_intiovar(dhd_pub_t *dhd, uint cmd, char *name, int val,
-	int def, bool down);
+int dhd_conf_set_intiovar(dhd_pub_t *dhd, int ifidx, uint cmd, char *name,
+	int val, int def, bool down);
 int dhd_conf_get_band(dhd_pub_t *dhd);
-int dhd_conf_set_country(dhd_pub_t *dhd, wl_country_t *cspec);
+bool dhd_conf_same_country(dhd_pub_t *dhd, char *buf);
+int dhd_conf_country(dhd_pub_t *dhd, char *cmd, char *buf);
 int dhd_conf_get_country(dhd_pub_t *dhd, wl_country_t *cspec);
-int dhd_conf_map_country_list(dhd_pub_t *dhd, wl_country_t *cspec);
 #ifdef CCODE_LIST
+int dhd_ccode_map_country_all(dhd_pub_t *dhd, wl_country_t *cspec);
 int dhd_ccode_map_country_list(dhd_pub_t *dhd, wl_country_t *cspec);
 #endif
-int dhd_conf_fix_country(dhd_pub_t *dhd);
-bool dhd_conf_match_channel(dhd_pub_t *dhd, uint32 channel);
 void dhd_conf_set_wme(dhd_pub_t *dhd, int ifidx, int mode);
 void dhd_conf_set_mchan_bw(dhd_pub_t *dhd, int go, int source);
 void dhd_conf_add_pkt_filter(dhd_pub_t *dhd);
@@ -402,6 +441,7 @@ int dhd_conf_set_chiprev(dhd_pub_t *dhd, uint chip, uint chiprev);
 uint dhd_conf_get_chip(void *context);
 uint dhd_conf_get_chiprev(void *context);
 int dhd_conf_get_pm(dhd_pub_t *dhd);
+int dhd_conf_reg2args(dhd_pub_t *dhd, char *cmd, bool set, uint32 index, uint32 *val);
 int dhd_conf_check_hostsleep(dhd_pub_t *dhd, int cmd, void *buf, int len,
 	int *hostsleep_set, int *hostsleep_val, int *ret);
 void dhd_conf_get_hostsleep(dhd_pub_t *dhd,
@@ -420,13 +460,20 @@ void dhd_conf_tput_monitor(dhd_pub_t *dhd);
 uint dhd_conf_get_insuspend(dhd_pub_t *dhd, uint mask);
 int dhd_conf_set_suspend_resume(dhd_pub_t *dhd, int suspend);
 void dhd_conf_postinit_ioctls(dhd_pub_t *dhd);
+void dhd_conf_preinit_ioctls_sta(dhd_pub_t *dhd, int ifidx);
 int dhd_conf_preinit(dhd_pub_t *dhd);
 int dhd_conf_reset(dhd_pub_t *dhd);
 int dhd_conf_attach(dhd_pub_t *dhd);
 void dhd_conf_detach(dhd_pub_t *dhd);
 void *dhd_get_pub(struct net_device *dev);
 int wl_pattern_atoh(char *src, char *dst);
-#ifdef BCMSDIO
+int dhd_conf_suspend_resume_sta(dhd_pub_t *dhd, int ifidx, int suspend);
+/* Add to adjust 802.1x priority */
+extern void pktset8021xprio(void *pkt, int prio);
+#if defined(BCMSDIO) || defined(BCMPCIE) || defined(BCMDBUS)
 extern int dhd_bus_sleep(dhd_pub_t *dhdp, bool sleep, uint32 *intstatus);
+#endif
+#ifdef WL_EXT_WOWL
+int dhd_conf_wowl_dngldown(dhd_pub_t *dhd);
 #endif
 #endif /* _dhd_config_ */
