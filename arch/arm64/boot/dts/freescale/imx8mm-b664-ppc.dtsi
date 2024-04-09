@@ -590,7 +590,7 @@
 		compatible = "iei,dsi2dp-g101ean024";
 		power-supply = <&reg_dp_backlight_pwr>;
 
-		dsi,flags = <0x0007>;
+		dsi,flags = <0x0001>;
 		dsi,format = <0>;
 		dsi,lanes = <4>;
 		panel-width-mm  = <217>;
