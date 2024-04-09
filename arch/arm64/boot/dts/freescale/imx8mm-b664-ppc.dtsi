@@ -601,7 +601,7 @@
 		rotate = <0>;
 
 		panel-timing {
-			clock-frequency = <77000000>;
+			clock-frequency = <79800000>;
 			hactive = <1280>;
 			vactive = <800>;
 			hfront-porch = <40>;
