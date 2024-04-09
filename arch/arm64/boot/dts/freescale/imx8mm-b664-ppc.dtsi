@@ -645,6 +645,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm_buzzer>;
 	status = "okay";
+	#pwm-cells = <2>;
 };
 
 &uart1 { /* BT */
