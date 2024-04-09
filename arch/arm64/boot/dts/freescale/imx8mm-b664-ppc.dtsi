@@ -197,6 +197,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm1_dp>;
 	status = "okay";
+	#pwm-cells = <2>;
 };
 
 &ecspi2 {
