@@ -363,17 +363,10 @@ static int panel_simple_resume(struct device *dev)
 static int panel_simple_prepare(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
-	int ret;
 
 	/* Preparing when already prepared is a no-op */
 	if (p->prepared)
 		return 0;
-
-	ret = pm_runtime_get_sync(panel->dev);
-	if (ret < 0) {
-		pm_runtime_put_autosuspend(panel->dev);
-		return ret;
-	}
 
 	p->prepared = true;
 
