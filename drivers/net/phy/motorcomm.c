@@ -111,6 +111,12 @@
 #define YT8511_EXT_DELAY_DRIVE	0x0d
 #define YT8511_EXT_SLEEP_CTRL	0x27
 
+/* Extended Register's Address Offset Register (0x1E)
+ * Extended Register's Data Register (0x1F)
+*/
+#define EXT_REG_ADDR_OFFSET	0x1e
+#define EXT_REG_DATA		0x1f
+
 /* 2b00 25m from pll
  * 2b01 25m from xtl *default*
  * 2b10 62.m from pll
@@ -276,6 +282,23 @@
 #define YTPHY_DTS_OUTPUT_CLK_25M		25000000
 #define YTPHY_DTS_OUTPUT_CLK_125M		125000000
 
+/* LED blink when link up, rx is bit 9 ,tx is bit 10 .
+ * if BLINK status is not activated, when PHY link up:
+ * speed mode is 10M ,LED on is bit 4
+ * speed mode is 100M ,LED on is bit 5
+ * speed mode is 1000M ,LED on is bit 6
+ *
+ * default value: LED0=0x610 LED1=0x620 LED2=0x640
+ */
+#define YT8521S_EXTREG_LED0 0xA00C
+#define YT8521S_EXTREG_LED1 0xA00D
+#define YT8521S_EXTREG_LED2 0xA00E
+
+#define YT8521S_EXT_REG_TX_BLINK    (1 << 10)
+#define YT8521S_EXT_REG_RX_BLINK    (1 << 9)
+#define YT8521S_EXT_REG_100M        (1 << 5)
+#define YT8521S_EXT_REG_1000M       (1 << 6)
+
 struct yt8521_priv {
 	/* combo_advertising is used for case of YT8521 in combo mode,
 	 * this means that yt8521 may work in utp or fiber mode which depends
@@ -371,6 +394,31 @@ static int ytphy_write_ext_with_lock(struct phy_device *phydev, u16 regnum,
 	phy_unlock_mdio_bus(phydev);
 
 	return ret;
+}
+
+static int init_LAN_LED_standard_customization(struct phy_device *phydev)
+{
+    int ret = 0,val;
+
+    val = ytphy_read_ext(phydev,YT8521S_EXTREG_LED0);
+    val = (val | YT8521S_EXT_REG_100M | YT8521S_EXT_REG_1000M);
+    ret = ytphy_write_ext(phydev, YT8521S_EXTREG_LED0, val);
+    if (ret < 0)
+        return ret;
+
+    val = ytphy_read_ext(phydev,YT8521S_EXTREG_LED1);
+    val = (val & ~YT8521S_EXT_REG_RX_BLINK & ~YT8521S_EXT_REG_TX_BLINK);
+    ret = ytphy_write_ext(phydev, YT8521S_EXTREG_LED1, val);
+    if (ret < 0)
+        return ret;
+
+    val = ytphy_read_ext(phydev,YT8521S_EXTREG_LED2);
+    val = (val & ~YT8521S_EXT_REG_RX_BLINK & ~YT8521S_EXT_REG_TX_BLINK);
+    ret = ytphy_write_ext(phydev, YT8521S_EXTREG_LED2, val);
+    if (ret < 0)
+        return ret;
+
+    return ret;
 }
 
 /**
@@ -1601,6 +1649,11 @@ static int yt8521_config_init(struct phy_device *phydev)
 		if (ret < 0)
 			goto err_restore_page;
 	}
+
+    ret = init_LAN_LED_standard_customization(phydev);
+    if (ret < 0)
+        goto err_restore_page;
+
 err_restore_page:
 	return phy_restore_page(phydev, old_page, ret);
 }
