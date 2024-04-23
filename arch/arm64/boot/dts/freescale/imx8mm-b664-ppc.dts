@@ -9,7 +9,7 @@
 #include "imx8mm-b664-ppc.dtsi"
 
 / {
-	model = "IEI i.MX8MM B664 Panel PC";
+	model = "IEI IASO-W10-IMX8M Medical Panel PC";
 	compatible = "fsl,imx8mm-evk", "fsl,imx8mm";
 
 	aliases {
