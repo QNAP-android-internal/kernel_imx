@@ -33,7 +33,7 @@ CONFIG_BCMDHD ?= m
 CONFIG_BCMDHD_PROPTXSTATUS := y
 CONFIG_DHD_USE_STATIC_BUF := y
 CONFIG_BCMDHD_STATIC_BUF_IN_DHD := y
-#CONFIG_BCMDHD_ANDROID_VERSION := 12
+CONFIG_BCMDHD_ANDROID_VERSION := 14
 CONFIG_BCMDHD_AUTO_SELECT := y
 CONFIG_BCMDHD_DEBUG := y
 #CONFIG_BCMDHD_RECONNECT := y
@@ -51,7 +51,8 @@ CONFIG_MACH_PLATFORM := y
 CONFIG_BCMDHD_DTS := y
 
 DHDCFLAGS = -Wall -Wstrict-prototypes -Wno-date-time                      \
-	-Wno-maybe-uninitialized                                              \
+	-Wno-unused-but-set-variable                                          \
+	-Wno-uninitialized                                                    \
 	-Dlinux -DLINUX -DBCMDRIVER -DBCMUTILS_ERR_CODES                      \
 	-DBCMDONGLEHOST -DBCMDMA32 -DBCMFILEIMAGE                             \
 	-DDHDTHREAD -DDHD_DEBUG -DSHOW_EVENTS -DGET_OTP_MAC_ENABLE            \
@@ -465,7 +466,7 @@ BCMDHD_ROOT = $(src)
 #$(warning "BCMDHD_ROOT=$(BCMDHD_ROOT)")
 EXTRA_CFLAGS = $(DHDCFLAGS)
 EXTRA_CFLAGS += -DDHD_COMPILED=\"$(BCMDHD_ROOT)\"
-EXTRA_CFLAGS += -I$(BCMDHD_ROOT)/include/ -I$(BCMDHD_ROOT)/
+EXTRA_CFLAGS += -I$(srctree)/drivers/net/wireless/bcmdhd/include/ -I$(srctree)/drivers/net/wireless/bcmdhd
 ifeq ($(CONFIG_BCMDHD),m)
 EXTRA_LDFLAGS += --strip-debug
 endif
