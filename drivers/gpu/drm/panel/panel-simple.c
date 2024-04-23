@@ -4808,6 +4808,7 @@ static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 	u32 dsi_flags;
 	u32 dsi_format;
 	u32 dsi_lanes;
+	u32 android_gki = 0;
 
 	id = of_match_node(dsi_of_match, dsi->dev.of_node);
 	np = dsi->dev.of_node;
@@ -4831,14 +4832,19 @@ static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 	if (of_property_read_bool(np, "dsi,lanes"))
 		of_property_read_u32(np, "dsi,lanes", &dsi_lanes);
 
-	if (dsi_flags != desc->flags || \
-		dsi_format != desc->format || \
-		dsi_lanes !=  desc->lanes) {
-			((struct panel_desc_dsi*)desc)->flags = dsi_flags;
-				((struct panel_desc_dsi*)desc)->format = dsi_format;
-				((struct panel_desc_dsi*)desc)->lanes = dsi_lanes;
-			dev_warn(&dsi->dev, "panel-desc-dsi setting overridden from dt\n");
-			}
+	if (of_property_read_bool(np, "android-gki"))
+		of_property_read_u32(np, "android-gki", &android_gki);
+
+	if(!android_gki) {
+		if (dsi_flags != desc->flags || \
+			dsi_format != desc->format || \
+			dsi_lanes !=  desc->lanes) {
+				((struct panel_desc_dsi*)desc)->flags = dsi_flags;
+					((struct panel_desc_dsi*)desc)->format = dsi_format;
+					((struct panel_desc_dsi*)desc)->lanes = dsi_lanes;
+				dev_warn(&dsi->dev, "panel-desc-dsi setting overridden from dt\n");
+				}
+	}
 
 	err = panel_simple_probe(&dsi->dev, &desc->desc);
 	if (err < 0)
