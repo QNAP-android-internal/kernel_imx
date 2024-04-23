@@ -600,6 +600,7 @@
 		bus-flags = <1>;
 		refresh-rate = <60>;
 		rotate = <0>;
+		android-gki = <1>;
 
 		panel-timing {
 			clock-frequency = <79800000>;
