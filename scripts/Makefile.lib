@@ -78,18 +78,26 @@ always-y += $(userprogs-always-y) $(userprogs-always-m)
 # DTB
 # If CONFIG_OF_ALL_DTBS is enabled, all DT blobs are built
 dtb-$(CONFIG_OF_ALL_DTBS)       += $(dtb-)
+
+ifndef CONFIG_IMX_GKI_FIX
 dtb-$(CONFIG_OF_ALL_DTBS)       += $(dtbo-)
+endif
 
 # Composite DTB (i.e. DTB constructed by overlay)
 multi-dtb-y := $(call multi-search, $(dtb-y), .dtb, -dtbs)
 # Primitive DTB compiled from *.dts
+ifndef CONFIG_IMX_GKI_FIX
+real-dtb-y := $(call real-search, $(dtb-y), .dtb, -dtbs)
+else
 real-dtb-y := $(call real-search, $(dtb-y), .dtb, -dtbs., $(dtbo-y))
+endif
 # Base DTB that overlay is applied onto (each first word of $(*-dtbs) expansion)
 base-dtb-y := $(foreach m, $(multi-dtb-y), $(firstword $(call suffix-search, $m, .dtb, -dtbs)))
 
 always-y			+= $(dtb-y)
+ifndef CONFIG_IMX_GKI_FIX
 always-y            += $(dtbo-y)
-
+endif
 # Add subdir path
 
 ifneq ($(obj),.)
@@ -356,7 +364,9 @@ DTC_FLAGS += -Wnode_name_chars_strict \
 	-Winterrupt_provider
 endif
 
+ifndef CONFIG_IMX_GKI_FIX
 DTC_FLAGS += -@
+endif
 
 DTC_FLAGS += $(DTC_FLAGS_$(basetarget))
 
@@ -388,8 +398,10 @@ cmd_dtc = $(HOSTCC) -E $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ;
 		-d $(depfile).dtc.tmp $(dtc-tmp) ; \
 	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
 
+ifndef CONFIG_IMX_GKI_FIX
 $(obj)/%.dtb: $(src)/%.dts $(DTC) FORCE
 	$(call if_changed_dep,dtbo)
+endif
 
 quiet_cmd_fdtoverlay = DTOVL   $@
       cmd_fdtoverlay = $(objtree)/scripts/dtc/fdtoverlay -o $@ -i $(real-prereqs)
@@ -417,6 +429,7 @@ $(obj)/%.dtb: $(src)/%.dts $(DTC) $(DT_TMP_SCHEMA) FORCE
 $(obj)/%.dtbo: $(src)/%.dts $(DTC) FORCE
 	$(call if_changed_dep,dtc)
 
+ifndef CONFIG_IMX_GKI_FIX
 quiet_cmd_dtco = DTCO    $@
 cmd_dtco = mkdir -p $(dir ${dtc-tmp}) ; \
    $(HOSTCC) -E $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
@@ -427,6 +440,7 @@ cmd_dtco = mkdir -p $(dir ${dtc-tmp}) ; \
 
 $(obj)/%.dtbo: $(src)/%-overlay.dts $(DTCO) FORCE
 	$(call if_changed_dep,dtco)
+endif
 
 dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
 
