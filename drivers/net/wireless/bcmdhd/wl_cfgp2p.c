@@ -1983,11 +1983,11 @@ wl_cfgp2p_generate_bss_mac(struct bcm_cfg80211 *cfg)
 	(void)memcpy_s(mac_addr->octet, ETHER_ADDR_LEN,
 		bcmcfg_to_prmry_ndev(cfg)->perm_addr, ETHER_ADDR_LEN);
 	mac_addr->octet[0] |= 0x02;
+#endif /* WL_P2P_RAND */
 #ifdef P2P_AP_CONCURRENT
 	if (dhd->conf->war & P2P_AP_MAC_CONFLICT)
 		wl_ext_iapsta_get_vif_macaddr(dhd, 2, (u8 *)mac_addr);
 #endif
-#endif /* WL_P2P_RAND */
 	WL_INFORM_MEM(("P2P Discovery address:"MACDBG "\n", MAC2STRDBG(mac_addr->octet)));
 
 	int_addr = wl_to_p2p_bss_macaddr(cfg, P2PAPI_BSSCFG_CONNECTION1);
