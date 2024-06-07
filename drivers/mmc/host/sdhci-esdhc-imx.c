@@ -1859,7 +1859,7 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_SLEEP
-static int sdhci_esdhc_suspend(struct device *dev)
+static int __maybe_unused sdhci_esdhc_suspend(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -1899,7 +1899,7 @@ static int sdhci_esdhc_suspend(struct device *dev)
 	return ret;
 }
 
-static int sdhci_esdhc_resume(struct device *dev)
+static int __maybe_unused sdhci_esdhc_resume(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	int ret;
@@ -1932,7 +1932,7 @@ static int sdhci_esdhc_resume(struct device *dev)
 #endif
 
 #ifdef CONFIG_PM
-static int sdhci_esdhc_runtime_suspend(struct device *dev)
+static int __maybe_unused sdhci_esdhc_runtime_suspend(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -1967,7 +1967,7 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
 	return ret;
 }
 
-static int sdhci_esdhc_runtime_resume(struct device *dev)
+static int __maybe_unused sdhci_esdhc_runtime_resume(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -2023,9 +2023,7 @@ remove_pm_qos_request:
 #endif
 
 static const struct dev_pm_ops sdhci_esdhc_pmops = {
-	SET_SYSTEM_SLEEP_PM_OPS(sdhci_esdhc_suspend, sdhci_esdhc_resume)
-	SET_RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend,
-				sdhci_esdhc_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
 };
 
 static struct platform_driver sdhci_esdhc_imx_driver = {
