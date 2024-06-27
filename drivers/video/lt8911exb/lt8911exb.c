@@ -754,7 +754,7 @@ void lt8911exb_config(struct i2c_client *client)
     lt8911exb_link_train(client);
 }
 
-static int lt8911exb_probe(struct i2c_client * client, const struct i2c_device_id * id)
+static int lt8911exb_probe(struct i2c_client * client)
 {
     int ret = -1;
     struct lt8911exb_data *lt8911exb;
