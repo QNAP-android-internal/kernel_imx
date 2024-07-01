@@ -118,7 +118,7 @@
 		regulator-always-on;
 	};
 
-	dp_backlight: dp_backlight {
+	backlight_dp: backlight_dp {
 		compatible = "pwm-backlight";
 		pwms = <&pwm1 0 100000>;
 		status = "okay";
