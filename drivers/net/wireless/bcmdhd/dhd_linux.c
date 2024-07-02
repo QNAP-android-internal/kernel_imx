@@ -14875,7 +14875,7 @@ exit:
 		dhd_static_buf_exit();
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_STATIC_IN_DRIVER */
 	printf("%s: Exit err=%d\n", __FUNCTION__, err);
-	return err;
+	return 0;
 }
 
 static int
