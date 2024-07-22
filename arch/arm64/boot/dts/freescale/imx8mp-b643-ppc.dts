@@ -436,7 +436,7 @@
 		status = "okay";
 		compatible = "realtek,alc5672";
 		reg = <0x1c>;
-		clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIOMIX_SAI3_IPG>;
+		clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIOMIX_SAI3_MCLK1>;
 		clock-names = "mclk";
 		headset-gpio = <&gpio4 28 GPIO_ACTIVE_HIGH>;
 	};
