@@ -4,10 +4,6 @@
 	dsi_backlight {
 		status = "okay";
 	};
-
-	sound-hdmi {
-		status = "disabled";
-	};
 };
 
 &i2c2 {
@@ -18,8 +14,4 @@
 
 &mipi_dsi {
 	status = "okay";
-};
-
-&hdmi {
-	status = "disabled";
 };
