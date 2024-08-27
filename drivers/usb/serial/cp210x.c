@@ -54,6 +54,10 @@ static void cp210x_process_read_urb(struct urb *urb);
 static void cp210x_enable_event_mode(struct usb_serial_port *port);
 static void cp210x_disable_event_mode(struct usb_serial_port *port);
 
+static int cp210x_write_u16_reg(struct usb_serial_port *port, u8 req, u16 val);
+int cp210x_write(struct tty_struct *tty,
+    struct usb_serial_port *port, const unsigned char *buf, int count);
+
 static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x045B, 0x0053) }, /* Renesas RX610 RX-Stick */
 	{ USB_DEVICE(0x0471, 0x066A) }, /* AKTAKOM ACE-1001 cable */
@@ -307,6 +311,7 @@ static struct usb_serial_driver cp210x_device = {
 	.port_remove		= cp210x_port_remove,
 	.dtr_rts		= cp210x_dtr_rts,
 	.process_read_urb	= cp210x_process_read_urb,
+	.write			= cp210x_write,
 };
 
 static struct usb_serial_driver * const serial_drivers[] = {
@@ -550,6 +555,26 @@ struct cp210x_gpio_write {
 	u8	mask;
 	u8	state;
 };
+
+int cp210x_write(struct tty_struct *tty,
+	struct usb_serial_port *port, const unsigned char *buf, int count)
+{
+	int result;
+
+	cp2102n_rs485_active = 1;
+	cp2102n_rs485_direction = 1;
+	cp210x_dtr_rts(port, 1);
+	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_DISABLE);
+	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_ENABLE);
+
+	result = usb_serial_generic_write(tty, port, buf , count);
+
+	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_DISABLE);
+	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_ENABLE);
+	cp2102n_rs485_direction = 0;
+	cp210x_dtr_rts(port, 0);
+	return result;
+}
 
 /*
  * Helper to get interface number when we only have struct usb_serial.
