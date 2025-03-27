@@ -23,6 +23,7 @@
 #include <linux/gpio/driver.h>
 #include <linux/bitops.h>
 #include <linux/mutex.h>
+#include <linux/platform_device.h>
 
 #define DRIVER_DESC "Silicon Labs CP210x RS232 serial adaptor driver"
 
@@ -57,6 +58,12 @@ static void cp210x_disable_event_mode(struct usb_serial_port *port);
 static int cp210x_write_u16_reg(struct usb_serial_port *port, u8 req, u16 val);
 int cp210x_write(struct tty_struct *tty,
     struct usb_serial_port *port, const unsigned char *buf, int count);
+
+static const struct of_device_id cp210x_of_match[] = {
+	{ .compatible = "silabs,cp210x" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, cp210x_of_match);
 
 static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x045B, 0x0053) }, /* Renesas RX610 RX-Stick */
@@ -561,18 +568,21 @@ int cp210x_write(struct tty_struct *tty,
 {
 	int result;
 
-	cp2102n_rs485_active = 1;
-	cp2102n_rs485_direction = 1;
-	cp210x_dtr_rts(port, 1);
-	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_DISABLE);
-	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_ENABLE);
+	if(cp2102n_rs485_active) {
+		cp2102n_rs485_direction = 1;
+		cp210x_dtr_rts(port, 1);
+		cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_DISABLE);
+		cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_ENABLE);
+	}
 
 	result = usb_serial_generic_write(tty, port, buf , count);
 
-	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_DISABLE);
-	cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_ENABLE);
-	cp2102n_rs485_direction = 0;
-	cp210x_dtr_rts(port, 0);
+	if(cp2102n_rs485_active) {
+		cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_DISABLE);
+		cp210x_write_u16_reg(port, CP210X_IFC_ENABLE, UART_ENABLE);
+		cp2102n_rs485_direction = 0;
+		cp210x_dtr_rts(port, 0);
+	}
 	return result;
 }
 
@@ -1665,12 +1675,6 @@ static void cp210x_gpio_set(struct gpio_chip *gc, unsigned int gpio, int value)
 	struct cp210x_gpio_write buf;
 	int result;
 
-	/* detect rs485 mode */
-	if(gpio == 2 ) {
-		cp2102n_rs485_active = 1;
-		cp2102n_rs485_direction = value;
-	}
-
 	if (value == 1)
 		buf.state = BIT(gpio);
 	else
@@ -2223,6 +2227,35 @@ static void cp210x_release(struct usb_serial *serial)
 
 	kfree(priv);
 }
+
+
+static int cp210x_plat_dev_drv_probe(struct platform_device *pdev)
+{
+	struct device_node *np = pdev->dev.of_node;
+	if (!np) {
+		dev_dbg(&pdev->dev, "%s - cp210x no device tree node found\n", __func__);
+	} else {
+		if (of_property_read_bool(np, "rs485-enable")) {
+			dev_dbg(&pdev->dev, "%s - RS485 mode enable\n", __func__);
+			cp2102n_rs485_active = 1;
+		} else {
+			dev_dbg(&pdev->dev, "%s - RS485 mode enable not enabled in device tree\n", __func__);
+		}
+	}
+
+	return 0;
+}
+
+
+static struct platform_driver cp210x_platform_dev_driver = {
+	.probe			= cp210x_plat_dev_drv_probe,
+	.driver			= {
+		.name	= "cp210x",
+		.of_match_table = cp210x_of_match,
+	}
+};
+
+module_platform_driver(cp210x_platform_dev_driver);
 
 module_usb_serial_driver(serial_drivers, id_table);
 
