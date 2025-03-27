@@ -89,6 +89,14 @@
 	status = "okay";
 };
 
+/ {
+	cp210x@0 {
+		compatible = "silabs,cp210x";
+		rs485-enable;
+		status = "okay";
+	};
+};
+
 &iomuxc {
     pinctrl_uart3: uart3grp {
         fsl,pins = <
