@@ -288,6 +288,8 @@
 #define DWC_CSI2RX_MAX_PIX_WIDTH	0xffff
 #define DWC_CSI2RX_MAX_PIX_HEIGHT	0xffff
 
+static bool ipi_enable_embedded_data;
+
 /* -----------------------------------------------------------------------------
  * Events
  */
@@ -633,6 +635,10 @@ static void dwc_csi_device_ipi_config(struct dwc_csi_device *csidev)
 
 	/* Select virtual channel and data type to be processed by IPI */
 	val = CSI2RX_IPI_DATA_TYPE_DT(csi_fmt->data_type);
+	if (ipi_enable_embedded_data) {
+		val |= CSI2RX_IPI_DATA_TYPE_EMB_DATA_EN;
+	}
+
 	dwc_csi_write(csidev, CSI2RX_IPI_DATA_TYPE, val);
 
 	/* Set virtual channel 0 as default */
@@ -1617,6 +1623,8 @@ static int dwc_csi_device_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to get IRQ (%d)\n", irq);
 		return irq;
 	}
+
+	ipi_enable_embedded_data = device_property_read_bool(dev, "snps,enable-embedded-data");
 
 	ret = devm_request_irq(dev, irq, dwc_csi_irq_handler, 0,
 			       dev_name(dev), csidev);
