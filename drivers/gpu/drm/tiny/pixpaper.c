@@ -4,8 +4,6 @@
  *
  * Author: LiangCheng Wang <zaq14760@gmail.com>,
  */
-#include <drm/clients/drm_client_setup.h>
-
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_drv.h>
@@ -483,6 +481,11 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 		return;
 	}
 
+	if(IS_ERR_OR_NULL(vaddr)) {
+		dev_err(drm->dev, "The vaddr is error or null pointer\n");
+		return;
+	}
+
 	src_pixels = (u32 *)vaddr;
 
 	dev_info(drm->dev, "Sending DTM command\n");
@@ -605,7 +608,7 @@ static struct drm_driver pixpaper_drm_driver = {
 	.minor = 0,
 	.fops = &pixpaper_fops,
 	DRM_GEM_DMA_DRIVER_OPS_VMAP,
-	DRM_FBDEV_DMA_DRIVER_OPS,
+	DRM_GEM_DMA_DRIVER_OPS,
 };
 
 static int pixpaper_mode_valid(struct drm_device *dev,
@@ -739,7 +742,7 @@ static int pixpaper_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	drm_client_setup(drm, NULL);
+	drm_fbdev_dma_setup(drm, 32);
 
 	dev_info(dev, "Initialized PIXPAPER panel driver successfully\n");
 	return 0;
