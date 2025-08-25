@@ -74,6 +74,8 @@ struct pixpaper_panel {
 	struct gpio_desc *reset;
 	struct gpio_desc *busy;
 	struct gpio_desc *dc;
+
+	bool update_on_commit;
 };
 
 static const struct drm_plane_funcs pixpaper_plane_funcs = {
@@ -467,6 +469,11 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 	int i, j, ret = 0;
 	u32 *src_pixels = NULL;
 
+	if (!panel->update_on_commit) {
+		dev_dbg(drm->dev, "Update deferred by manual policy\n");
+		return;
+	}
+
 	dev_info(drm->dev, "Starting frame update (phys=%dx%d, buf_w=%d)\n",
 		 PIXPAPER_WIDTH, PIXPAPER_HEIGHT, PANEL_BUFFER_WIDTH);
 
@@ -536,6 +543,9 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 	pixpaper_wait_busy(panel);
 
 	dev_info(drm->dev, "Frame update completed and refresh triggered\n");
+
+	dev_info(drm->dev, "Automatically resetting update policy to manual.\n");
+	panel->update_on_commit = false;
 
 update_cleanup:
 	if (ret && ret != -ETIMEDOUT)
@@ -629,6 +639,102 @@ static const struct drm_mode_config_funcs pixpaper_mode_config_funcs = {
 	.mode_valid = pixpaper_mode_valid,
 	.atomic_check = drm_atomic_helper_check,
 	.atomic_commit = drm_atomic_helper_commit,
+};
+
+static ssize_t update_on_commit_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct pixpaper_panel *panel = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%d\n", panel->update_on_commit);
+}
+
+static ssize_t update_on_commit_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	struct pixpaper_panel *panel = dev_get_drvdata(dev);
+	struct drm_device *drm = &panel->drm;
+	struct drm_atomic_state *state;
+	struct drm_crtc_state *crtc_state;
+	struct drm_modeset_acquire_ctx ctx;
+	bool new_val;
+	int ret = 0;
+
+	ret = kstrtobool(buf, &new_val);
+	if (ret)
+		return ret;
+
+	if (!new_val) {
+		panel->update_on_commit = false;
+		dev_info(dev, "Update policy set to 'manual', updates deferred.\n");
+		return count;
+	}
+
+	panel->update_on_commit = true;
+	dev_info(dev, "Update policy set to 'auto', triggering one-shot refresh.\n");
+
+	drm_modeset_acquire_init(&ctx, 0);
+
+retry_lock:
+	ret = drm_modeset_lock_all_ctx(drm, &ctx);
+	if (ret) {
+		if (ret == -EDEADLK) {
+			drm_modeset_backoff(&ctx);
+			goto retry_lock;
+		}
+		drm_modeset_drop_locks(&ctx);
+		drm_modeset_acquire_fini(&ctx);
+		dev_err(dev, "Failed to acquire lock: %d\n", ret);
+		panel->update_on_commit = false;
+		return ret;
+	}
+
+	state = drm_atomic_state_alloc(drm);
+	if (!state) {
+		ret = -ENOMEM;
+		dev_err(dev, "Failed to allocate atomic state\n");
+		goto out_unlock;
+	}
+
+	state->acquire_ctx = &ctx;
+
+	crtc_state = drm_atomic_get_crtc_state(state, &panel->crtc);
+	if (IS_ERR(crtc_state)) {
+		ret = PTR_ERR(crtc_state);
+		dev_err(dev, "Failed to get crtc state: %d\n", ret);
+		goto out_free_state;
+	}
+
+	crtc_state->mode_changed = true;
+
+	ret = drm_atomic_commit(state);
+	if (ret) {
+		dev_err(dev, "Failed to commit atomic state for refresh: %d\n", ret);
+		panel->update_on_commit = false;
+	}
+
+	drm_modeset_acquire_fini(&ctx);
+	return count;
+
+out_free_state:
+	drm_atomic_state_put(state);
+out_unlock:
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+	panel->update_on_commit = false;
+	return ret;
+}
+
+static DEVICE_ATTR_RW(update_on_commit);
+
+static struct attribute *pixpaper_attrs[] = {
+	&dev_attr_update_on_commit.attr,
+	NULL,
+};
+
+static const struct attribute_group pixpaper_attr_group = {
+	.attrs = pixpaper_attrs,
 };
 
 static int pixpaper_probe(struct spi_device *spi)
@@ -738,9 +844,17 @@ static int pixpaper_probe(struct spi_device *spi)
 
 	drm_mode_config_reset(drm);
 
+	panel->update_on_commit = false;
+	ret = sysfs_create_group(&dev->kobj, &pixpaper_attr_group);
+	if (ret) {
+		dev_err(dev, "Failed to create sysfs attributes\n");
+	}
+
 	ret = drm_dev_register(drm, 0);
-	if (ret)
+	if (ret) {
+		sysfs_remove_group(&dev->kobj, &pixpaper_attr_group);
 		return ret;
+	}
 
 	drm_fbdev_dma_setup(drm, 32);
 
@@ -756,6 +870,8 @@ static void pixpaper_remove(struct spi_device *spi)
 		return;
 
 	dev_info(&spi->dev, "Removing PIXPAPER panel driver\n");
+
+	sysfs_remove_group(&spi->dev.kobj, &pixpaper_attr_group);
 
 	drm_dev_unplug(&panel->drm);
 	drm_atomic_helper_shutdown(&panel->drm);
