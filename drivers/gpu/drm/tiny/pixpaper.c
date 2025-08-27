@@ -20,11 +20,14 @@
 
 MODULE_IMPORT_NS("DMA_BUF");
 
-#define PIXPAPER_WIDTH 122
-#define PIXPAPER_HEIGHT 250
+#define PIXPAPER_WIDTH 250
+#define PIXPAPER_HEIGHT 122
+
+#define PANEL_PHYSICAL_WIDTH 122
+#define PANEL_PHYSICAL_HEIGHT 250
 
 #define PANEL_BUFFER_WIDTH 128
-#define PANEL_BUFFER_TWO_BYTES_PER_ROW (PANEL_BUFFER_WIDTH / 4)
+#define PANEL_BUFFER_BYTES_PER_ROW (PANEL_BUFFER_WIDTH / 4)
 
 #define PIXPAPER_SPI_SPEED_DEFAULT 1000000
 
@@ -50,6 +53,11 @@ MODULE_IMPORT_NS("DMA_BUF");
 #define PIXPAPER_CMD_POWER_SAVING 0xE3
 #define PIXPAPER_CMD_AUTO_MEASURE_VCOM 0xE7
 #define PIXPAPER_CMD_UNKNOWN_E9 0xE9
+
+#define THRESHOLD_LOW       60
+#define THRESHOLD_HIGH      200
+#define THRESHOLD_YELLOW_GREEN_LOW  180
+
 
 static int pixpaper_crtc_helper_atomic_check(struct drm_crtc *crtc,
 					     struct drm_atomic_state *state);
@@ -414,44 +422,6 @@ static void pixpaper_crtc_atomic_disable(struct drm_crtc *crtc,
 	dev_info(drm->dev, "Panel disabled\n");
 }
 
-static u8 pack_pixels_to_byte(u32 *src_pixels, int i, int j,
-			      struct drm_framebuffer *fb)
-{
-	u8 packed_byte = 0;
-	int k;
-
-	for (k = 0; k < 4; k++) {
-		int current_pixel_x = j * 4 + k;
-		u8 two_bit_val;
-
-		if (current_pixel_x < PIXPAPER_WIDTH) {
-			u32 pixel_offset =
-				(i * (fb->pitches[0] / 4)) + current_pixel_x;
-			u32 pixel = src_pixels[pixel_offset];
-			u32 r = (pixel >> 16) & 0xFF;
-			u32 g = (pixel >> 8) & 0xFF;
-			u32 b = pixel & 0xFF;
-			u32 gray_val =
-				(r * 299 + g * 587 + b * 114 + 500) / 1000;
-
-			if (gray_val < 64)
-				two_bit_val = 0b00;
-			else if (gray_val < 128)
-				two_bit_val = 0b01;
-			else if (gray_val < 192)
-				two_bit_val = 0b10;
-			else
-				two_bit_val = 0b11;
-		} else {
-			two_bit_val = 0b11;
-		}
-
-		packed_byte |= two_bit_val << ((3 - k) * 2);
-	}
-
-	return packed_byte;
-}
-
 static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 					 struct drm_atomic_state *state)
 {
@@ -464,10 +434,10 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 
 	struct drm_device *drm = &panel->drm;
 	struct drm_framebuffer *fb = plane_state->fb;
-	struct iosys_map map = shadow_plane_state->data[0];
-	void *vaddr = map.vaddr;
-	int i, j, ret = 0;
-	u32 *src_pixels = NULL;
+	struct iosys_map map;
+	void *vaddr;
+	u32 *src_pixels;
+	int ret = 0;
 
 	if (!panel->update_on_commit) {
 		dev_dbg(drm->dev, "Update deferred by manual policy\n");
@@ -480,22 +450,22 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 	if (!fb || !plane_state->visible) {
 		dev_err(drm->dev,
 			"No framebuffer or plane not visible, skipping update\n");
-		return;
+		goto reset_flag;
 	}
 
-	if (ret) {
-		dev_err(drm->dev, "Failed to vmap dma_buf\n");
-		return;
-	}
+	map = shadow_plane_state->data[0];
+	vaddr = map.vaddr;
 
-	if(IS_ERR_OR_NULL(vaddr)) {
+	if (IS_ERR_OR_NULL(vaddr)) {
 		dev_err(drm->dev, "The vaddr is error or null pointer\n");
-		return;
+		goto reset_flag;
 	}
 
 	src_pixels = (u32 *)vaddr;
 
-	dev_info(drm->dev, "Sending DTM command\n");
+	dev_info(drm->dev, "Starting frame update (logical=%dx%d, physical=%dx%d)\n",
+		 PIXPAPER_WIDTH, PIXPAPER_HEIGHT, PANEL_PHYSICAL_WIDTH, PANEL_PHYSICAL_HEIGHT);
+
 	ret = pixpaper_send_cmd(panel, PIXPAPER_CMD_DATA_START_TRANSMISSION);
 	if (ret)
 		goto update_cleanup;
@@ -504,33 +474,67 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 	pixpaper_wait_busy(panel);
 
 	dev_info(drm->dev,
-		 "Panel idle after DTM command, starting data batch send.\n");
+		 "Panel idle after DTM command, starting rotated data batch send.\n");
 
-	for (i = 0; i < PIXPAPER_HEIGHT; i++) {
-		for (j = 0; j < PANEL_BUFFER_TWO_BYTES_PER_ROW; j++) {
-			u8 packed_byte =
-				pack_pixels_to_byte(src_pixels, i, j, fb);
+	for (int hw_y = 0; hw_y < PANEL_PHYSICAL_HEIGHT; hw_y++) {
+		for (int byte_index = 0; byte_index < PANEL_BUFFER_BYTES_PER_ROW; byte_index++) {
+			u8 packed_byte = 0;
 
+			for (int k = 0; k < 4; k++) {
+				int hw_x = byte_index * 4 + k;
+				u8 two_bit_val;
+
+				if (hw_x < PANEL_PHYSICAL_WIDTH) {
+					int fb_x = (PIXPAPER_WIDTH - 1) - hw_y;
+					int fb_y = hw_x;
+
+					if (fb_x >= 0 && fb_x < PIXPAPER_WIDTH &&
+						fb_y >= 0 && fb_y < PIXPAPER_HEIGHT) {
+
+						u32 pixel_offset = (fb_y * (fb->pitches[0] / 4)) + fb_x;
+						u32 pixel = src_pixels[pixel_offset];
+
+						u32 r = (pixel >> 16) & 0xFF;
+						u32 g = (pixel >> 8) & 0xFF;
+						u32 b = (pixel >> 0) & 0xFF;
+
+						if (r < THRESHOLD_LOW && g < THRESHOLD_LOW && b < THRESHOLD_LOW) {
+							two_bit_val = 0b00;
+						} else if (r > THRESHOLD_HIGH && g > THRESHOLD_HIGH && b > THRESHOLD_HIGH) {
+							two_bit_val = 0b01;
+						} else if (r > THRESHOLD_HIGH && g < THRESHOLD_LOW && b < THRESHOLD_LOW) {
+							two_bit_val = 0b11;
+						} else if (r > THRESHOLD_HIGH && g > THRESHOLD_YELLOW_GREEN_LOW && b < THRESHOLD_LOW) {
+							two_bit_val = 0b10;
+						} else {
+							two_bit_val = 0b01;
+						}
+
+					} else {
+						two_bit_val = 0b01;
+					}
+				} else {
+					two_bit_val = 0b01;
+				}
+				packed_byte |= two_bit_val << ((3 - k) * 2);
+			}
 			pixpaper_wait_busy(panel);
 			pixpaper_send_data(panel, packed_byte);
 		}
 	}
 	pixpaper_wait_busy(panel);
 
-	dev_info(drm->dev, "Sending PON + 0x00 before DRF\n");
 	ret = pixpaper_send_cmd(panel, PIXPAPER_CMD_POWER_ON);
 	if (ret)
 		goto update_cleanup;
 	ret = pixpaper_send_data(panel, 0x00);
 	if (ret) {
-		dev_err(drm->dev,
-			"Failed sending data after PON-before-DRF: %d\n", ret);
+		dev_err(drm->dev, "Failed sending data after PON-before-DRF: %d\n", ret);
 		goto update_cleanup;
 	}
 	usleep_range(10000, 11000);
 	pixpaper_wait_busy(panel);
 
-	dev_info(drm->dev, "Triggering display refresh (DRF)\n");
 	ret = pixpaper_send_cmd(panel, PIXPAPER_CMD_DISPLAY_REFRESH);
 	if (ret)
 		goto update_cleanup;
@@ -544,14 +548,13 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 
 	dev_info(drm->dev, "Frame update completed and refresh triggered\n");
 
-	dev_info(drm->dev, "Automatically resetting update policy to manual.\n");
-	panel->update_on_commit = false;
-
 update_cleanup:
 	if (ret && ret != -ETIMEDOUT)
-		dev_err(drm->dev,
-			"Frame update function failed with error %d\n", ret);
+		dev_err(drm->dev, "Frame update function failed with error %d\n", ret);
 
+reset_flag:
+	dev_info(drm->dev, "Automatically resetting update policy to manual.\n");
+	panel->update_on_commit = false;
 }
 
 static int pixpaper_connector_get_modes(struct drm_connector *connector)
@@ -601,8 +604,8 @@ static int pixpaper_connector_get_modes(struct drm_connector *connector)
 		 mode->name, mode->hdisplay, mode->vdisplay,
 		 drm_mode_vrefresh(mode), connector->name);
 
-	connector->display_info.width_mm = 30;
-	connector->display_info.height_mm = 47;
+	connector->display_info.width_mm = 47;
+	connector->display_info.height_mm = 30;
 
 	return 1;
 }
