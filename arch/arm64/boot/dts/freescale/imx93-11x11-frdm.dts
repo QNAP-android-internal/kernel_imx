@@ -1049,4 +1049,13 @@
 		compatible = "lwn,bk4";
 		spi-max-frequency = <1000000>;
 	};
+
+	display@1 {
+		compatible = "mayqueen,pixpaper";
+		reg = <1>;
+		spi-max-frequency = <5000000>;
+		reset-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+		dc-gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;
+		busy-gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
+	};
 };
