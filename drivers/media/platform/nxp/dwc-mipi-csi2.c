@@ -288,7 +288,7 @@
 #define DWC_CSI2RX_MAX_PIX_WIDTH	0xffff
 #define DWC_CSI2RX_MAX_PIX_HEIGHT	0xffff
 
-static bool ipi_enable_embedded_data;
+static bool ipi_enable_embedded_data = false;
 
 /* -----------------------------------------------------------------------------
  * Events
