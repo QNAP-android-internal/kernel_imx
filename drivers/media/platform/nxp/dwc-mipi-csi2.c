@@ -289,6 +289,7 @@
 #define DWC_CSI2RX_MAX_PIX_HEIGHT	0xffff
 
 static bool ipi_enable_embedded_data = false;
+static bool dwc_color_16bit_enable = false;
 
 /* -----------------------------------------------------------------------------
  * Events
@@ -651,7 +652,9 @@ static void dwc_csi_device_ipi_config(struct dwc_csi_device *csidev)
 	 */
 	val = dwc_csi_read(csidev, CSI2RX_IPI_MODE);
 	val &= ~CSI2RX_IPI_MODE_CONTROLLER;
-	val |= CSI2RX_IPI_MODE_COLOR_MODE16;
+	val = (dwc_color_16bit_enable == true) ?
+		(val | CSI2RX_IPI_MODE_COLOR_MODE16) :
+		(val & CSI2RX_IPI_MODE_COLOR_MODE16);
 	val |= CSI2RX_IPI_MODE_CUT_THROUGH;
 	dwc_csi_write(csidev, CSI2RX_IPI_MODE, val);
 }
@@ -1625,6 +1628,7 @@ static int dwc_csi_device_probe(struct platform_device *pdev)
 	}
 
 	ipi_enable_embedded_data = device_property_read_bool(dev, "snps,enable-embedded-data");
+	dwc_color_16bit_enable = device_property_read_bool(dev, "dwc_color_16bit_enable");
 
 	ret = devm_request_irq(dev, irq, dwc_csi_irq_handler, 0,
 			       dev_name(dev), csidev);
