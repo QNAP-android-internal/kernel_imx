@@ -2331,7 +2331,7 @@ static const struct drm_display_mode rpi_5inch_default_mode = {
 };
 
 static const struct drm_display_mode rpi_7inch_default_mode = {
-	.clock          = 83330,
+	.clock          = 74250,
 
 	.hdisplay	= 720,
 	.hsync_start	= 720 + 239,
