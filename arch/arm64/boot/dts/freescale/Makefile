@@ -543,6 +543,7 @@ imx93-11x11-evk-pmic-pf0900-mt9m114-dtbs := imx93-11x11-evk-mt9m114.dtb imx93-11
 imx93-11x11-evk-pmic-pf0900-ld-dtbs := imx93-11x11-evk-ld.dtb imx93-11x11-evk-pmic-pf0900.dtbo
 imx93-11x11-evk-pmic-pf0900-rpmsg-dtbs := imx93-11x11-evk-rpmsg.dtb imx93-11x11-evk-pmic-pf0900.dtbo
 imx93-lite93-evb-ov5640-dtbs := imx93-lite93-evb.dtb imx93-lite93-evb-ov5640.dtbo
+imx93-lite93-evb-rpi-panel-v2-dtbs := imx93-lite93-evb.dtb imx93-lite93-evb-rpi-panel-v2.dtbo
 
 dtb-$(CONFIG_ARCH_MXC) += imx93-11x11-evk-pmic-pf0900.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx93-11x11-evk-pmic-pf0900-root.dtb
@@ -567,6 +568,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx91-11x11-frdm.dtb \
 imx91-11x11-frdm-tianma-wvga-panel-dtbs := imx91-11x11-frdm.dtb imx91-11x11-frdm-tianma-wvga-panel.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx91-11x11-frdm-tianma-wvga-panel.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx93-lite93-evb-ov5640.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx93-lite93-evb-rpi-panel-v2.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx93-9x9-qsb.dtb \
 			  imx93-9x9-qsb-can1.dtb \
