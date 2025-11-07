@@ -1121,6 +1121,11 @@ imx95-19x19-evk-ox05b1s-isp-lvds-two-disp-dtbs := imx95-19x19-evk.dtb imx95-19x1
 							  imx95-19x19-evk-it6263-lvds1.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-ox05b1s-isp-lvds-two-disp.dtb
 
+imx95-19x19-evk-imx519-ak7375-isp-it6263-lvds0-dtbs := imx95-19x19-evk.dtb \
+						imx95-19x19-evk-imx519-ak7375.dtbo \
+						imx95-19x19-evk-it6263-lvds0.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-imx519-ak7375-isp-it6263-lvds0.dtb
+
 imx95-19x19-evk-neutron-dtbs := imx95-19x19-evk.dtb imx95-19x19-evk-neutron.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-neutron.dtb
 
