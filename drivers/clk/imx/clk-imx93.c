@@ -346,8 +346,10 @@ static int imx93_clocks_probe(struct platform_device *pdev)
 							      &imx_fracn_gppll_integer);
 	clks[IMX93_CLK_AUDIO_PLL] = imx_clk_fracn_gppll("audio_pll", "osc_24m", anatop_base + 0x1200,
 							&imx_fracn_gppll);
-	clks[IMX93_CLK_VIDEO_PLL] = imx_clk_fracn_gppll("video_pll", "osc_24m", anatop_base + 0x1400,
-							&imx_fracn_gppll);
+	clks[IMX93_CLK_VIDEO_PLL] = imx_clk_fracn_gppll_flags("video_pll", "osc_24m",
+							      anatop_base + 0x1400,
+							      &imx_fracn_gppll,
+							      CLK_FRACN_GPPLL_NEAREST);
 
 	np = dev->of_node;
 	base = devm_platform_ioremap_resource(pdev, 0);

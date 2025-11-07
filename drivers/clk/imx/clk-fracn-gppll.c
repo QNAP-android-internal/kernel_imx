@@ -9,6 +9,7 @@
 #include <linux/export.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
+#include <linux/limits.h>
 #include <linux/slab.h>
 #include <asm/div64.h>
 
@@ -141,16 +142,40 @@ static int clk_fracn_gppll_determine_rate(struct clk_hw *hw,
 	const struct imx_fracn_gppll_rate_table *rate_table = pll->rate_table;
 	int i;
 
-	/* Assuming rate_table is in descending order */
-	for (i = 0; i < pll->rate_count; i++)
-		if (req->rate >= rate_table[i].rate) {
-			req->rate = rate_table[i].rate;
+	if (pll->rate_count == 0)
+		return -EINVAL;
 
-			return 0;
+	if (pll->flags & CLK_FRACN_GPPLL_NEAREST) {
+		unsigned long best_rate = 0;
+		unsigned long lowest_error = ULONG_MAX;
+
+		for (i = 0; i < pll->rate_count; i++) {
+			unsigned long delta;
+
+			if (req->rate > rate_table[i].rate)
+				delta = req->rate - rate_table[i].rate;
+			else
+				delta = rate_table[i].rate - req->rate;
+
+			if (delta < lowest_error) {
+				lowest_error = delta;
+				best_rate = rate_table[i].rate;
+			}
 		}
 
-	/* return minimum supported value */
-	req->rate = rate_table[pll->rate_count - 1].rate;
+		req->rate = best_rate;
+	} else {
+		/* Assuming rate_table is in descending order */
+		for (i = 0; i < pll->rate_count; i++) {
+			if (req->rate >= rate_table[i].rate) {
+				req->rate = rate_table[i].rate;
+				return 0;
+			}
+		}
+
+		/* return minimum supported value */
+		req->rate = rate_table[pll->rate_count - 1].rate;
+	}
 
 	return 0;
 }
@@ -406,3 +431,13 @@ struct clk_hw *imx_clk_fracn_gppll_integer(const char *name, const char *parent_
 	return _imx_clk_fracn_gppll(name, parent_name, base, pll_clk, CLK_FRACN_GPPLL_INTEGER);
 }
 EXPORT_SYMBOL_GPL(imx_clk_fracn_gppll_integer);
+
+struct clk_hw *imx_clk_fracn_gppll_flags(const char *name, const char *parent_name,
+					 void __iomem *base,
+					 const struct imx_fracn_gppll_clk *pll_clk,
+					 unsigned int flags)
+{
+	return _imx_clk_fracn_gppll(name, parent_name, base, pll_clk,
+				    CLK_FRACN_GPPLL_FRACN | flags);
+}
+EXPORT_SYMBOL_GPL(imx_clk_fracn_gppll_flags);
