@@ -50,6 +50,11 @@ struct pixpaper_panel {
 	struct gpio_desc *dc;
 };
 
+static const uint32_t pixpaper_formats[] = {
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_ARGB8888,
+};
+
 static inline struct pixpaper_panel *to_pixpaper_panel(struct drm_device *drm)
 {
 	return container_of(drm, struct pixpaper_panel, drm);
@@ -207,10 +212,9 @@ init_fail:
 	return 1;
 }
 
-static void pixpaper_xrgb8888_to_mono(void *src, void *dst, int height,
-				      int width, int dst_pitch)
+static void pixpaper_fb_to_mono(void *src, void *dst, int height,
+				int width, int dst_pitch, uint32_t format)
 {
-	uint32_t *src_pixels = src;
 	uint8_t *dst_pixels = dst;
 
 	if (dst == NULL || src == NULL)
@@ -220,13 +224,22 @@ static void pixpaper_xrgb8888_to_mono(void *src, void *dst, int height,
 		uint8_t *dst_row = dst_pixels + y * dst_pitch;
 
 		for (int x = 0; x < width; x++) {
-			uint32_t pixel = src_pixels[y * width + x];
-			uint8_t r = (pixel >> 16) & 0xFF;
-			uint8_t g = (pixel >> 8) & 0xFF;
-			uint8_t b = pixel & 0xFF;
+			uint8_t r, g, b;
 			int bit_pos = x % 8;
 			int byte_pos = x / 8;
-			uint32_t gray_val = (r * 299 + g * 587 + b * 114 + 500) / 1000;
+			uint32_t gray_val;
+
+			if (format == DRM_FORMAT_XRGB8888 || format == DRM_FORMAT_ARGB8888) {
+				uint32_t *src_pixels = src;
+				uint32_t pixel = src_pixels[y * width + x];
+				r = (pixel >> 16) & 0xFF;
+				g = (pixel >> 8) & 0xFF;
+				b = pixel & 0xFF;
+			} else {
+				continue;
+			}
+
+			gray_val = (r * 299 + g * 587 + b * 114 + 500) / 1000;
 
 			if (gray_val < 112)
 				dst_row[byte_pos] &= ~(1 << (7 - bit_pos));
@@ -354,7 +367,8 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 		}
 
 		memset(dst, 0xff, dst_pitch * fb->height);
-		pixpaper_xrgb8888_to_mono(vaddr, dst, fb->height, fb->width, dst_pitch);
+		pixpaper_fb_to_mono(vaddr, dst, fb->height, fb->width, dst_pitch, fb->format->format);
+
 
 		pixpaper_send_cmd(panel, 0x24, &err);
 		if (err.errno_code)
@@ -596,7 +610,7 @@ static int pixpaper_probe(struct spi_device *spi)
 		return ret;
 
 	ret = drm_universal_plane_init(drm, &panel->plane, 1, &pixpaper_plane_funcs,
-				       (const uint32_t[]){ DRM_FORMAT_XRGB8888 }, 1, NULL,
+				       pixpaper_formats, ARRAY_SIZE(pixpaper_formats), NULL,
 				       DRM_PLANE_TYPE_PRIMARY, NULL);
 	if (ret)
 		return ret;
