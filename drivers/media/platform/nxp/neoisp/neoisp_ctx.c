@@ -2,11 +2,10 @@
 /*
  * NEOISP context registers/memory setting helpers
  *
- * Copyright 2023-2025 NXP
+ * Copyright 2023-2026 NXP
  */
 
 #include <linux/clk.h>
-#include <linux/debugfs.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/media/nxp/nxp_neoisp.h>
@@ -30,9 +29,9 @@
  * It could be updated later by the driver depending on input/output formats setup by userspace
  * and also if fine tuned parameters are provided by the camera stack.
  */
-const struct neoisp_context_s def_context = {
+static const struct neoisp_context_s def_context = {
 	.hw = {
-		.pipe_conf.common = {
+		.pipe_conf = {
 			.img_conf =
 				NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN0_SET(0) |
 				NEO_PIPE_CONF_IMG_CONF_CAM0_LPALIGN0_SET(1) |
@@ -55,17 +54,17 @@ const struct neoisp_context_s def_context = {
 			.ctrl =
 				NEO_OB_WB0_CTRL_CAM0_OBPP_SET(3),
 			.r_ctrl =
-				NEO_OB_WB0_R_CTRL_CAM0_OFFSET_SET(0) |
-				NEO_OB_WB0_R_CTRL_CAM0_GAIN_SET(1 << 8),
+				NEO_OB_WB0_R_CTRL_CAM0_GAIN_SET(1 << 8) |
+				NEO_OB_WB0_R_CTRL_CAM0_OFFSET_SET(0),
 			.gr_ctrl =
-				NEO_OB_WB0_GR_CTRL_CAM0_OFFSET_SET(0) |
-				NEO_OB_WB0_GR_CTRL_CAM0_GAIN_SET(1 << 8),
+				NEO_OB_WB0_GR_CTRL_CAM0_GAIN_SET(1 << 8) |
+				NEO_OB_WB0_GR_CTRL_CAM0_OFFSET_SET(0),
 			.gb_ctrl =
-				NEO_OB_WB0_GB_CTRL_CAM0_OFFSET_SET(0) |
-				NEO_OB_WB0_GB_CTRL_CAM0_GAIN_SET(1 << 8),
+				NEO_OB_WB0_GB_CTRL_CAM0_GAIN_SET(1 << 8) |
+				NEO_OB_WB0_GB_CTRL_CAM0_OFFSET_SET(0),
 			.b_ctrl =
-				NEO_OB_WB0_B_CTRL_CAM0_OFFSET_SET(0) |
-				NEO_OB_WB0_B_CTRL_CAM0_GAIN_SET(1 << 8),
+				NEO_OB_WB0_B_CTRL_CAM0_GAIN_SET(1 << 8) |
+				NEO_OB_WB0_B_CTRL_CAM0_OFFSET_SET(0),
 		},
 		.obwb1 = {
 			.ctrl =
@@ -122,7 +121,7 @@ const struct neoisp_context_s def_context = {
 			.upscale =
 				NEO_HDR_MERGE_UPSCALE_CAM0_IMGSCALE1_SET(8),
 		},
-		.color_temp = {},
+		.ctemp = {},
 		.rgbir = {
 			.ctrl =
 				NEO_RGBIR_CTRL_CAM0_ENABLE_SET(0),
@@ -341,9 +340,76 @@ static const __u32 neoisp_ext_stats_blocks_v1[] = {
 	NEOISP_STATS_BLK_MDRC,
 };
 
-struct neoisp_block_handler_s {
-	size_t size;
-	void (*handler)(struct neoisp_dev_s *neoispd, union neoisp_params_block_u *blk);
+union neoisp_params_block_u {
+	struct neoisp_pipe_conf_cfg_s pipe_conf;
+	struct neoisp_head_color_cfg_s head_color;
+	struct neoisp_hdr_decompress0_cfg_s hdr_decompress0;
+	struct neoisp_hdr_decompress1_cfg_s hdr_decompress1;
+	struct neoisp_obwb_cfg_s obwb;
+	struct neoisp_hdr_merge_cfg_s hdr_merge;
+	struct neoisp_rgbir_cfg_s rgbir;
+	struct neoisp_stat_cfg_s stat;
+	struct neoisp_ir_compress_cfg_s ir_compress;
+	struct neoisp_bnr_cfg_s bnr;
+	struct neoisp_vignetting_ctrl_cfg_s vignetting_ctrl;
+	struct neoisp_ctemp_cfg_s ctemp;
+	struct neoisp_demosaic_cfg_s demosaic;
+	struct neoisp_rgb2yuv_cfg_s rgb2yuv;
+	struct neoisp_dr_comp_cfg_s drc;
+	struct neoisp_nr_cfg_s nrc;
+	struct neoisp_af_cfg_s afc;
+	struct neoisp_ee_cfg_s eec;
+	struct neoisp_df_cfg_s dfc;
+	struct neoisp_convmed_cfg_s convmed;
+	struct neoisp_cas_cfg_s cas;
+	struct neoisp_gcm_cfg_s gcm;
+	struct neoisp_vignetting_table_mem_params_s vignetting_table;
+	struct neoisp_drc_global_tonemap_mem_params_s drc_global_tonemap;
+	struct neoisp_drc_local_tonemap_mem_params_s drc_local_tonemap;
+};
+
+union neoisp_ext_params_block_u {
+	struct v4l2_isp_params_block_header header;
+	struct neoisp_pipe_conf_cfg_es pipe_conf;
+	struct neoisp_head_color_cfg_es head_color;
+	struct neoisp_hdr_decompress0_cfg_es hdr_decompress0;
+	struct neoisp_hdr_decompress1_cfg_es hdr_decompress1;
+	struct neoisp_obwb_cfg_es obwb;
+	struct neoisp_hdr_merge_cfg_es hdr_merge;
+	struct neoisp_rgbir_cfg_es rgbir;
+	struct neoisp_stat_cfg_es stat;
+	struct neoisp_ir_compress_cfg_es ir_compress;
+	struct neoisp_bnr_cfg_es bnr;
+	struct neoisp_vignetting_ctrl_cfg_es vignetting_ctrl;
+	struct neoisp_ctemp_cfg_es ctemp;
+	struct neoisp_demosaic_cfg_es demosaic;
+	struct neoisp_rgb2yuv_cfg_es rgb2yuv;
+	struct neoisp_dr_comp_cfg_es dr_comp;
+	struct neoisp_nr_cfg_es nr;
+	struct neoisp_af_cfg_es af;
+	struct neoisp_ee_cfg_es ee;
+	struct neoisp_df_cfg_es df;
+	struct neoisp_convmed_cfg_es convmed;
+	struct neoisp_cas_cfg_es cas;
+	struct neoisp_gcm_cfg_es gcm;
+	struct neoisp_vignetting_table_mem_params_es vignetting_table;
+	struct neoisp_drc_global_tonemap_mem_params_es drc_global_tonemap;
+	struct neoisp_drc_local_tonemap_mem_params_es drc_local_tonemap;
+};
+
+union neoisp_stats_block_u {
+	struct v4l2_isp_stats_block_header header;
+	struct neoisp_ctemp_reg_stats_es rctemp;
+	struct neoisp_drc_reg_stats_es rdrc;
+	struct neoisp_af_reg_stats_es raf;
+	struct neoisp_bnr_reg_stats_es rbnr;
+	struct neoisp_nr_reg_stats_es rnr;
+	struct neoisp_ee_reg_stats_es ree;
+	struct neoisp_df_reg_stats_es rdf;
+	struct neoisp_ctemp_mem_stats_es mctemp;
+	struct neoisp_rgbir_mem_stats_es mrgbir;
+	struct neoisp_hist_mem_stats_es mhist;
+	struct neoisp_drc_mem_stats_es mdrc;
 };
 
 static dma_addr_t get_addr(struct neoisp_buffer_s *buf, u32 num_plane)
@@ -360,24 +426,35 @@ static u32 *get_vaddr(struct neoisp_buffer_s *buf)
 	return NULL;
 }
 
-static inline void ctx_blk_write(uint32_t field, u32 *ptr, u32 *dest)
+/*
+ * Extract offset and size in bytes from memory region map
+ */
+static inline void get_offsize(enum isp_block_map_e map, u32 *offset, u32 *size)
+{
+	*offset = ISP_GET_OFF(map);
+	*size = ISP_GET_SZ(map);
+}
+
+static inline void ctx_blk_write(enum isp_block_map_e map, u32 *ptr, u32 *dest)
 {
 	u32 woffset, count;
 
-	woffset = ISP_GET_OFF(field) / sizeof(u32);
-	count = ISP_GET_SZ(field);
+	get_offsize(map, &woffset, &count);
+
 	if (IS_ERR_OR_NULL(ptr) || IS_ERR_OR_NULL(dest)) {
 		pr_err("Invalid pointer for memcpy block !");
 		return;
 	}
+
+	woffset /= sizeof(u32);
 	memcpy(dest + woffset, ptr, count);
 }
 
-static void neoisp_set_context_img_conf(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_pipe_conf(struct neoisp_dev_s *neoispd,
+					    union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
-	struct neoisp_pipe_conf_s *pc = &ctx->hw.pipe_conf.common;
+	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_pipe_conf_s *pc = &ctx->hw.pipe_conf;
 	u32 tmp = pc->img_conf;
 
 	tmp &= ~(NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN0 |
@@ -392,10 +469,10 @@ static void neoisp_set_context_img_conf(struct neoisp_dev_s *neoispd,
 	pc->img_conf = tmp;
 }
 
-static void neoisp_set_context_head_color(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_head_color(struct neoisp_dev_s *neoispd,
+					     union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hc_s *hc = &ctx->hw.hc;
 
 	hc->ctrl =
@@ -403,120 +480,144 @@ static void neoisp_set_context_head_color(struct neoisp_dev_s *neoispd,
 		NEO_HC_CTRL_CAM0_VOFFSET_SET(blk->head_color.ctrl_voffset);
 }
 
-static void neoisp_set_context_hdr_decompress0(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_hdr_decompress0(struct neoisp_dev_s *neoispd,
+						  union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hdr_decompress0_s *hd0 = &ctx->hw.hdr_decompress0;
 
 	hd0->ctrl =
 		NEO_CTRL_CAM0_ENABLE_SET(blk->hdr_decompress0.ctrl_enable);
 	hd0->knee_point1 =
-		NEO_HDR_DECOMPRESS0_KNEE_POINT1_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_point1);
+		NEO_HDR_DECOMPRESS0_KNEE_POINT1_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_point1);
 	hd0->knee_point2 =
-		NEO_HDR_DECOMPRESS0_KNEE_POINT2_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_point2);
+		NEO_HDR_DECOMPRESS0_KNEE_POINT2_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_point2);
 	hd0->knee_point3 =
-		NEO_HDR_DECOMPRESS0_KNEE_POINT3_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_point3);
+		NEO_HDR_DECOMPRESS0_KNEE_POINT3_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_point3);
 	hd0->knee_point4 =
-		NEO_HDR_DECOMPRESS0_KNEE_POINT4_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_point4);
+		NEO_HDR_DECOMPRESS0_KNEE_POINT4_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_point4);
 	hd0->knee_offset0 =
-		NEO_HDR_DECOMPRESS0_KNEE_OFFSET0_CAM0_OFFSET_SET(blk->hdr_decompress0.knee_offset0);
+		NEO_HDR_DECOMPRESS0_KNEE_OFFSET0_CAM0_OFFSET_SET
+		(blk->hdr_decompress0.knee_offset0);
 	hd0->knee_offset1 =
-		NEO_HDR_DECOMPRESS0_KNEE_OFFSET1_CAM0_OFFSET_SET(blk->hdr_decompress0.knee_offset1);
+		NEO_HDR_DECOMPRESS0_KNEE_OFFSET1_CAM0_OFFSET_SET
+		(blk->hdr_decompress0.knee_offset1);
 	hd0->knee_offset2 =
-		NEO_HDR_DECOMPRESS0_KNEE_OFFSET2_CAM0_OFFSET_SET(blk->hdr_decompress0.knee_offset2);
+		NEO_HDR_DECOMPRESS0_KNEE_OFFSET2_CAM0_OFFSET_SET
+		(blk->hdr_decompress0.knee_offset2);
 	hd0->knee_offset3 =
-		NEO_HDR_DECOMPRESS0_KNEE_OFFSET3_CAM0_OFFSET_SET(blk->hdr_decompress0.knee_offset3);
+		NEO_HDR_DECOMPRESS0_KNEE_OFFSET3_CAM0_OFFSET_SET
+		(blk->hdr_decompress0.knee_offset3);
 	hd0->knee_offset4 =
-		NEO_HDR_DECOMPRESS0_KNEE_OFFSET4_CAM0_OFFSET_SET(blk->hdr_decompress0.knee_offset4);
+		NEO_HDR_DECOMPRESS0_KNEE_OFFSET4_CAM0_OFFSET_SET
+		(blk->hdr_decompress0.knee_offset4);
 	hd0->knee_ratio01 =
-		NEO_HDR_DECOMPRESS0_KNEE_RATIO01_CAM0_RATIO0_SET(blk->hdr_decompress0.knee_ratio0) |
-		NEO_HDR_DECOMPRESS0_KNEE_RATIO01_CAM0_RATIO1_SET(blk->hdr_decompress0.knee_ratio1);
+		NEO_HDR_DECOMPRESS0_KNEE_RATIO01_CAM0_RATIO0_SET
+		(blk->hdr_decompress0.knee_ratio0);
+	hd0->knee_ratio01 |=
+		NEO_HDR_DECOMPRESS0_KNEE_RATIO01_CAM0_RATIO1_SET
+		(blk->hdr_decompress0.knee_ratio1);
 	hd0->knee_ratio23 =
-		NEO_HDR_DECOMPRESS0_KNEE_RATIO23_CAM0_RATIO2_SET(blk->hdr_decompress0.knee_ratio2) |
-		NEO_HDR_DECOMPRESS0_KNEE_RATIO23_CAM0_RATIO3_SET(blk->hdr_decompress0.knee_ratio3);
+		NEO_HDR_DECOMPRESS0_KNEE_RATIO23_CAM0_RATIO2_SET
+		(blk->hdr_decompress0.knee_ratio2);
+	hd0->knee_ratio23 |=
+		NEO_HDR_DECOMPRESS0_KNEE_RATIO23_CAM0_RATIO3_SET
+		(blk->hdr_decompress0.knee_ratio3);
 	hd0->knee_ratio4 =
-		NEO_HDR_DECOMPRESS0_KNEE_RATIO4_CAM0_RATIO4_SET(blk->hdr_decompress0.knee_ratio4);
+		NEO_HDR_DECOMPRESS0_KNEE_RATIO4_CAM0_RATIO4_SET
+		(blk->hdr_decompress0.knee_ratio4);
 	hd0->knee_npoint0 =
-		NEO_HDR_DECOMPRESS0_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_npoint0);
+		NEO_HDR_DECOMPRESS0_KNEE_NPOINT0_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_npoint0);
 	hd0->knee_npoint1 =
-		NEO_HDR_DECOMPRESS0_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_npoint1);
+		NEO_HDR_DECOMPRESS0_KNEE_NPOINT1_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_npoint1);
 	hd0->knee_npoint2 =
-		NEO_HDR_DECOMPRESS0_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_npoint2);
+		NEO_HDR_DECOMPRESS0_KNEE_NPOINT2_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_npoint2);
 	hd0->knee_npoint3 =
-		NEO_HDR_DECOMPRESS0_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_npoint3);
+		NEO_HDR_DECOMPRESS0_KNEE_NPOINT3_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_npoint3);
 	hd0->knee_npoint4 =
-		NEO_HDR_DECOMPRESS0_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress0.knee_npoint4);
+		NEO_HDR_DECOMPRESS0_KNEE_NPOINT4_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress0.knee_npoint4);
 }
 
-static void neoisp_set_context_hdr_decompress1(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_hdr_decompress1(struct neoisp_dev_s *neoispd,
+						  union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hdr_decompress1_s *hd1 = &ctx->hw.hdr_decompress1;
 
-	hd1->ctrl = NEO_CTRL_CAM0_ENABLE_SET(
-		blk->hdr_decompress1.ctrl_enable);
+	hd1->ctrl =
+		NEO_CTRL_CAM0_ENABLE_SET(blk->hdr_decompress1.ctrl_enable);
 	hd1->knee_point1 =
-		NEO_HDR_DECOMPRESS1_KNEE_POINT1_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_point1);
+		NEO_HDR_DECOMPRESS1_KNEE_POINT1_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_point1);
 	hd1->knee_point2 =
-		NEO_HDR_DECOMPRESS1_KNEE_POINT2_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_point2);
+		NEO_HDR_DECOMPRESS1_KNEE_POINT2_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_point2);
 	hd1->knee_point3 =
-		NEO_HDR_DECOMPRESS1_KNEE_POINT3_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_point3);
+		NEO_HDR_DECOMPRESS1_KNEE_POINT3_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_point3);
 	hd1->knee_point4 =
-		NEO_HDR_DECOMPRESS1_KNEE_POINT4_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_point4);
+		NEO_HDR_DECOMPRESS1_KNEE_POINT4_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_point4);
 	hd1->knee_offset0 =
-		NEO_HDR_DECOMPRESS1_KNEE_OFFSET0_CAM0_OFFSET_SET(blk->hdr_decompress1.knee_offset0);
+		NEO_HDR_DECOMPRESS1_KNEE_OFFSET0_CAM0_OFFSET_SET
+		(blk->hdr_decompress1.knee_offset0);
 	hd1->knee_offset1 =
-		NEO_HDR_DECOMPRESS1_KNEE_OFFSET1_CAM0_OFFSET_SET(blk->hdr_decompress1.knee_offset1);
+		NEO_HDR_DECOMPRESS1_KNEE_OFFSET1_CAM0_OFFSET_SET
+		(blk->hdr_decompress1.knee_offset1);
 	hd1->knee_offset2 =
-		NEO_HDR_DECOMPRESS1_KNEE_OFFSET2_CAM0_OFFSET_SET(blk->hdr_decompress1.knee_offset2);
+		NEO_HDR_DECOMPRESS1_KNEE_OFFSET2_CAM0_OFFSET_SET
+		(blk->hdr_decompress1.knee_offset2);
 	hd1->knee_offset3 =
-		NEO_HDR_DECOMPRESS1_KNEE_OFFSET3_CAM0_OFFSET_SET(blk->hdr_decompress1.knee_offset3);
+		NEO_HDR_DECOMPRESS1_KNEE_OFFSET3_CAM0_OFFSET_SET
+		(blk->hdr_decompress1.knee_offset3);
 	hd1->knee_offset4 =
-		NEO_HDR_DECOMPRESS1_KNEE_OFFSET4_CAM0_OFFSET_SET(blk->hdr_decompress1.knee_offset4);
+		NEO_HDR_DECOMPRESS1_KNEE_OFFSET4_CAM0_OFFSET_SET
+		(blk->hdr_decompress1.knee_offset4);
 	hd1->knee_ratio01 =
-		NEO_HDR_DECOMPRESS1_KNEE_RATIO01_CAM0_RATIO0_SET(blk->hdr_decompress1.knee_ratio0) |
-		NEO_HDR_DECOMPRESS1_KNEE_RATIO01_CAM0_RATIO1_SET(blk->hdr_decompress1.knee_ratio1);
+		NEO_HDR_DECOMPRESS1_KNEE_RATIO01_CAM0_RATIO0_SET
+		(blk->hdr_decompress1.knee_ratio0);
+	hd1->knee_ratio01 |=
+		NEO_HDR_DECOMPRESS1_KNEE_RATIO01_CAM0_RATIO1_SET
+		(blk->hdr_decompress1.knee_ratio1);
 	hd1->knee_ratio23 =
-		NEO_HDR_DECOMPRESS1_KNEE_RATIO23_CAM0_RATIO2_SET(blk->hdr_decompress1.knee_ratio2) |
-		NEO_HDR_DECOMPRESS1_KNEE_RATIO23_CAM0_RATIO3_SET(blk->hdr_decompress1.knee_ratio3);
+		NEO_HDR_DECOMPRESS1_KNEE_RATIO23_CAM0_RATIO2_SET
+		(blk->hdr_decompress1.knee_ratio2);
+	hd1->knee_ratio23 |=
+		NEO_HDR_DECOMPRESS1_KNEE_RATIO23_CAM0_RATIO3_SET
+		(blk->hdr_decompress1.knee_ratio3);
 	hd1->knee_ratio4 =
-		NEO_HDR_DECOMPRESS1_KNEE_RATIO4_CAM0_RATIO4_SET(blk->hdr_decompress1.knee_ratio4);
+		NEO_HDR_DECOMPRESS1_KNEE_RATIO4_CAM0_RATIO4_SET
+		(blk->hdr_decompress1.knee_ratio4);
 	hd1->knee_npoint0 =
-		NEO_HDR_DECOMPRESS1_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_npoint0);
+		NEO_HDR_DECOMPRESS1_KNEE_NPOINT0_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_npoint0);
 	hd1->knee_npoint1 =
-		NEO_HDR_DECOMPRESS1_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_npoint1);
+		NEO_HDR_DECOMPRESS1_KNEE_NPOINT1_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_npoint1);
 	hd1->knee_npoint2 =
-		NEO_HDR_DECOMPRESS1_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_npoint2);
+		NEO_HDR_DECOMPRESS1_KNEE_NPOINT2_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_npoint2);
 	hd1->knee_npoint3 =
-		NEO_HDR_DECOMPRESS1_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_npoint3);
+		NEO_HDR_DECOMPRESS1_KNEE_NPOINT3_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_npoint3);
 	hd1->knee_npoint4 =
-		NEO_HDR_DECOMPRESS1_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->hdr_decompress1.knee_npoint4);
+		NEO_HDR_DECOMPRESS1_KNEE_NPOINT4_CAM0_KNEEPOINT_SET
+		(blk->hdr_decompress1.knee_npoint4);
 }
 
-static void __neoisp_set_context_obwb(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk, u8 id)
+static void __neoisp_params_handler_obwb(struct neoisp_dev_s *neoispd,
+					 union neoisp_params_block_u *blk, u8 id)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_obwb_s *obwb;
 
 	switch (id) {
@@ -530,7 +631,7 @@ static void __neoisp_set_context_obwb(struct neoisp_dev_s *neoispd,
 		obwb = &ctx->hw.obwb2;
 		break;
 	default:
-		pr_err("Unexpected OBWB instance %u\n", id);
+		dev_err(neoispd->dev, "Unexpected OBWB instance %u\n", id);
 		return;
 	}
 
@@ -550,28 +651,28 @@ static void __neoisp_set_context_obwb(struct neoisp_dev_s *neoispd,
 		NEO_OB_WB0_B_CTRL_CAM0_GAIN_SET(blk->obwb.b_ctrl_gain);
 }
 
-static void neoisp_set_context_obwb0(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_obwb0(struct neoisp_dev_s *neoispd,
+					union neoisp_params_block_u *blk)
 {
-	__neoisp_set_context_obwb(neoispd, blk, 0);
+	__neoisp_params_handler_obwb(neoispd, blk, 0);
 }
 
-static void neoisp_set_context_obwb1(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_obwb1(struct neoisp_dev_s *neoispd,
+					union neoisp_params_block_u *blk)
 {
-	__neoisp_set_context_obwb(neoispd, blk, 1);
+	__neoisp_params_handler_obwb(neoispd, blk, 1);
 }
 
-static void neoisp_set_context_obwb2(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_obwb2(struct neoisp_dev_s *neoispd,
+					union neoisp_params_block_u *blk)
 {
-	__neoisp_set_context_obwb(neoispd, blk, 2);
+	__neoisp_params_handler_obwb(neoispd, blk, 2);
 }
 
-static void neoisp_set_context_hdr_merge(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_hdr_merge(struct neoisp_dev_s *neoispd,
+					    union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hdr_merge_s *hmg = &ctx->hw.hdr_merge;
 
 	hmg->ctrl =
@@ -606,10 +707,10 @@ static void neoisp_set_context_hdr_merge(struct neoisp_dev_s *neoispd,
 		NEO_HDR_MERGE_POST_SCALE_CAM0_SCALE_SET(blk->hdr_merge.post_scale_scale);
 }
 
-static void neoisp_set_context_rgbir(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_rgbir(struct neoisp_dev_s *neoispd,
+					union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_rgbir_s *rgbir = &ctx->hw.rgbir;
 	struct neoisp_stat_hist_cfg_s *hist;
 
@@ -659,10 +760,10 @@ static void neoisp_set_context_rgbir(struct neoisp_dev_s *neoispd,
 		NEO_RGBIR_HIST1_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
 }
 
-static void neoisp_set_context_stat_hists(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_stat(struct neoisp_dev_s *neoispd,
+				       union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_stat_s *stat = &ctx->hw.stat;
 	struct neoisp_stat_hist_cfg_s *hist;
 
@@ -716,77 +817,79 @@ static void neoisp_set_context_stat_hists(struct neoisp_dev_s *neoispd,
 		NEO_STAT_HIST3_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
 }
 
-static void neoisp_set_context_ir_compress(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_ir_compress(struct neoisp_dev_s *neoispd,
+					      union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_ir_compress_s *ircomp = &ctx->hw.ir_compress;
 
 	ircomp->ctrl =
 		NEO_IR_COMPRESS_CTRL_CAM0_OBPP_SET(blk->ir_compress.ctrl_obpp) |
 		NEO_IR_COMPRESS_CTRL_CAM0_ENABLE_SET(blk->ir_compress.ctrl_enable);
 	ircomp->knee_point1 =
-		NEO_IR_COMPRESS_KNEE_POINT1_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_point1_kneepoint);
+		NEO_IR_COMPRESS_KNEE_POINT1_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_point1_kneepoint);
 	ircomp->knee_point2 =
-		NEO_IR_COMPRESS_KNEE_POINT2_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_point2_kneepoint);
+		NEO_IR_COMPRESS_KNEE_POINT2_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_point2_kneepoint);
 	ircomp->knee_point3 =
-		NEO_IR_COMPRESS_KNEE_POINT3_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_point3_kneepoint);
+		NEO_IR_COMPRESS_KNEE_POINT3_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_point3_kneepoint);
 	ircomp->knee_point4 =
-		NEO_IR_COMPRESS_KNEE_POINT4_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_point4_kneepoint);
+		NEO_IR_COMPRESS_KNEE_POINT4_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_point4_kneepoint);
 	ircomp->knee_offset0 =
-		NEO_IR_COMPRESS_KNEE_OFFSET0_CAM0_OFFSET_SET(
-			blk->ir_compress.knee_offset0_offset);
+		NEO_IR_COMPRESS_KNEE_OFFSET0_CAM0_OFFSET_SET
+		(blk->ir_compress.knee_offset0_offset);
 	ircomp->knee_offset1 =
-		NEO_IR_COMPRESS_KNEE_OFFSET1_CAM0_OFFSET_SET(
-			blk->ir_compress.knee_offset1_offset);
+		NEO_IR_COMPRESS_KNEE_OFFSET1_CAM0_OFFSET_SET
+		(blk->ir_compress.knee_offset1_offset);
 	ircomp->knee_offset2 =
-		NEO_IR_COMPRESS_KNEE_OFFSET2_CAM0_OFFSET_SET(
-			blk->ir_compress.knee_offset2_offset);
+		NEO_IR_COMPRESS_KNEE_OFFSET2_CAM0_OFFSET_SET
+		(blk->ir_compress.knee_offset2_offset);
 	ircomp->knee_offset3 =
-		NEO_IR_COMPRESS_KNEE_OFFSET3_CAM0_OFFSET_SET(
-			blk->ir_compress.knee_offset3_offset);
+		NEO_IR_COMPRESS_KNEE_OFFSET3_CAM0_OFFSET_SET
+		(blk->ir_compress.knee_offset3_offset);
 	ircomp->knee_offset4 =
-		NEO_IR_COMPRESS_KNEE_OFFSET4_CAM0_OFFSET_SET(
-			blk->ir_compress.knee_offset4_offset);
+		NEO_IR_COMPRESS_KNEE_OFFSET4_CAM0_OFFSET_SET
+		(blk->ir_compress.knee_offset4_offset);
 	ircomp->knee_ratio01 =
-		NEO_IR_COMPRESS_KNEE_RATIO01_CAM0_RATIO0_SET(
-			blk->ir_compress.knee_ratio01_ratio0) |
-		NEO_IR_COMPRESS_KNEE_RATIO01_CAM0_RATIO1_SET(
-			blk->ir_compress.knee_ratio01_ratio1);
+		NEO_IR_COMPRESS_KNEE_RATIO01_CAM0_RATIO0_SET
+		(blk->ir_compress.knee_ratio01_ratio0);
+	ircomp->knee_ratio01 |=
+		NEO_IR_COMPRESS_KNEE_RATIO01_CAM0_RATIO1_SET
+		(blk->ir_compress.knee_ratio01_ratio1);
 	ircomp->knee_ratio23 =
-		NEO_IR_COMPRESS_KNEE_RATIO23_CAM0_RATIO2_SET(
-			blk->ir_compress.knee_ratio23_ratio2) |
-		NEO_IR_COMPRESS_KNEE_RATIO23_CAM0_RATIO3_SET(
-			blk->ir_compress.knee_ratio23_ratio3);
+		NEO_IR_COMPRESS_KNEE_RATIO23_CAM0_RATIO2_SET
+		(blk->ir_compress.knee_ratio23_ratio2);
+	ircomp->knee_ratio23 |=
+		NEO_IR_COMPRESS_KNEE_RATIO23_CAM0_RATIO3_SET
+		(blk->ir_compress.knee_ratio23_ratio3);
 	ircomp->knee_ratio4 =
-		NEO_IR_COMPRESS_KNEE_RATIO4_CAM0_RATIO4_SET(
-			blk->ir_compress.knee_ratio4_ratio4);
+		NEO_IR_COMPRESS_KNEE_RATIO4_CAM0_RATIO4_SET
+		(blk->ir_compress.knee_ratio4_ratio4);
 	ircomp->knee_npoint0 =
-		NEO_IR_COMPRESS_KNEE_NPOINT0_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_npoint0_kneepoint);
+		NEO_IR_COMPRESS_KNEE_NPOINT0_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_npoint0_kneepoint);
 	ircomp->knee_npoint1 =
-		NEO_IR_COMPRESS_KNEE_NPOINT1_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_npoint1_kneepoint);
+		NEO_IR_COMPRESS_KNEE_NPOINT1_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_npoint1_kneepoint);
 	ircomp->knee_npoint2 =
-		NEO_IR_COMPRESS_KNEE_NPOINT2_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_npoint2_kneepoint);
+		NEO_IR_COMPRESS_KNEE_NPOINT2_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_npoint2_kneepoint);
 	ircomp->knee_npoint3 =
-		NEO_IR_COMPRESS_KNEE_NPOINT3_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_npoint3_kneepoint);
+		NEO_IR_COMPRESS_KNEE_NPOINT3_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_npoint3_kneepoint);
 	ircomp->knee_npoint4 =
-		NEO_IR_COMPRESS_KNEE_NPOINT4_CAM0_KNEEPOINT_SET(
-			blk->ir_compress.knee_npoint4_kneepoint);
+		NEO_IR_COMPRESS_KNEE_NPOINT4_CAM0_KNEEPOINT_SET
+		(blk->ir_compress.knee_npoint4_kneepoint);
 }
 
-static void neoisp_set_context_color_temp(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_ctemp(struct neoisp_dev_s *neoispd,
+					union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
-	struct neoisp_color_temp_s *ctemp = &ctx->hw.color_temp;
+	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_ctemp_s *ctemp = &ctx->hw.ctemp;
 	struct neoisp_ctemp_roi_desc_s *croi;
 
 	ctemp->ctrl =
@@ -915,10 +1018,10 @@ static void neoisp_set_context_color_temp(struct neoisp_dev_s *neoispd,
 		NEO_COLOR_TEMP_GB_AVG_IN_CAM0_GB_AGV_SET(blk->ctemp.gb_avg_in_gb_agv);
 }
 
-static void neoisp_set_context_bnr(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_bnr(struct neoisp_dev_s *neoispd,
+				      union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_bnr_s *bnr = &ctx->hw.bnr;
 
 	bnr->ctrl =
@@ -992,30 +1095,30 @@ static void neoisp_set_context_bnr(struct neoisp_dev_s *neoispd,
 		NEO_BNR_STRETCH_CAM0_GAIN_SET(blk->bnr.stretch_gain);
 }
 
-static void neoisp_set_context_vignetting(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_vignetting_ctrl(struct neoisp_dev_s *neoispd,
+						  union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
-	struct neoisp_vignetting_s *vignetting_ctl = &ctx->hw.vignetting;
+	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_vignetting_ctrl_s *vignetting = &ctx->hw.vignetting_ctrl;
 
-	vignetting_ctl->ctrl =
+	vignetting->ctrl =
 		NEO_VIGNETTING_CTRL_CAM0_ENABLE_SET(blk->vignetting_ctrl.ctrl_enable);
-	vignetting_ctl->blk_conf =
+	vignetting->blk_conf =
 		NEO_VIGNETTING_BLK_CONF_CAM0_COLS_SET(blk->vignetting_ctrl.blk_conf_cols) |
 		NEO_VIGNETTING_BLK_CONF_CAM0_ROWS_SET(blk->vignetting_ctrl.blk_conf_rows);
-	vignetting_ctl->blk_size =
+	vignetting->blk_size =
 		NEO_VIGNETTING_BLK_SIZE_CAM0_XSIZE_SET(blk->vignetting_ctrl.blk_size_xsize) |
 		NEO_VIGNETTING_BLK_SIZE_CAM0_YSIZE_SET(blk->vignetting_ctrl.blk_size_ysize);
-	vignetting_ctl->blk_stepy =
+	vignetting->blk_stepy =
 		NEO_VIGNETTING_BLK_STEPY_CAM0_STEP_SET(blk->vignetting_ctrl.blk_stepy_step);
-	vignetting_ctl->blk_stepx =
+	vignetting->blk_stepx =
 		NEO_VIGNETTING_BLK_STEPX_CAM0_STEP_SET(blk->vignetting_ctrl.blk_stepx_step);
 }
 
-static void neoisp_set_context_demosaic(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_demosaic(struct neoisp_dev_s *neoispd,
+					   union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_demosaic_s *demosaic = &ctx->hw.demosaic;
 
 	demosaic->ctrl =
@@ -1024,19 +1127,20 @@ static void neoisp_set_context_demosaic(struct neoisp_dev_s *neoispd,
 		NEO_DEMOSAIC_ACTIVITY_CTL_CAM0_ALPHA_SET(blk->demosaic.activity_ctl_alpha) |
 		NEO_DEMOSAIC_ACTIVITY_CTL_CAM0_ACT_RATIO_SET(blk->demosaic.activity_ctl_act_ratio);
 	demosaic->dynamics_ctl0 =
-		NEO_DEMOSAIC_DYNAMICS_CTL0_CAM0_STRENGTHG_SET(
-			blk->demosaic.dynamics_ctl0_strengthg) |
-		NEO_DEMOSAIC_DYNAMICS_CTL0_CAM0_STRENGTHC_SET(
-			blk->demosaic.dynamics_ctl0_strengthc);
+		NEO_DEMOSAIC_DYNAMICS_CTL0_CAM0_STRENGTHG_SET
+		(blk->demosaic.dynamics_ctl0_strengthg);
+	demosaic->dynamics_ctl0 |=
+		NEO_DEMOSAIC_DYNAMICS_CTL0_CAM0_STRENGTHC_SET
+		(blk->demosaic.dynamics_ctl0_strengthc);
 	demosaic->dynamics_ctl2 =
-		NEO_DEMOSAIC_DYNAMICS_CTL2_CAM0_MAX_IMPACT_SET(
-			blk->demosaic.dynamics_ctl2_max_impact);
+		NEO_DEMOSAIC_DYNAMICS_CTL2_CAM0_MAX_IMPACT_SET
+		(blk->demosaic.dynamics_ctl2_max_impact);
 }
 
-static void neoisp_set_context_rgb_to_yuv(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_rgb2yuv(struct neoisp_dev_s *neoispd,
+					  union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_rgb2yuv_s *rgb2yuv = &ctx->hw.rgb2yuv;
 
 	rgb2yuv->gain_ctrl =
@@ -1065,11 +1169,11 @@ static void neoisp_set_context_rgb_to_yuv(struct neoisp_dev_s *neoispd,
 		NEO_RGB_TO_YUV_OFFSET2_CAM0_OFFSET_SET(blk->rgb2yuv.csc_offsets[2]);
 }
 
-static void neoisp_set_context_drc(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_dr_comp(struct neoisp_dev_s *neoispd,
+					  union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
-	struct neoisp_drc_s *drc = &ctx->hw.drc;
+	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_dr_comp_s *drc = &ctx->hw.drc;
 
 	drc->roi0_pos =
 		NEO_DRC_ROI0_POS_CAM0_XPOS_SET(blk->drc.roi0.xpos) |
@@ -1104,27 +1208,27 @@ static void neoisp_set_context_drc(struct neoisp_dev_s *neoispd,
 		NEO_DRC_ALPHA_CAM0_ALPHA_SET(blk->drc.alpha_alpha);
 }
 
-static void neoisp_set_context_nr(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_nr(struct neoisp_dev_s *neoispd,
+				     union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
-	struct neoisp_nr_s *nrc = &ctx->hw.nr;
+	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_nr_s *nr = &ctx->hw.nr;
 
-	nrc->ctrl =
+	nr->ctrl =
 		NEO_NR_CTRL_CAM0_DEBUG_SET(blk->nrc.ctrl_debug) |
 		NEO_NR_CTRL_CAM0_ENABLE_SET(blk->nrc.ctrl_enable);
-	nrc->blend_scale =
+	nr->blend_scale =
 		NEO_NR_BLEND_SCALE_CAM0_SCALE_SET(blk->nrc.blend_scale_scale) |
 		NEO_NR_BLEND_SCALE_CAM0_SHIFT_SET(blk->nrc.blend_scale_shift) |
 		NEO_NR_BLEND_SCALE_CAM0_GAIN_SET(blk->nrc.blend_scale_gain);
-	nrc->blend_th0 =
+	nr->blend_th0 =
 		NEO_NR_BLEND_TH0_CAM0_TH_SET(blk->nrc.blend_th0_th);
 }
 
-static void neoisp_set_context_df(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_df(struct neoisp_dev_s *neoispd,
+				     union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_df_s *df = &ctx->hw.df;
 
 	df->ctrl =
@@ -1138,10 +1242,10 @@ static void neoisp_set_context_df(struct neoisp_dev_s *neoispd,
 		NEO_DF_BLEND_TH0_CAM0_TH_SET(blk->dfc.blend_th0_th);
 }
 
-static void neoisp_set_context_ee(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_ee(struct neoisp_dev_s *neoispd,
+				     union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_ee_s *ee = &ctx->hw.ee;
 
 	ee->ctrl =
@@ -1155,20 +1259,20 @@ static void neoisp_set_context_ee(struct neoisp_dev_s *neoispd,
 		NEO_EE_MASKGAIN_CAM0_GAIN_SET(blk->eec.maskgain_gain);
 }
 
-static void neoisp_set_context_convmed(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_convmed(struct neoisp_dev_s *neoispd,
+					  union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_convmed_s *convmed = &ctx->hw.convmed;
 
 	convmed->ctrl =
 		NEO_CCONVMED_CTRL_CAM0_FLT_SET(blk->convmed.ctrl_flt);
 }
 
-static void neoisp_set_context_cas(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_cas(struct neoisp_dev_s *neoispd,
+				      union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_cas_s *cas = &ctx->hw.cas;
 
 	cas->gain =
@@ -1180,10 +1284,10 @@ static void neoisp_set_context_cas(struct neoisp_dev_s *neoispd,
 		NEO_CAS_OFFSET_CAM0_OFFSET_SET(blk->cas.offset_offset);
 }
 
-static void neoisp_set_context_gcm(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_gcm(struct neoisp_dev_s *neoispd,
+				      union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_gcm_s *gcm = &ctx->hw.gcm;
 
 	gcm->imat0 =
@@ -1255,125 +1359,383 @@ static void neoisp_set_context_gcm(struct neoisp_dev_s *neoispd,
 		NEO_GCM_MAT_CONFG_CAM0_SIGN_CONFG_SET(blk->gcm.mat_confg_sign_confg);
 }
 
-static void neoisp_set_context_autofocus(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_af(struct neoisp_dev_s *neoispd,
+				     union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
-	struct neoisp_autofocus_s *afc = &ctx->hw.autofocus;
+	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_autofocus_s *af = &ctx->hw.autofocus;
 
-	afc->roi0_pos =
+	af->roi0_pos =
 		NEO_AUTOFOCUS_ROI0_POS_CAM0_XPOS_SET(blk->afc.af_roi[0].xpos) |
 		NEO_AUTOFOCUS_ROI0_POS_CAM0_YPOS_SET(blk->afc.af_roi[0].ypos);
-	afc->roi0_size =
+	af->roi0_size =
 		NEO_AUTOFOCUS_ROI0_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[0].width) |
 		NEO_AUTOFOCUS_ROI0_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[0].height);
-	afc->roi1_pos =
+	af->roi1_pos =
 		NEO_AUTOFOCUS_ROI1_POS_CAM0_XPOS_SET(blk->afc.af_roi[1].xpos) |
 		NEO_AUTOFOCUS_ROI1_POS_CAM0_YPOS_SET(blk->afc.af_roi[1].ypos);
-	afc->roi1_size =
+	af->roi1_size =
 		NEO_AUTOFOCUS_ROI1_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[1].width) |
 		NEO_AUTOFOCUS_ROI1_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[1].height);
-	afc->roi2_pos =
+	af->roi2_pos =
 		NEO_AUTOFOCUS_ROI2_POS_CAM0_XPOS_SET(blk->afc.af_roi[2].xpos) |
 		NEO_AUTOFOCUS_ROI2_POS_CAM0_YPOS_SET(blk->afc.af_roi[2].ypos);
-	afc->roi2_size =
+	af->roi2_size =
 		NEO_AUTOFOCUS_ROI2_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[2].width) |
 		NEO_AUTOFOCUS_ROI2_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[2].height);
-	afc->roi3_pos =
+	af->roi3_pos =
 		NEO_AUTOFOCUS_ROI3_POS_CAM0_XPOS_SET(blk->afc.af_roi[3].xpos) |
 		NEO_AUTOFOCUS_ROI3_POS_CAM0_YPOS_SET(blk->afc.af_roi[3].ypos);
-	afc->roi3_size =
+	af->roi3_size =
 		NEO_AUTOFOCUS_ROI3_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[3].width) |
 		NEO_AUTOFOCUS_ROI3_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[3].height);
-	afc->roi4_pos =
+	af->roi4_pos =
 		NEO_AUTOFOCUS_ROI4_POS_CAM0_XPOS_SET(blk->afc.af_roi[4].xpos) |
 		NEO_AUTOFOCUS_ROI4_POS_CAM0_YPOS_SET(blk->afc.af_roi[4].ypos);
-	afc->roi4_size =
+	af->roi4_size =
 		NEO_AUTOFOCUS_ROI4_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[4].width) |
 		NEO_AUTOFOCUS_ROI4_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[4].height);
-	afc->roi5_pos =
+	af->roi5_pos =
 		NEO_AUTOFOCUS_ROI5_POS_CAM0_XPOS_SET(blk->afc.af_roi[5].xpos) |
 		NEO_AUTOFOCUS_ROI5_POS_CAM0_YPOS_SET(blk->afc.af_roi[5].ypos);
-	afc->roi5_size =
+	af->roi5_size =
 		NEO_AUTOFOCUS_ROI5_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[5].width) |
 		NEO_AUTOFOCUS_ROI5_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[5].height);
-	afc->roi6_pos =
+	af->roi6_pos =
 		NEO_AUTOFOCUS_ROI6_POS_CAM0_XPOS_SET(blk->afc.af_roi[6].xpos) |
 		NEO_AUTOFOCUS_ROI6_POS_CAM0_YPOS_SET(blk->afc.af_roi[6].ypos);
-	afc->roi6_size =
+	af->roi6_size =
 		NEO_AUTOFOCUS_ROI6_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[6].width) |
 		NEO_AUTOFOCUS_ROI6_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[6].height);
-	afc->roi7_pos =
+	af->roi7_pos =
 		NEO_AUTOFOCUS_ROI7_POS_CAM0_XPOS_SET(blk->afc.af_roi[7].xpos) |
 		NEO_AUTOFOCUS_ROI7_POS_CAM0_YPOS_SET(blk->afc.af_roi[7].ypos);
-	afc->roi7_size =
+	af->roi7_size =
 		NEO_AUTOFOCUS_ROI7_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[7].width) |
 		NEO_AUTOFOCUS_ROI7_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[7].height);
-	afc->roi8_pos =
+	af->roi8_pos =
 		NEO_AUTOFOCUS_ROI8_POS_CAM0_XPOS_SET(blk->afc.af_roi[8].xpos) |
 		NEO_AUTOFOCUS_ROI8_POS_CAM0_YPOS_SET(blk->afc.af_roi[8].ypos);
-	afc->roi8_size =
+	af->roi8_size =
 		NEO_AUTOFOCUS_ROI8_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[8].width) |
 		NEO_AUTOFOCUS_ROI8_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[8].height);
-	afc->fil0_coeffs0 =
+	af->fil0_coeffs0 =
 		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF0_SET(blk->afc.fil0_coeffs[0]) |
 		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF1_SET(blk->afc.fil0_coeffs[1]) |
 		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF2_SET(blk->afc.fil0_coeffs[2]) |
 		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF3_SET(blk->afc.fil0_coeffs[3]);
-	afc->fil0_coeffs1 =
+	af->fil0_coeffs1 =
 		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF4_SET(blk->afc.fil0_coeffs[4]) |
 		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF5_SET(blk->afc.fil0_coeffs[5]) |
 		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF6_SET(blk->afc.fil0_coeffs[6]) |
 		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF7_SET(blk->afc.fil0_coeffs[7]);
-	afc->fil0_coeffs2 =
+	af->fil0_coeffs2 =
 		NEO_AUTOFOCUS_FIL0_COEFFS2_CAM0_COEFF8_SET(blk->afc.fil0_coeffs[8]);
-	afc->fil0_shift =
+	af->fil0_shift =
 		NEO_AUTOFOCUS_FIL0_SHIFT_CAM0_SHIFT_SET(blk->afc.fil0_shift_shift);
-	afc->fil1_coeffs0 =
+	af->fil1_coeffs0 =
 		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF0_SET(blk->afc.fil1_coeffs[0]) |
 		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF1_SET(blk->afc.fil1_coeffs[1]) |
 		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF2_SET(blk->afc.fil1_coeffs[2]) |
 		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF3_SET(blk->afc.fil1_coeffs[3]);
-	afc->fil1_coeffs1 =
+	af->fil1_coeffs1 =
 		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF4_SET(blk->afc.fil1_coeffs[4]) |
 		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF5_SET(blk->afc.fil1_coeffs[5]) |
 		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF6_SET(blk->afc.fil1_coeffs[6]) |
 		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF7_SET(blk->afc.fil1_coeffs[7]);
-	afc->fil1_coeffs2 =
+	af->fil1_coeffs2 =
 		NEO_AUTOFOCUS_FIL1_COEFFS2_CAM0_COEFF8_SET(blk->afc.fil1_coeffs[8]);
-	afc->fil1_shift =
+	af->fil1_shift =
 		NEO_AUTOFOCUS_FIL1_SHIFT_CAM0_SHIFT_SET(blk->afc.fil1_shift_shift);
 }
 
-static void neoisp_set_context_mem_vignetting_table(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_vignetting_table(struct neoisp_dev_s *neoispd,
+						   union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 
 	memcpy((u8 *)(uintptr_t)&ctx->vig,
-		(u8 *)(uintptr_t)blk->vignetting_table.vignetting_table,
-		sizeof(struct neoisp_vignetting_table_mem_params_s));
+	       (u8 *)(uintptr_t)blk->vignetting_table.vignetting_table,
+	       sizeof(struct neoisp_vignetting_table_mem_params_s));
 }
 
-static void neoisp_set_context_mem_global_tonemap(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_drc_global_tonemap(struct neoisp_dev_s *neoispd,
+						     union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 
 	memcpy((u8 *)(uintptr_t)&ctx->gtm,
-		(u8 *)(uintptr_t)blk->drc_global_tonemap.drc_global_tonemap,
-		sizeof(struct neoisp_drc_global_tonemap_mem_params_s));
+	       (u8 *)(uintptr_t)blk->drc_global_tonemap.drc_global_tonemap,
+	       sizeof(struct neoisp_drc_global_tonemap_mem_params_s));
 }
 
-static void neoisp_set_context_mem_local_tonemap(struct neoisp_dev_s *neoispd,
-		union neoisp_params_block_u *blk)
+static void neoisp_params_handler_drc_local_tonemap(struct neoisp_dev_s *neoispd,
+						    union neoisp_params_block_u *blk)
 {
-	struct neoisp_context_s *ctx = neoispd->queued_job.node_group->context;
+	struct neoisp_context_s *ctx = neoispd->context;
 
 	memcpy((u8 *)(uintptr_t)&ctx->ltm,
-		(u8 *)(uintptr_t)blk->drc_local_tonemap.drc_local_tonemap,
-		sizeof(struct neoisp_drc_local_tonemap_mem_params_s));
+	       (u8 *)(uintptr_t)blk->drc_local_tonemap.drc_local_tonemap,
+	       sizeof(struct neoisp_drc_local_tonemap_mem_params_s));
 }
+
+/*
+ * Extended params block handlers
+ *
+ * Handlers are created with below macros. Extended parameters handlers goal is
+ * to  prepare all the block parameters' fields, then forward to the second
+ * level handler (used from legacy API too) that performs the copy into hw
+ * context memory region. The extended parameters handlers check block size and
+ * header flag from the struct c:type:`v4l2_isp_params_block_header`. Flags are
+ * not handled the same on all macros, depending on ISP blocks. Reason is that
+ * some ISP blocks do have a ctrl_enable bit, then associated contexts do have
+ * ctrl_enable field, while some other ISP blocks don't.
+ *
+ * When ctrl_enable bit is present:
+ *  - if :c:type:`v4l2_isp_params_block_header` flag is set to either ENABLE
+ * or DISABLE, then the block's parameter `ctrl_enable` field is configured the
+ * same.
+ *  - if :c:type:`v4l2_isp_params_block_header` flag is not set at all, then
+ * the `ctrl_enable` value from the hw context is copied to the block's
+ * parameters `ctrl_enable` field. This is because 2nd level handler uses all
+ * the parameters block fields and overwrite the whole hw context. Thus we
+ * ensure that `ctrl_enable` in hw context is overwritten with same value.
+ *  - According to v4l2-isp documentation, a block data could be omitted if
+ * DISABLE flag is set. In such case, the `ctrl_enable` field value from the hw
+ * context is forced to DISABLE.
+ *
+ * When `ctrl_enable` bit is not present in an ISP block, all the block fields
+ * are shared to the 2nd level handler, to be copied into hw context, except
+ * when the :c:type:`v4l2_isp_params_block_header` flag is DISABLED and the
+ * block is empty. In such case, the block is simply ignored.
+ */
+#define NEOISP_EXT_PARAMS_HANDLER(block, type) \
+	static void neoisp_ext_params_handler_ ## block \
+		(struct neoisp_dev_s *neoispd, \
+		 union neoisp_ext_params_block_u *ext_blk) \
+	{ \
+		struct neoisp_ ## block ## _ ## type ## _es *ext_params = &ext_blk->block; \
+		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE && \
+		    ext_params->header.size == sizeof(struct v4l2_isp_params_block_header)) \
+			/* Only header w/ DISABLE flag, then bypass context update */ \
+			return; \
+		union neoisp_params_block_u *cfg = \
+			(union neoisp_params_block_u *)&ext_params->cfg; \
+		neoisp_params_handler_ ## block(neoispd, cfg); \
+	}
+
+#define NEOISP_EXT_PARAMS_HANDLER_MULT(block, inst) \
+	static void neoisp_ext_params_handler_ ## block ## inst \
+		(struct neoisp_dev_s *neoispd, \
+		 union neoisp_ext_params_block_u *ext_blk) \
+	{ \
+		struct neoisp_ ## block ## _cfg_es *ext_params = &ext_blk->block; \
+		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE && \
+		    ext_params->header.size == sizeof(struct v4l2_isp_params_block_header)) \
+			/* Only header w/ DISABLE flag, then bypass context update */ \
+			return; \
+		union neoisp_params_block_u *cfg = \
+			(union neoisp_params_block_u *)&ext_params->cfg; \
+		__neoisp_params_handler_ ## block(neoispd, cfg, inst); \
+	}
+
+#define NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(block) \
+	static void neoisp_ext_params_handler_ ## block \
+		(struct neoisp_dev_s *neoispd, \
+		 union neoisp_ext_params_block_u *ext_blk) \
+	{ \
+		struct neoisp_ ## block ## _cfg_es *ext_params = &ext_blk->block; \
+		union neoisp_params_block_u *cfg; \
+		struct neoisp_context_s *ctx = neoispd->context; \
+		struct neoisp_ ## block ## _s *blk = &ctx->hw.block; \
+		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE && \
+		    ext_params->header.size == sizeof(struct v4l2_isp_params_block_header)) { \
+			/* Only header w/ DISABLE flag, then disable in context */ \
+			blk->ctrl = 0; \
+			return; \
+		} \
+		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE) \
+			ext_params->cfg.ctrl_enable = 0; \
+		else if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_ENABLE) \
+			ext_params->cfg.ctrl_enable = 1; \
+		else \
+			ext_params->cfg.ctrl_enable = blk->ctrl; \
+		cfg = (union neoisp_params_block_u *)&ext_params->cfg; \
+		neoisp_params_handler_ ## block(neoispd, cfg); \
+	}
+
+#define NEOISP_EXT_PARAMS_HANDLER_CFG(block) \
+	NEOISP_EXT_PARAMS_HANDLER(block, cfg)
+
+NEOISP_EXT_PARAMS_HANDLER_CFG(pipe_conf)
+NEOISP_EXT_PARAMS_HANDLER_CFG(head_color)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(hdr_decompress0)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(hdr_decompress1)
+NEOISP_EXT_PARAMS_HANDLER_MULT(obwb, 0)
+NEOISP_EXT_PARAMS_HANDLER_MULT(obwb, 1)
+NEOISP_EXT_PARAMS_HANDLER_MULT(obwb, 2)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(hdr_merge)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(rgbir)
+NEOISP_EXT_PARAMS_HANDLER_CFG(stat)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(ir_compress)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(bnr)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(vignetting_ctrl)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(ctemp)
+NEOISP_EXT_PARAMS_HANDLER_CFG(demosaic)
+NEOISP_EXT_PARAMS_HANDLER_CFG(rgb2yuv)
+NEOISP_EXT_PARAMS_HANDLER_CFG(dr_comp)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(nr)
+NEOISP_EXT_PARAMS_HANDLER_CFG(af)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(ee)
+NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(df)
+NEOISP_EXT_PARAMS_HANDLER_CFG(convmed)
+NEOISP_EXT_PARAMS_HANDLER_CFG(cas)
+NEOISP_EXT_PARAMS_HANDLER_CFG(gcm)
+NEOISP_EXT_PARAMS_HANDLER(vignetting_table, mem_params)
+NEOISP_EXT_PARAMS_HANDLER(drc_global_tonemap, mem_params)
+NEOISP_EXT_PARAMS_HANDLER(drc_local_tonemap, mem_params)
+
+static const struct neoisp_block_handler_s {
+	size_t size;
+	void (*handler)(struct neoisp_dev_s *neoispd, union neoisp_params_block_u *blk);
+	void (*ext_handler)(struct neoisp_dev_s *neoispd, union neoisp_ext_params_block_u *ext_blk);
+} neoisp_block_handlers[] = {
+	[NEOISP_PARAM_BLK_PIPE_CONF] = {
+		.size = sizeof(struct neoisp_pipe_conf_cfg_s),
+		.handler = &neoisp_params_handler_pipe_conf,
+		.ext_handler = &neoisp_ext_params_handler_pipe_conf,
+	},
+	[NEOISP_PARAM_BLK_HEAD_COLOR] = {
+		.size = sizeof(struct neoisp_head_color_cfg_s),
+		.handler = &neoisp_params_handler_head_color,
+		.ext_handler = &neoisp_ext_params_handler_head_color,
+	},
+	[NEOISP_PARAM_BLK_HDR_DECOMPRESS0] = {
+		.size = sizeof(struct neoisp_hdr_decompress0_cfg_s),
+		.handler = &neoisp_params_handler_hdr_decompress0,
+		.ext_handler = &neoisp_ext_params_handler_hdr_decompress0,
+	},
+	[NEOISP_PARAM_BLK_HDR_DECOMPRESS1] = {
+		.size = sizeof(struct neoisp_hdr_decompress1_cfg_s),
+		.handler = &neoisp_params_handler_hdr_decompress1,
+		.ext_handler = &neoisp_ext_params_handler_hdr_decompress1,
+	},
+	[NEOISP_PARAM_BLK_OBWB0] = {
+		.size = sizeof(struct neoisp_obwb_cfg_s),
+		.handler = &neoisp_params_handler_obwb0,
+		.ext_handler = &neoisp_ext_params_handler_obwb0,
+	},
+	[NEOISP_PARAM_BLK_OBWB1] = {
+		.size = sizeof(struct neoisp_obwb_cfg_s),
+		.handler = &neoisp_params_handler_obwb1,
+		.ext_handler = &neoisp_ext_params_handler_obwb1,
+	},
+	[NEOISP_PARAM_BLK_OBWB2] = {
+		.size = sizeof(struct neoisp_obwb_cfg_s),
+		.handler = &neoisp_params_handler_obwb2,
+		.ext_handler = &neoisp_ext_params_handler_obwb2,
+	},
+	[NEOISP_PARAM_BLK_HDR_MERGE] = {
+		.size = sizeof(struct neoisp_hdr_merge_cfg_s),
+		.handler = &neoisp_params_handler_hdr_merge,
+		.ext_handler = &neoisp_ext_params_handler_hdr_merge,
+	},
+	[NEOISP_PARAM_BLK_RGBIR] = {
+		.size = sizeof(struct neoisp_rgbir_cfg_s),
+		.handler = &neoisp_params_handler_rgbir,
+		.ext_handler = &neoisp_ext_params_handler_rgbir,
+	},
+	[NEOISP_PARAM_BLK_STAT] = {
+		.size = sizeof(struct neoisp_stat_cfg_s),
+		.handler = &neoisp_params_handler_stat,
+		.ext_handler = &neoisp_ext_params_handler_stat,
+	},
+	[NEOISP_PARAM_BLK_IR_COMPRESS] = {
+		.size = sizeof(struct neoisp_ir_compress_cfg_s),
+		.handler = &neoisp_params_handler_ir_compress,
+		.ext_handler = &neoisp_ext_params_handler_ir_compress,
+	},
+	[NEOISP_PARAM_BLK_BNR] = {
+		.size = sizeof(struct neoisp_bnr_cfg_s),
+		.handler = &neoisp_params_handler_bnr,
+		.ext_handler = &neoisp_ext_params_handler_bnr,
+	},
+	[NEOISP_PARAM_BLK_VIGNETTING_CTRL] = {
+		.size = sizeof(struct neoisp_vignetting_ctrl_cfg_s),
+		.handler = &neoisp_params_handler_vignetting_ctrl,
+		.ext_handler = &neoisp_ext_params_handler_vignetting_ctrl,
+	},
+	[NEOISP_PARAM_BLK_CTEMP] = {
+		.size = sizeof(struct neoisp_ctemp_cfg_s),
+		.handler = &neoisp_params_handler_ctemp,
+		.ext_handler = &neoisp_ext_params_handler_ctemp,
+	},
+	[NEOISP_PARAM_BLK_DEMOSAIC] = {
+		.size = sizeof(struct neoisp_demosaic_cfg_s),
+		.handler = &neoisp_params_handler_demosaic,
+		.ext_handler = &neoisp_ext_params_handler_demosaic,
+	},
+	[NEOISP_PARAM_BLK_RGB2YUV] = {
+		.size = sizeof(struct neoisp_rgb2yuv_cfg_s),
+		.handler = &neoisp_params_handler_rgb2yuv,
+		.ext_handler = &neoisp_ext_params_handler_rgb2yuv,
+	},
+	[NEOISP_PARAM_BLK_DR_COMP] = {
+		.size = sizeof(struct neoisp_dr_comp_cfg_s),
+		.handler = &neoisp_params_handler_dr_comp,
+		.ext_handler = &neoisp_ext_params_handler_dr_comp,
+	},
+	[NEOISP_PARAM_BLK_NR] = {
+		.size = sizeof(struct neoisp_nr_cfg_s),
+		.handler = &neoisp_params_handler_nr,
+		.ext_handler = &neoisp_ext_params_handler_nr,
+	},
+	[NEOISP_PARAM_BLK_AF] = {
+		.size = sizeof(struct neoisp_af_cfg_s),
+		.handler = &neoisp_params_handler_af,
+		.ext_handler = &neoisp_ext_params_handler_af,
+	},
+	[NEOISP_PARAM_BLK_EE] = {
+		.size = sizeof(struct neoisp_ee_cfg_s),
+		.handler = &neoisp_params_handler_ee,
+		.ext_handler = &neoisp_ext_params_handler_ee,
+	},
+	[NEOISP_PARAM_BLK_DF] = {
+		.size = sizeof(struct neoisp_df_cfg_s),
+		.handler = &neoisp_params_handler_df,
+		.ext_handler = &neoisp_ext_params_handler_df,
+	},
+	[NEOISP_PARAM_BLK_CONVMED] = {
+		.size = sizeof(struct neoisp_convmed_cfg_s),
+		.handler = &neoisp_params_handler_convmed,
+		.ext_handler = &neoisp_ext_params_handler_convmed,
+	},
+	[NEOISP_PARAM_BLK_CAS] = {
+		.size = sizeof(struct neoisp_cas_cfg_s),
+		.handler = &neoisp_params_handler_cas,
+		.ext_handler = &neoisp_ext_params_handler_cas,
+	},
+	[NEOISP_PARAM_BLK_GCM] = {
+		.size = sizeof(struct neoisp_gcm_cfg_s),
+		.handler = &neoisp_params_handler_gcm,
+		.ext_handler = &neoisp_ext_params_handler_gcm,
+	},
+	[NEOISP_PARAM_BLK_VIGNETTING_TABLE] = {
+		.size = sizeof(struct neoisp_vignetting_table_mem_params_s),
+		.handler = &neoisp_params_handler_vignetting_table,
+		.ext_handler = &neoisp_ext_params_handler_vignetting_table,
+	},
+	[NEOISP_PARAM_BLK_DRC_GLOBAL_TONEMAP] = {
+		.size = sizeof(struct neoisp_drc_global_tonemap_mem_params_s),
+		.handler = &neoisp_params_handler_drc_global_tonemap,
+		.ext_handler = &neoisp_ext_params_handler_drc_global_tonemap,
+	},
+	[NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP] = {
+		.size = sizeof(struct neoisp_drc_local_tonemap_mem_params_s),
+		.handler = &neoisp_params_handler_drc_local_tonemap,
+		.ext_handler = &neoisp_ext_params_handler_drc_local_tonemap,
+	},
+};
 
 struct ycbcr_enc {
 	/* Matrix stored in s8.8 format */
@@ -1383,6 +1745,7 @@ struct ycbcr_enc {
 	 */
 	s16 offsets[NEO_GAMMA_MATRIX_SIZE];
 };
+
 struct xfer_func {
 	s16 gain; /* s8.8 format*/
 	s16 blklvl_gain; /* s8.8 format */
@@ -1457,12 +1820,99 @@ static const struct xfer_func xfer_lut[] = {
 	},
 };
 
-void neoisp_update_context_gcm(struct neoisp_dev_s *neoispd,
-		struct neoisp_context_s *context,
-		enum v4l2_colorspace cspace, enum v4l2_xfer_func xfer,
-		enum v4l2_ycbcr_encoding enc, enum v4l2_quantization quant)
+void neoisp_ctx_set_default_context(struct neoisp_dev_s *neoispd, struct neoisp_context_s *context)
+{
+	memcpy(context, &def_context,
+	       sizeof(struct neoisp_context_s));
+}
+
+/*
+ * Set pipe conf volatile settings (i.e. buffer addresses)
+ */
+void neoisp_ctx_update_buf_addr(struct neoisp_dev_s *neoispd)
+{
+	struct neoisp_job_s *job = &neoispd->queued_job;
+	struct neoisp_pipe_conf_s *cfg = &neoispd->context->hw.pipe_conf;
+	struct neoisp_buffer_s *buf_inp0 = job->buf[NEOISP_INPUT0_NODE];
+	struct neoisp_buffer_s *buf_inp1 = job->buf[NEOISP_INPUT1_NODE];
+	struct neoisp_buffer_s *buf_out = job->buf[NEOISP_FRAME_NODE];
+	struct neoisp_buffer_s *buf_ir = job->buf[NEOISP_IR_NODE];
+	struct neoisp_node_s *nd;
+	u32 ibpp, inp0_stride, inp1_stride;
+	dma_addr_t inp0_addr, inp1_addr;
+
+	/* Input0 specific */
+	nd = &neoispd->node[NEOISP_INPUT0_NODE];
+	ibpp = (nd->neoisp_format->bit_depth + 7) / 8;
+	inp0_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
+
+	/* Input0 - Take crop into account if any */
+	inp0_addr = get_addr(buf_inp0, 0) + (nd->crop.left * ibpp) + (nd->crop.top * inp0_stride);
+
+	/* Input 1 specific */
+	nd = &neoispd->node[NEOISP_INPUT1_NODE];
+	ibpp = (nd->neoisp_format->bit_depth + 7) / 8;
+	inp1_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
+
+	/* Input1 - Take crop into account if any */
+	inp1_addr = get_addr(buf_inp1, 0) + (nd->crop.left * ibpp) + (nd->crop.top * inp1_stride);
+
+	cfg->img0_in_addr =
+		NEO_PIPE_CONF_ADDR_SET(inp0_addr);
+
+	/* Handle hdr inputs */
+	nd = &neoispd->node[NEOISP_INPUT1_NODE];
+	if (neoisp_node_link_is_enabled(nd)) {
+		cfg->img1_in_addr =
+			NEO_PIPE_CONF_ADDR_SET(inp1_addr);
+	}
+
+	nd = &neoispd->node[NEOISP_FRAME_NODE];
+	if (neoisp_node_link_is_enabled(nd)) {
+		/* Planar/multiplanar output image addresses */
+		switch (nd->format.fmt.pix_mp.pixelformat) {
+		case V4L2_PIX_FMT_GREY:
+		case V4L2_PIX_FMT_Y10:
+		case V4L2_PIX_FMT_Y12:
+		case V4L2_PIX_FMT_Y16:
+		case V4L2_PIX_FMT_Y16_BE:
+			/* Monochrome formats: only output channel 0 is used */
+			cfg->outch0_addr =
+				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 0));
+			break;
+		case V4L2_PIX_FMT_NV12:
+		case V4L2_PIX_FMT_NV21:
+		case V4L2_PIX_FMT_NV16:
+		case V4L2_PIX_FMT_NV61:
+			/* Semi-Planar formats: both output channels are used */
+			cfg->outch0_addr =
+				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 0));
+			cfg->outch1_addr =
+				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 1));
+			break;
+		default:
+			/* Interleaved formats: only output channel 1 is used */
+			cfg->outch1_addr =
+				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 0));
+			break;
+		}
+	}
+
+	nd = &neoispd->node[NEOISP_IR_NODE];
+	if (neoisp_node_link_is_enabled(nd))
+		cfg->outir_addr =
+			NEO_PIPE_CONF_ADDR_SET(get_addr(buf_ir, 0));
+}
+
+void neoisp_ctx_update_gcm(struct neoisp_dev_s *neoispd,
+			   struct neoisp_context_s *context,
+			   struct v4l2_pix_format_mplane *pix_mp,
+			   enum v4l2_ycbcr_encoding enc)
 {
 	struct neoisp_gcm_s *gcm = &context->hw.gcm;
+	enum v4l2_xfer_func xfer = pix_mp->xfer_func;
+	enum v4l2_quantization quant = pix_mp->quantization;
+
 	int i, j;
 	s32 value, tmat[NEO_GAMMA_MATRIX_SIZE][NEO_GAMMA_MATRIX_SIZE];
 	u32 tmp;
@@ -1527,8 +1977,8 @@ void neoisp_update_context_gcm(struct neoisp_dev_s *neoispd,
 		s32 factor = (quant == V4L2_QUANTIZATION_LIM_RANGE) ?
 			(i == 0 ? 219 : 224) : 256;
 		for (j = 0; j < NEO_GAMMA_MATRIX_SIZE; j++) {
-			value = ((s32) enc_lut[enc].matrix[i][j] * factor) / 256;
-			value = ((s32) value * (s32) xfer_lut[xfer].gain) / 256;
+			value = ((s32)enc_lut[enc].matrix[i][j] * factor) / 256;
+			value = ((s32)value * (s32)xfer_lut[xfer].gain) / 256;
 			tmat[i][j] = (s16)value;
 		}
 	}
@@ -1549,201 +1999,21 @@ void neoisp_update_context_gcm(struct neoisp_dev_s *neoispd,
 		NEO_GCM_OMAT5_CAM0_R2C2_SET(tmat[2][2]);
 }
 
-/*
- * extract offset and size in bytes from memory region map
- */
-static void neoisp_get_offsize(enum isp_block_map_e map, u32 *offset, u32 *size)
+void neoisp_ctx_update_hdr_mode(struct neoisp_dev_s *neoispd,
+				struct neoisp_context_s *context)
 {
-	*offset = ISP_GET_OFF(map);
-	*size = ISP_GET_SZ(map);
-}
+	struct neoisp_hdr_merge_s *hmg = &context->hw.hdr_merge;
+	struct neoisp_hdr_decompress1_s *hd1 = &context->hw.hdr_decompress1;
 
-static void neoisp_get_stats_blk(struct neoisp_dev_s *neoispd, u32 btype, u8 *src,
-		struct neoisp_ext_stats_s *dest, u32 *offset)
-{
-	union neoisp_stats_block_u *blk = (union neoisp_stats_block_u *)&dest->data[*offset];
-	uint32_t size, loff, lsz;
-
-	blk->header.type = btype;
-	switch (btype) {
-	case NEOISP_STATS_BLK_RCTEMP:
-		size = sizeof(struct neoisp_ctemp_reg_stats_s);
-		memcpy_fromio(&blk->rctemp.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG0, size);
-		break;
-	case NEOISP_STATS_BLK_RDRC:
-		size = sizeof(struct neoisp_drc_reg_stats_s);
-		memcpy_fromio(&blk->rdrc.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG59, size);
-		break;
-	case NEOISP_STATS_BLK_RAF:
-		size = sizeof(struct neoisp_af_reg_stats_s);
-		memcpy_fromio(&blk->raf.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG61, size);
-		break;
-	case NEOISP_STATS_BLK_RBNR:
-		size = sizeof(struct neoisp_bnr_reg_stats_s);
-		memcpy_fromio(&blk->rbnr.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG79, size);
-		break;
-	case NEOISP_STATS_BLK_RNR:
-		size = sizeof(struct neoisp_nr_reg_stats_s);
-		memcpy_fromio(&blk->rnr.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG81, size);
-		break;
-	case NEOISP_STATS_BLK_REE:
-		size = sizeof(struct neoisp_ee_reg_stats_s);
-		memcpy_fromio(&blk->ree.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG82, size);
-		break;
-	case NEOISP_STATS_BLK_RDF:
-		size = sizeof(struct neoisp_df_reg_stats_s);
-		memcpy_fromio(&blk->rdf.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG83, size);
-		break;
-	case NEOISP_STATS_BLK_MCTEMP:
-		size = sizeof(struct neoisp_ctemp_mem_stats_s);
-		/* Get ctemp stats from memory */
-		neoisp_get_offsize(NEO_CTEMP_R_SUM_MAP, &loff, &lsz);
-		memcpy(&blk->mctemp.stat.ctemp_r_sum, &src[loff], lsz);
-
-		neoisp_get_offsize(NEO_CTEMP_G_SUM_MAP, &loff, &lsz);
-		memcpy(&blk->mctemp.stat.ctemp_g_sum, &src[loff], lsz);
-
-		neoisp_get_offsize(NEO_CTEMP_B_SUM_MAP, &loff, &lsz);
-		memcpy(&blk->mctemp.stat.ctemp_b_sum, &src[loff], lsz);
-
-		neoisp_get_offsize(NEO_CTEMP_PIX_CNT_MAP, &loff, &lsz);
-		memcpy(&blk->mctemp.stat.ctemp_pix_cnt, &src[loff], lsz);
-		break;
-	case NEOISP_STATS_BLK_MRGBIR:
-		size = sizeof(struct neoisp_rgbir_mem_stats_s);
-		/* Get rgbir stats from memory */
-		neoisp_get_offsize(NEO_RGBIR_HIST_MAP, &loff, &lsz);
-		memcpy(&blk->mrgbir.stat, &src[loff], lsz);
-		break;
-	case NEOISP_STATS_BLK_MHIST:
-		size = sizeof(struct neoisp_hist_mem_stats_s);
-		/* Get histograms stats from memory */
-		neoisp_get_offsize(NEO_HIST_STAT_MAP, &loff, &lsz);
-		memcpy(&blk->mhist.stat, &src[loff], lsz);
-		break;
-	case NEOISP_STATS_BLK_MDRC:
-		size = sizeof(struct neoisp_drc_mem_stats_s);
-		/* Get drc local sum stats from memory */
-		neoisp_get_offsize(neoispd->info->mems->drc_local_sum, &loff, &lsz);
-		memcpy(&blk->mdrc.stat.drc_local_sum, &src[loff], lsz);
-
-		/* Get drc hist roi0 stats from memory */
-		neoisp_get_offsize(neoispd->info->mems->drc_global_hist_roi0, &loff, &lsz);
-		memcpy(&blk->mdrc.stat.drc_global_hist_roi0, &src[loff], lsz);
-
-		/* Get drc hist roi1 stats from memory */
-		neoisp_get_offsize(neoispd->info->mems->drc_global_hist_roi1, &loff, &lsz);
-		memcpy(&blk->mdrc.stat.drc_global_hist_roi1, &src[loff], lsz);
-		break;
-	}
-	blk->header.size = ALIGN(size + sizeof(struct neoisp_ext_stats_block_header_s), 8);
-	blk->header.flags = NEOISP_EXT_STATS_BLK_FL_NONE;
-	*offset += blk->header.size;
-}
-
-void neoisp_get_stats(struct neoisp_dev_s *neoispd, struct neoisp_buffer_s *buf)
-{
-	struct neoisp_node_s *node = &neoispd->queued_job.node_group->node[NEOISP_STATS_NODE];
-	u8 *src = (u8 *)(uintptr_t)neoispd->mmio_tcm;
-	u32 offset, size, *blk_list, count;
-
-	/* Check if stats node link is enabled */
-	if (!neoisp_node_link_is_enabled(node))
-		return;
-
-	if (IS_ERR_OR_NULL(buf) || IS_ERR_OR_NULL(src)) {
-		dev_err(&neoispd->pdev->dev, "Error: stats pointer\n");
-		return;
-	}
-
-	switch (neoispd->api_ver) {
-	case NEOISP_LEGACY_META_BUFFER: {
-		struct neoisp_meta_stats_s *lstats = (struct neoisp_meta_stats_s *)get_vaddr(buf);
-		/* Get stats from registers */
-		memcpy_fromio((u32 *)(uintptr_t)&lstats->regs,
-				neoispd->mmio + NEO_ALIAS_ALIAS_REG0,
-				sizeof(struct neoisp_reg_stats_s));
-
-		/* Get ctemp stats from memory */
-		neoisp_get_offsize(NEO_CTEMP_R_SUM_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_r_sum, &src[offset], size);
-
-		neoisp_get_offsize(NEO_CTEMP_G_SUM_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_g_sum, &src[offset], size);
-
-		neoisp_get_offsize(NEO_CTEMP_B_SUM_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_b_sum, &src[offset], size);
-
-		neoisp_get_offsize(NEO_CTEMP_PIX_CNT_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_pix_cnt, &src[offset], size);
-
-		/* Get rgbir stats from memory */
-		neoisp_get_offsize(NEO_RGBIR_HIST_MAP, &offset, &size);
-		memcpy(&lstats->mems.rgbir.rgbir_hist, &src[offset], size);
-
-		/* Get histograms stats from memory */
-		neoisp_get_offsize(NEO_HIST_STAT_MAP, &offset, &size);
-		memcpy(&lstats->mems.hist.hist_stat, &src[offset], size);
-
-		/* Get drc local sum stats from memory */
-		neoisp_get_offsize(neoispd->info->mems->drc_local_sum, &offset, &size);
-		memcpy(&lstats->mems.drc.drc_local_sum, &src[offset], size);
-
-		/* Get drc hist roi0 stats from memory */
-		neoisp_get_offsize(neoispd->info->mems->drc_global_hist_roi0, &offset, &size);
-		memcpy(&lstats->mems.drc.drc_global_hist_roi0, &src[offset], size);
-
-		/* Get drc hist roi1 stats from memory */
-		neoisp_get_offsize(neoispd->info->mems->drc_global_hist_roi1, &offset, &size);
-		memcpy(&lstats->mems.drc.drc_global_hist_roi1, &src[offset], size);
-		break;
-	}
-
-	case NEOISP_EXT_META_BUFFER_V1: {
-		struct neoisp_ext_stats_s *dest = (struct neoisp_ext_stats_s *)get_vaddr(buf);
-
-		dest->version = neoispd->api_ver;
-		offset = 0;
-		blk_list = (u32 *)neoisp_ext_stats_blocks_v1;
-		count = ARRAY_SIZE(neoisp_ext_stats_blocks_v1);
-		for (int i = 0; i < count; i++)
-			neoisp_get_stats_blk(neoispd, blk_list[i], src, dest, &offset);
-
-		dest->data_size = offset;
-		break;
-	}
-	default:
-		dev_err(&neoispd->pdev->dev, "Error: unknown api version (%d)\n", neoispd->api_ver);
-		break;
-	}
-}
-
-/*
- * Update relevant IP parameters for monochrome sensors
- */
-void neoisp_update_context_monochrome_fmt(struct neoisp_dev_s *neoispd,
-		struct neoisp_context_s *context, u32 pixfmt)
-{
-	struct neoisp_demosaic_s *dmsc;
-	struct neoisp_bnr_s *bnr;
-
-	dmsc = &context->hw.demosaic;
-	bnr = &context->hw.bnr;
-
-	if (FORMAT_IS_MONOCHROME(pixfmt)) {
-		dmsc->ctrl = NEO_DEMOSAIC_CTRL_CAM0_FMT_SET(2); /* Monochrome format */
-		bnr->ctrl |= NEO_BNR_CTRL_CAM0_NHOOD; /* 1-pixel Neighbourhood */
-	} else {
-		dmsc->ctrl = NEO_DEMOSAIC_CTRL_CAM0_FMT_SET(0); /* Bayer format */
-		bnr->ctrl &= ~NEO_BNR_CTRL_CAM0_NHOOD; /* 2-pixel Neighbourhood */
-	}
+	hmg->ctrl |= NEO_HDR_MERGE_CTRL_CAM0_ENABLE;
+	hd1->ctrl |= NEO_HDR_DECOMPRESS1_CTRL_CAM0_ENABLE;
 }
 
 /*
  * Set Head Color selection
  */
-void neoisp_update_context_head_color(struct neoisp_dev_s *neoispd,
-		struct neoisp_context_s *context, u32 pixfmt)
+void neoisp_ctx_update_head_color(struct neoisp_dev_s *neoispd,
+				  struct neoisp_context_s *context, u32 pixfmt)
 {
 	struct neoisp_hc_s *hc = &context->hw.hc;
 	u8 hoffset, voffset;
@@ -1781,38 +2051,58 @@ void neoisp_update_context_head_color(struct neoisp_dev_s *neoispd,
 		hoffset = 1;
 		voffset = 1;
 		break;
+	default:
+		dev_err(neoispd->dev, "Unsupported pixel format %#x\n", pixfmt);
+		return;
 	}
 	hc->ctrl =
 		NEO_HC_CTRL_CAM0_HOFFSET_SET(hoffset) |
 		NEO_HC_CTRL_CAM0_VOFFSET_SET(voffset);
 }
 
-void neoisp_update_context_hdr_mode(struct neoisp_dev_s *neoispd,
-		struct neoisp_context_s *context)
+/*
+ * Update relevant IP parameters for monochrome sensors
+ */
+void neoisp_ctx_update_monochrome_fmt(struct neoisp_dev_s *neoispd,
+				      struct neoisp_context_s *context, u32 pixfmt)
 {
-	struct neoisp_hdr_merge_s *hmg = &context->hw.hdr_merge;
-	struct neoisp_hdr_decompress1_s *hd1 = &context->hw.hdr_decompress1;
+	struct neoisp_demosaic_s *dmsc;
+	struct neoisp_bnr_s *bnr;
 
-	hmg->ctrl |= NEO_HDR_MERGE_CTRL_CAM0_ENABLE;
-	hd1->ctrl |= NEO_HDR_DECOMPRESS1_CTRL_CAM0_ENABLE;
+	dmsc = &context->hw.demosaic;
+	bnr = &context->hw.bnr;
+
+	if (format_is_monochrome(pixfmt)) {
+		dmsc->ctrl = NEO_DEMOSAIC_CTRL_CAM0_FMT_SET(2); /* Monochrome format */
+		bnr->ctrl |= NEO_BNR_CTRL_CAM0_NHOOD; /* 1-pixel Neighbourhood */
+	} else {
+		dmsc->ctrl = NEO_DEMOSAIC_CTRL_CAM0_FMT_SET(0); /* Bayer format */
+		bnr->ctrl &= ~NEO_BNR_CTRL_CAM0_NHOOD; /* 2-pixel Neighbourhood */
+	}
 }
 
-void neoisp_update_context_packetizer(struct neoisp_node_group_s *node_group)
+void neoisp_ctx_update_packetizer(struct neoisp_dev_s *neoispd)
 {
-	struct neoisp_node_s *nd = &node_group->node[NEOISP_FRAME_NODE];
-	struct neoisp_packetizer_s *pck = &node_group->context->hw.packetizer;
-	u32 pixfmt, i;
+	struct neoisp_node_s *nd = &neoispd->node[NEOISP_FRAME_NODE];
+	struct neoisp_packetizer_s *pck = &neoispd->context->hw.packetizer;
 	u8 obpp, lsa, rsa, type, order0, order1, order2, a0s, subsample;
+	u32 pixfmt;
 
 	if (neoisp_node_link_is_enabled(nd)) {
 		pixfmt = nd->format.fmt.pix_mp.pixelformat;
 		obpp = nd->neoisp_format->bpp_enc;
 	} else {
 		/* Force dummy buffer configuration to YUYV format */
+		const struct neoisp_fmt_s *fmt =
+			neoisp_find_video_capture_format(V4L2_PIX_FMT_YUYV);
+
+		if (!fmt) {
+			dev_err(neoispd->dev, "YUYV pixel format not found\n");
+			return;
+		}
+
 		pixfmt = V4L2_PIX_FMT_YUYV;
-		for (i = 0; i < ARRAY_SIZE(formats_vcap); i++)
-			if (formats_vcap[i].fourcc == pixfmt)
-				obpp = formats_vcap[i].bpp_enc;
+		obpp = fmt->bpp_enc;
 	}
 
 	switch (pixfmt) {
@@ -1997,14 +2287,14 @@ void neoisp_update_context_packetizer(struct neoisp_node_group_s *node_group)
  * Set pipe conf fixed settings: image size, bpp, line stride, and dummy
  * addresses.
  */
-void neoisp_update_context_pipe_conf(struct neoisp_node_group_s *node_group)
+void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 {
-	struct neoisp_pipe_conf_s *cfg = &node_group->context->hw.pipe_conf.common;
+	struct neoisp_pipe_conf_s *cfg = &neoispd->context->hw.pipe_conf;
 	struct neoisp_node_s *nd;
 	u32 tmp, width, height, obpp, irbpp, inp0_stride, inp1_stride;
 
 	/* Input0 specific */
-	nd = &node_group->node[NEOISP_INPUT0_NODE];
+	nd = &neoispd->node[NEOISP_INPUT0_NODE];
 	width = nd->crop.width;
 	height = nd->crop.height;
 	inp0_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
@@ -2014,7 +2304,7 @@ void neoisp_update_context_pipe_conf(struct neoisp_node_group_s *node_group)
 	cfg->img_conf = tmp;
 
 	/* Input 1 specific */
-	nd = &node_group->node[NEOISP_INPUT1_NODE];
+	nd = &neoispd->node[NEOISP_INPUT1_NODE];
 	inp1_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
 
 	tmp = cfg->img_conf & ~NEO_PIPE_CONF_IMG_CONF_CAM0_IBPP1_MASK;
@@ -2029,7 +2319,7 @@ void neoisp_update_context_pipe_conf(struct neoisp_node_group_s *node_group)
 		NEO_PIPE_CONF_IMG0_IN_LS_CAM0_LS_SET(inp0_stride);
 
 	/* Handle hdr inputs */
-	nd = &node_group->node[NEOISP_INPUT1_NODE];
+	nd = &neoispd->node[NEOISP_INPUT1_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		cfg->img1_in_ls =
 			NEO_PIPE_CONF_IMG1_IN_LS_CAM0_LS_SET(inp1_stride);
@@ -2040,7 +2330,7 @@ void neoisp_update_context_pipe_conf(struct neoisp_node_group_s *node_group)
 			NEO_PIPE_CONF_IMG1_IN_LS_CAM0_LS_SET(0u);
 	}
 
-	nd = &node_group->node[NEOISP_FRAME_NODE];
+	nd = &neoispd->node[NEOISP_FRAME_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		obpp = (nd->neoisp_format->bit_depth + 7) / 8;
 
@@ -2056,7 +2346,7 @@ void neoisp_update_context_pipe_conf(struct neoisp_node_group_s *node_group)
 			 * - output1 on dummy buffer
 			 */
 			cfg->outch1_addr =
-				NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
+				NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
 
 			cfg->outch0_ls =
 				NEO_PIPE_CONF_OUTCH0_LS_CAM0_LS_SET(obpp * width);
@@ -2094,16 +2384,16 @@ void neoisp_update_context_pipe_conf(struct neoisp_node_group_s *node_group)
 	} else {
 		/* Default dummy pixelformat is set to YUYV */
 		cfg->outch0_addr =
-			NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
+			NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
 		cfg->outch1_addr =
-			NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
+			NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
 		cfg->outch0_ls =
 			NEO_PIPE_CONF_OUTCH0_LS_CAM0_LS_SET(0u);
 		cfg->outch1_ls =
 			NEO_PIPE_CONF_OUTCH1_LS_CAM0_LS_SET(0u);
 	}
 
-	nd = &node_group->node[NEOISP_IR_NODE];
+	nd = &neoispd->node[NEOISP_IR_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		irbpp = (nd->neoisp_format->bit_depth + 7) / 8;
 
@@ -2111,202 +2401,206 @@ void neoisp_update_context_pipe_conf(struct neoisp_node_group_s *node_group)
 			NEO_PIPE_CONF_OUTIR_LS_CAM0_LS_SET(irbpp * width);
 	} else {
 		cfg->outir_addr =
-			NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
+			NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
 		cfg->outir_ls =
 			NEO_PIPE_CONF_OUTIR_LS_CAM0_LS_SET(0u);
 	}
 }
 
 /*
- * Set pipe conf volatile settings: buffer addresses.
+ * neoisp_ctx_update_w_user_params is used to update the context of the
+ * queued node with user space values.
  */
-void neoisp_update_context_buf_addr(struct neoisp_dev_s *neoispd)
+void neoisp_ctx_update_w_user_params(struct neoisp_dev_s *neoispd)
 {
-	struct neoisp_job_s *job = &neoispd->queued_job;
-	struct neoisp_pipe_conf_s *cfg = &job->node_group->context->hw.pipe_conf.common;
-	struct neoisp_buffer_s *buf_inp0 = job->buf[NEOISP_INPUT0_NODE];
-	struct neoisp_buffer_s *buf_inp1 = job->buf[NEOISP_INPUT1_NODE];
-	struct neoisp_buffer_s *buf_out = job->buf[NEOISP_FRAME_NODE];
-	struct neoisp_buffer_s *buf_ir = job->buf[NEOISP_IR_NODE];
-	struct neoisp_node_s *nd;
-	u32 width, height, ibpp, inp0_stride, inp1_stride;
-	dma_addr_t inp0_addr, inp1_addr;
+	struct neoisp_buffer_s *buf = neoispd->queued_job.buf[NEOISP_PARAMS_NODE];
+	struct neoisp_node_s *node = &neoispd->node[NEOISP_PARAMS_NODE];
 
-	/* Input0 specific */
-	nd = &job->node_group->node[NEOISP_INPUT0_NODE];
-	width = nd->crop.width;
-	height = nd->crop.height;
-	ibpp = (nd->neoisp_format->bit_depth + 7) / 8;
-	inp0_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
+	if (IS_ERR_OR_NULL(buf))
+		return;
 
-	/* Input0 - Take crop into account if any */
-	inp0_addr = get_addr(buf_inp0, 0) + (nd->crop.left * ibpp) + (nd->crop.top * inp0_stride);
+	/* Check parameters buffer format */
+	switch (node->neoisp_format->fourcc) {
+	case V4L2_META_FMT_NEO_ISP_PARAMS: {
+		/* Legacy params API */
+		struct neoisp_meta_params_s *lparams =
+			(struct neoisp_meta_params_s *)get_vaddr(buf);
+		const struct neoisp_block_handler_s *block_handler;
+		union neoisp_params_block_u *block;
 
-	/* Input 1 specific */
-	nd = &job->node_group->node[NEOISP_INPUT1_NODE];
-	ibpp = (nd->neoisp_format->bit_depth + 7) / 8;
-	inp1_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
-
-	/* Input1 - Take crop into account if any */
-	inp1_addr = get_addr(buf_inp1, 0) + (nd->crop.left * ibpp) + (nd->crop.top * inp1_stride);
-
-	cfg->img0_in_addr =
-		NEO_PIPE_CONF_ADDR_SET(inp0_addr);
-
-	/* Handle hdr inputs */
-	nd = &job->node_group->node[NEOISP_INPUT1_NODE];
-	if (neoisp_node_link_is_enabled(nd)) {
-		cfg->img1_in_addr =
-			NEO_PIPE_CONF_ADDR_SET(inp1_addr);
-	}
-
-	nd = &job->node_group->node[NEOISP_FRAME_NODE];
-	if (neoisp_node_link_is_enabled(nd)) {
-		/* Planar/multiplanar output image addresses */
-		switch (nd->format.fmt.pix_mp.pixelformat) {
-		case V4L2_PIX_FMT_GREY:
-		case V4L2_PIX_FMT_Y10:
-		case V4L2_PIX_FMT_Y12:
-		case V4L2_PIX_FMT_Y16:
-		case V4L2_PIX_FMT_Y16_BE:
-			/* Monochrome formats: only output channel 0 is used */
-			cfg->outch0_addr =
-				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 0));
-			break;
-		case V4L2_PIX_FMT_NV12:
-		case V4L2_PIX_FMT_NV21:
-		case V4L2_PIX_FMT_NV16:
-		case V4L2_PIX_FMT_NV61:
-			/* Semi-Planar formats: both output channels are used */
-			cfg->outch0_addr =
-				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 0));
-			cfg->outch1_addr =
-				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 1));
-			break;
-		default:
-			/* Interleaved formats: only output channel 1 is used */
-			cfg->outch1_addr =
-				NEO_PIPE_CONF_ADDR_SET(get_addr(buf_out, 0));
-			break;
+		/* Update selected blocks wrt feature config flag */
+		if (lparams->features_cfg.pipe_conf_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_PIPE_CONF];
+			block = (union neoisp_params_block_u *)&lparams->regs.pipe_conf;
+			block_handler->handler(neoispd, block);
 		}
+		if (lparams->features_cfg.head_color_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HEAD_COLOR];
+			block = (union neoisp_params_block_u *)&lparams->regs.head_color;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.hdr_decompress_input0_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_DECOMPRESS0];
+			block = (union neoisp_params_block_u *)&lparams->regs.decompress_input0;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.hdr_decompress_input1_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_DECOMPRESS1];
+			block = (union neoisp_params_block_u *)&lparams->regs.decompress_input1;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.obwb0_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB0];
+			block = (union neoisp_params_block_u *)&lparams->regs.obwb[0];
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.obwb1_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB1];
+			block = (union neoisp_params_block_u *)&lparams->regs.obwb[1];
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.obwb2_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB2];
+			block = (union neoisp_params_block_u *)&lparams->regs.obwb[2];
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.hdr_merge_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_MERGE];
+			block = (union neoisp_params_block_u *)&lparams->regs.hdr_merge;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.rgbir_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_RGBIR];
+			block = (union neoisp_params_block_u *)&lparams->regs.rgbir;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.stat_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_STAT];
+			block = (union neoisp_params_block_u *)&lparams->regs.stat;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.ir_compress_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_IR_COMPRESS];
+			block = (union neoisp_params_block_u *)&lparams->regs.ir_compress;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.bnr_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_BNR];
+			block = (union neoisp_params_block_u *)&lparams->regs.bnr;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.vignetting_ctrl_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_VIGNETTING_CTRL];
+			block = (union neoisp_params_block_u *)&lparams->regs.vignetting_ctrl;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.ctemp_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CTEMP];
+			block = (union neoisp_params_block_u *)&lparams->regs.ctemp;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.demosaic_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DEMOSAIC];
+			block = (union neoisp_params_block_u *)&lparams->regs.demosaic;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.rgb2yuv_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_RGB2YUV];
+			block = (union neoisp_params_block_u *)&lparams->regs.rgb2yuv;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.dr_comp_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DR_COMP];
+			block = (union neoisp_params_block_u *)&lparams->regs.drc;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.nr_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_NR];
+			block = (union neoisp_params_block_u *)&lparams->regs.nr;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.af_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_AF];
+			block = (union neoisp_params_block_u *)&lparams->regs.af;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.ee_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_EE];
+			block = (union neoisp_params_block_u *)&lparams->regs.ee;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.df_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DF];
+			block = (union neoisp_params_block_u *)&lparams->regs.df;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.convmed_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CONVMED];
+			block = (union neoisp_params_block_u *)&lparams->regs.convmed;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.cas_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CAS];
+			block = (union neoisp_params_block_u *)&lparams->regs.cas;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.gcm_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_GCM];
+			block = (union neoisp_params_block_u *)&lparams->regs.gcm;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.vignetting_table_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_VIGNETTING_TABLE];
+			block = (union neoisp_params_block_u *)&lparams->mems.vt;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.drc_global_tonemap_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DRC_GLOBAL_TONEMAP];
+			block = (union neoisp_params_block_u *)&lparams->mems.gtm;
+			block_handler->handler(neoispd, block);
+		}
+		if (lparams->features_cfg.drc_local_tonemap_cfg) {
+			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP];
+			block = (union neoisp_params_block_u *)&lparams->mems.ltm;
+			block_handler->handler(neoispd, block);
+		}
+
+		break;
 	}
+	case V4L2_META_FMT_NEO_ISP_EXT_PARAMS: {
+		/* Extended params API */
+		const struct neoisp_block_handler_s *block_handler;
+		struct v4l2_isp_params_buffer *ext_params =
+			(struct v4l2_isp_params_buffer *)get_vaddr(buf);
+		size_t block_offset = 0, max_offset;
 
-	nd = &job->node_group->node[NEOISP_IR_NODE];
-	if (neoisp_node_link_is_enabled(nd))
-		cfg->outir_addr =
-			NEO_PIPE_CONF_ADDR_SET(get_addr(buf_ir, 0));
+		if (ext_params->data_size == 0)
+			/* No relevant parameters in this buffer */
+			break;
+
+		max_offset = ext_params->data_size;
+
+		/*
+		 * Walk the list of parameter blocks and process them. No
+		 * validation is done here, as the content of the parameters
+		 * buffer is already checked when the buffer is queued.
+		 */
+		while (block_offset < max_offset) {
+			union neoisp_ext_params_block_u *block = (union neoisp_ext_params_block_u *)
+				&ext_params->data[block_offset];
+			block_offset += block->header.size;
+
+			block_handler = &neoisp_block_handlers[block->header.type];
+			block_handler->ext_handler(neoispd, block);
+		}
+		break;
+	}
+	default:
+		dev_err(neoispd->dev, "Error: unknown params fmt (%#x)\n",
+			node->neoisp_format->fourcc);
+		break;
+	}
 }
-
-static const struct neoisp_block_handler_s neoisp_block_handlers[] = {
-	[NEOISP_PARAM_BLK_PIPE_CONF] = {
-		.size = sizeof(struct neoisp_pipe_conf_cfg_s),
-		.handler = &neoisp_set_context_img_conf,
-	},
-	[NEOISP_PARAM_BLK_HEAD_COLOR] = {
-		.size = sizeof(struct neoisp_head_color_cfg_s),
-		.handler = &neoisp_set_context_head_color,
-	},
-	[NEOISP_PARAM_BLK_HDR_DECOMPRESS0] = {
-		.size = sizeof(struct neoisp_hdr_decompress0_cfg_s),
-		.handler = &neoisp_set_context_hdr_decompress0,
-	},
-	[NEOISP_PARAM_BLK_HDR_DECOMPRESS1] = {
-		.size = sizeof(struct neoisp_hdr_decompress1_cfg_s),
-		.handler = &neoisp_set_context_hdr_decompress1,
-	},
-	[NEOISP_PARAM_BLK_OBWB0] = {
-		.size = sizeof(struct neoisp_obwb_cfg_s),
-		.handler = &neoisp_set_context_obwb0,
-	},
-	[NEOISP_PARAM_BLK_OBWB1] = {
-		.size = sizeof(struct neoisp_obwb_cfg_s),
-		.handler = &neoisp_set_context_obwb1,
-	},
-	[NEOISP_PARAM_BLK_OBWB2] = {
-		.size = sizeof(struct neoisp_obwb_cfg_s),
-		.handler = &neoisp_set_context_obwb2,
-	},
-	[NEOISP_PARAM_BLK_HDR_MERGE] = {
-		.size = sizeof(struct neoisp_hdr_merge_cfg_s),
-		.handler = &neoisp_set_context_hdr_merge,
-	},
-	[NEOISP_PARAM_BLK_RGBIR] = {
-		.size = sizeof(struct neoisp_rgbir_cfg_s),
-		.handler = &neoisp_set_context_rgbir,
-	},
-	[NEOISP_PARAM_BLK_STAT] = {
-		.size = sizeof(struct neoisp_stat_cfg_s),
-		.handler = &neoisp_set_context_stat_hists,
-	},
-	[NEOISP_PARAM_BLK_IR_COMPRESS] = {
-		.size = sizeof(struct neoisp_ir_compress_cfg_s),
-		.handler = &neoisp_set_context_ir_compress,
-	},
-	[NEOISP_PARAM_BLK_BNR] = {
-		.size = sizeof(struct neoisp_bnr_cfg_s),
-		.handler = &neoisp_set_context_bnr,
-	},
-	[NEOISP_PARAM_BLK_VIGNETTING_CTRL] = {
-		.size = sizeof(struct neoisp_vignetting_ctrl_cfg_s),
-		.handler = &neoisp_set_context_vignetting,
-	},
-	[NEOISP_PARAM_BLK_CTEMP] = {
-		.size = sizeof(struct neoisp_ctemp_cfg_s),
-		.handler = &neoisp_set_context_color_temp,
-	},
-	[NEOISP_PARAM_BLK_DEMOSAIC] = {
-		.size = sizeof(struct neoisp_demosaic_cfg_s),
-		.handler = &neoisp_set_context_demosaic,
-	},
-	[NEOISP_PARAM_BLK_RGB2YUV] = {
-		.size = sizeof(struct neoisp_rgb2yuv_cfg_s),
-		.handler = &neoisp_set_context_rgb_to_yuv,
-	},
-	[NEOISP_PARAM_BLK_DR_COMP] = {
-		.size = sizeof(struct neoisp_dr_comp_cfg_s),
-		.handler = &neoisp_set_context_drc,
-	},
-	[NEOISP_PARAM_BLK_NR] = {
-		.size = sizeof(struct neoisp_nr_cfg_s),
-		.handler = &neoisp_set_context_nr,
-	},
-	[NEOISP_PARAM_BLK_AF] = {
-		.size = sizeof(struct neoisp_af_cfg_s),
-		.handler = &neoisp_set_context_autofocus,
-	},
-	[NEOISP_PARAM_BLK_EE] = {
-		.size = sizeof(struct neoisp_ee_cfg_s),
-		.handler = &neoisp_set_context_ee,
-	},
-	[NEOISP_PARAM_BLK_DF] = {
-		.size = sizeof(struct neoisp_df_cfg_s),
-		.handler = &neoisp_set_context_df,
-	},
-	[NEOISP_PARAM_BLK_CONVMED] = {
-		.size = sizeof(struct neoisp_convmed_cfg_s),
-		.handler = &neoisp_set_context_convmed,
-	},
-	[NEOISP_PARAM_BLK_CAS] = {
-		.size = sizeof(struct neoisp_cas_cfg_s),
-		.handler = &neoisp_set_context_cas,
-	},
-	[NEOISP_PARAM_BLK_GCM] = {
-		.size = sizeof(struct neoisp_gcm_cfg_s),
-		.handler = &neoisp_set_context_gcm,
-	},
-	[NEOISP_PARAM_BLK_VIGNETTING_TABLE] = {
-		.size = sizeof(struct neoisp_vignetting_table_mem_params_s),
-		.handler = &neoisp_set_context_mem_vignetting_table,
-	},
-	[NEOISP_PARAM_BLK_DRC_GLOBAL_TONEMAP] = {
-		.size = sizeof(struct neoisp_drc_global_tonemap_mem_params_s),
-		.handler = &neoisp_set_context_mem_global_tonemap,
-	},
-	[NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP] = {
-		.size = sizeof(struct neoisp_drc_local_tonemap_mem_params_s),
-		.handler = &neoisp_set_context_mem_local_tonemap,
-	},
-};
 
 /*
  * neoisp_upload_context is used to write all parameters to registers and
@@ -2318,210 +2612,183 @@ static const struct neoisp_block_handler_s neoisp_block_handlers[] = {
  * The memory copy is performed by block, because base addresses of the LUT
  * depend on the hw version.
  */
-void neoisp_upload_context(struct neoisp_dev_s *neoispd)
+void neoisp_ctx_upload_context(struct neoisp_dev_s *neoispd)
 {
-	struct neoisp_node_group_s *node_group = neoispd->queued_job.node_group;
-	struct neoisp_context_s *ctx = node_group->context;
-	u8 *src = (u8 *)(uintptr_t)&ctx->hw.pipe_conf.common.img_conf;
+	struct neoisp_context_s *ctx = neoispd->context;
+	u8 *src = (u8 *)(uintptr_t)&ctx->hw.pipe_conf.img_conf;
 	u8 *dst = (u8 *)(uintptr_t)(neoispd->mmio + NEO_PIPE_CONF_IMG_CONF_CAM0);
 	u32 *imem = (u32 *)(uintptr_t)neoispd->mmio_tcm;
 
 	memcpy(dst, src, NEO_AUTOFOCUS_ROI0_SUM0_CAM0 - NEO_PIPE_CONF_IMG_CONF_CAM0);
 
-	ctx_blk_write(neoispd->info->mems->vignetting_table,
-		      (u32 *)ctx->vig.vignetting_table, imem);
-
-	ctx_blk_write(neoispd->info->mems->drc_global_tonemap,
-		      (u32 *)ctx->gtm.drc_global_tonemap, imem);
-
-	ctx_blk_write(neoispd->info->mems->drc_local_tonemap,
-		      (u32 *)ctx->ltm.drc_local_tonemap, imem);
+	ctx_blk_write(NEO_VIGNETTING_TABLE_MAP, (u32 *)ctx->vig.vignetting_table, imem);
+	ctx_blk_write(NEO_DRC_GLOBAL_TONEMAP_MAP, (u32 *)ctx->gtm.drc_global_tonemap, imem);
+	ctx_blk_write(NEO_DRC_LOCAL_TONEMAP_MAP, (u32 *)ctx->ltm.drc_local_tonemap, imem);
 }
 
-/*
- * neoisp_update_context_w_user_params is used to update the context of the
- * queued node_group with user space values.
- */
-void neoisp_update_context_w_user_params(struct neoisp_dev_s *neoispd)
+static void neoisp_ctx_get_stats_blk(struct neoisp_dev_s *neoispd, u32 btype, u8 *src,
+				     struct v4l2_isp_stats_buffer *ext_stats, u32 *offset)
 {
-	struct neoisp_buffer_s *buf = neoispd->queued_job.buf[NEOISP_PARAMS_NODE];
-	const struct neoisp_block_handler_s *blk_handler;
-	struct neoisp_ext_params_s *ext_params;
-	union neoisp_params_block_u *blk, *cfg;
-	size_t max_offset, blk_offset = 0, hdr_size;
+	union neoisp_stats_block_u *blk = (union neoisp_stats_block_u *)&ext_stats->data[*offset];
+	u32 size = 0, loff, lsz;
 
-	if (IS_ERR_OR_NULL(buf))
-		return; /* No params buffer provided */
+	switch (btype) {
+	case NEOISP_STATS_BLK_RCTEMP:
+		size = sizeof(struct neoisp_ctemp_reg_stats_s);
+		memcpy_fromio(&blk->rctemp.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG0, size);
+		break;
+	case NEOISP_STATS_BLK_RDRC:
+		size = sizeof(struct neoisp_drc_reg_stats_s);
+		memcpy_fromio(&blk->rdrc.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG59, size);
+		break;
+	case NEOISP_STATS_BLK_RAF:
+		size = sizeof(struct neoisp_af_reg_stats_s);
+		memcpy_fromio(&blk->raf.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG61, size);
+		break;
+	case NEOISP_STATS_BLK_RBNR:
+		size = sizeof(struct neoisp_bnr_reg_stats_s);
+		memcpy_fromio(&blk->rbnr.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG79, size);
+		break;
+	case NEOISP_STATS_BLK_RNR:
+		size = sizeof(struct neoisp_nr_reg_stats_s);
+		memcpy_fromio(&blk->rnr.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG81, size);
+		break;
+	case NEOISP_STATS_BLK_REE:
+		size = sizeof(struct neoisp_ee_reg_stats_s);
+		memcpy_fromio(&blk->ree.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG82, size);
+		break;
+	case NEOISP_STATS_BLK_RDF:
+		size = sizeof(struct neoisp_df_reg_stats_s);
+		memcpy_fromio(&blk->rdf.stat, neoispd->mmio + NEO_ALIAS_ALIAS_REG83, size);
+		break;
+	case NEOISP_STATS_BLK_MCTEMP:
+		size = sizeof(struct neoisp_ctemp_mem_stats_s);
+		/* Get ctemp stats from memory */
+		get_offsize(NEO_CTEMP_R_SUM_MAP, &loff, &lsz);
+		memcpy(&blk->mctemp.stat.ctemp_r_sum, &src[loff], lsz);
 
-	/* Check if legacy parameters provided */
-	if (neoispd->api_ver == NEOISP_LEGACY_META_BUFFER) {
-		struct neoisp_meta_params_s *lparams =
-			(struct neoisp_meta_params_s *)get_vaddr(buf);
+		get_offsize(NEO_CTEMP_G_SUM_MAP, &loff, &lsz);
+		memcpy(&blk->mctemp.stat.ctemp_g_sum, &src[loff], lsz);
 
-		/* Update selected blocks wrt feature config flag */
-		if (lparams->features_cfg.pipe_conf_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_PIPE_CONF];
-			blk = (union neoisp_params_block_u *)&lparams->regs.pipe_conf;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.head_color_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HEAD_COLOR];
-			blk = (union neoisp_params_block_u *)&lparams->regs.head_color;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.hdr_decompress_input0_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_DECOMPRESS0];
-			blk = (union neoisp_params_block_u *)&lparams->regs.decompress_input0;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.hdr_decompress_input1_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_DECOMPRESS1];
-			blk = (union neoisp_params_block_u *)&lparams->regs.decompress_input1;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.obwb0_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB0];
-			blk = (union neoisp_params_block_u *)&lparams->regs.obwb[0];
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.obwb1_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB1];
-			blk = (union neoisp_params_block_u *)&lparams->regs.obwb[1];
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.obwb2_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB2];
-			blk = (union neoisp_params_block_u *)&lparams->regs.obwb[2];
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.hdr_merge_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_MERGE];
-			blk = (union neoisp_params_block_u *)&lparams->regs.hdr_merge;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.rgbir_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_RGBIR];
-			blk = (union neoisp_params_block_u *)&lparams->regs.rgbir;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.stat_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_STAT];
-			blk = (union neoisp_params_block_u *)&lparams->regs.stat;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.ir_compress_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_IR_COMPRESS];
-			blk = (union neoisp_params_block_u *)&lparams->regs.ir_compress;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.bnr_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_BNR];
-			blk = (union neoisp_params_block_u *)&lparams->regs.bnr;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.vignetting_ctrl_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_VIGNETTING_CTRL];
-			blk = (union neoisp_params_block_u *)&lparams->regs.vignetting_ctrl;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.ctemp_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CTEMP];
-			blk = (union neoisp_params_block_u *)&lparams->regs.ctemp;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.demosaic_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DEMOSAIC];
-			blk = (union neoisp_params_block_u *)&lparams->regs.demosaic;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.rgb2yuv_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_RGB2YUV];
-			blk = (union neoisp_params_block_u *)&lparams->regs.rgb2yuv;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.dr_comp_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DR_COMP];
-			blk = (union neoisp_params_block_u *)&lparams->regs.drc;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.nr_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_NR];
-			blk = (union neoisp_params_block_u *)&lparams->regs.nr;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.af_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_AF];
-			blk = (union neoisp_params_block_u *)&lparams->regs.af;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.ee_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_EE];
-			blk = (union neoisp_params_block_u *)&lparams->regs.ee;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.df_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DF];
-			blk = (union neoisp_params_block_u *)&lparams->regs.df;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.convmed_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CONVMED];
-			blk = (union neoisp_params_block_u *)&lparams->regs.convmed;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.cas_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CAS];
-			blk = (union neoisp_params_block_u *)&lparams->regs.cas;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.gcm_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_GCM];
-			blk = (union neoisp_params_block_u *)&lparams->regs.gcm;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.vignetting_table_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_VIGNETTING_TABLE];
-			blk = (union neoisp_params_block_u *)&lparams->mems.vt;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.drc_global_tonemap_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DRC_GLOBAL_TONEMAP];
-			blk = (union neoisp_params_block_u *)&lparams->mems.gtm;
-			blk_handler->handler(neoispd, blk);
-		}
-		if (lparams->features_cfg.drc_local_tonemap_cfg) {
-			blk_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP];
-			blk = (union neoisp_params_block_u *)&lparams->mems.ltm;
-			blk_handler->handler(neoispd, blk);
-		}
+		get_offsize(NEO_CTEMP_B_SUM_MAP, &loff, &lsz);
+		memcpy(&blk->mctemp.stat.ctemp_b_sum, &src[loff], lsz);
 
+		get_offsize(NEO_CTEMP_PIX_CNT_MAP, &loff, &lsz);
+		memcpy(&blk->mctemp.stat.ctemp_pix_cnt, &src[loff], lsz);
+		break;
+	case NEOISP_STATS_BLK_MRGBIR:
+		size = sizeof(struct neoisp_rgbir_mem_stats_s);
+		/* Get rgbir stats from memory */
+		get_offsize(NEO_RGBIR_HIST_MAP, &loff, &lsz);
+		memcpy(&blk->mrgbir.stat, &src[loff], lsz);
+		break;
+	case NEOISP_STATS_BLK_MHIST:
+		size = sizeof(struct neoisp_hist_mem_stats_s);
+		/* Get histograms stats from memory */
+		get_offsize(NEO_HIST_STAT_MAP, &loff, &lsz);
+		memcpy(&blk->mhist.stat, &src[loff], lsz);
+		break;
+	case NEOISP_STATS_BLK_MDRC:
+		size = sizeof(struct neoisp_drc_mem_stats_s);
+		/* Get drc local sum stats from memory */
+		get_offsize(NEO_DRC_LOCAL_SUM_MAP, &loff, &lsz);
+		memcpy(&blk->mdrc.stat.drc_local_sum, &src[loff], lsz);
+
+		/* Get drc hist roi0 stats from memory */
+		get_offsize(NEO_DRC_GLOBAL_HIST_ROI0_MAP, &loff, &lsz);
+		memcpy(&blk->mdrc.stat.drc_global_hist_roi0, &src[loff], lsz);
+
+		/* Get drc hist roi1 stats from memory */
+		get_offsize(NEO_DRC_GLOBAL_HIST_ROI1_MAP, &loff, &lsz);
+		memcpy(&blk->mdrc.stat.drc_global_hist_roi1, &src[loff], lsz);
+		break;
+	default:
+		dev_err(neoispd->dev, "Error: unknown stats block id (%u)\n", btype);
+		return;
+	}
+	blk->header.type = btype;
+	blk->header.size = ALIGN(size + sizeof(struct v4l2_isp_stats_block_header), 8);
+	blk->header.flags = 0;
+	*offset += blk->header.size;
+}
+
+void neoisp_ctx_get_stats(struct neoisp_dev_s *neoispd, struct neoisp_buffer_s *buf)
+{
+	struct neoisp_node_s *node = &neoispd->node[NEOISP_STATS_NODE];
+	u8 *src = (u8 *)(uintptr_t)neoispd->mmio_tcm;
+	u32 offset, size, *blk_list, count;
+
+	/* Check if stats node link is enabled */
+	if (!neoisp_node_link_is_enabled(node))
+		return;
+
+	if (IS_ERR_OR_NULL(buf) || IS_ERR_OR_NULL(src)) {
+		dev_err(neoispd->dev, "Error: stats pointer\n");
 		return;
 	}
 
-	/* Extended params API */
-	hdr_size = sizeof(struct neoisp_ext_params_block_header_s);
-	ext_params = (struct neoisp_ext_params_s *)get_vaddr(buf);
-	max_offset = ext_params->data_size - hdr_size;
+	switch (node->neoisp_format->fourcc) {
+	case V4L2_META_FMT_NEO_ISP_STATS: {
+		struct neoisp_meta_stats_s *lstats = (struct neoisp_meta_stats_s *)get_vaddr(buf);
 
-	/*
-	 * Walk the list of parameter blocks and process them. No validation is
-	 * done here, as the contents of the config buffer are already checked
-	 * when the buffer is queued.
-	 */
-	while (blk_offset < max_offset) {
-		blk = (union neoisp_params_block_u *)&ext_params->data[blk_offset];
-		cfg = (union neoisp_params_block_u *)&blk->data[hdr_size];
+		/* Get stats from registers */
+		memcpy_fromio((u32 *)(uintptr_t)&lstats->regs,
+			      neoispd->mmio + NEO_ALIAS_ALIAS_REG0,
+			      sizeof(struct neoisp_reg_stats_s));
 
-		/* Avoid infinite loop */
-		if (blk->header.size == 0)
-			break;
+		/* Get ctemp stats from memory */
+		get_offsize(NEO_CTEMP_R_SUM_MAP, &offset, &size);
+		memcpy(&lstats->mems.ctemp.ctemp_r_sum, &src[offset], size);
 
-		/* Update selected blocks wrt feature config flag */
-		if (blk->header.flags == NEOISP_EXT_PARAMS_BLK_FL_UPDATE) {
-			blk_handler = &neoisp_block_handlers[blk->header.type];
-			blk_handler->handler(neoispd, cfg);
-		}
+		get_offsize(NEO_CTEMP_G_SUM_MAP, &offset, &size);
+		memcpy(&lstats->mems.ctemp.ctemp_g_sum, &src[offset], size);
 
-		blk_offset += blk->header.size;
+		get_offsize(NEO_CTEMP_B_SUM_MAP, &offset, &size);
+		memcpy(&lstats->mems.ctemp.ctemp_b_sum, &src[offset], size);
+
+		get_offsize(NEO_CTEMP_PIX_CNT_MAP, &offset, &size);
+		memcpy(&lstats->mems.ctemp.ctemp_pix_cnt, &src[offset], size);
+
+		/* Get rgbir stats from memory */
+		get_offsize(NEO_RGBIR_HIST_MAP, &offset, &size);
+		memcpy(&lstats->mems.rgbir.rgbir_hist, &src[offset], size);
+
+		/* Get histograms stats from memory */
+		get_offsize(NEO_HIST_STAT_MAP, &offset, &size);
+		memcpy(&lstats->mems.hist.hist_stat, &src[offset], size);
+
+		/* Get drc local sum stats from memory */
+		get_offsize(NEO_DRC_LOCAL_SUM_MAP, &offset, &size);
+		memcpy(&lstats->mems.drc.drc_local_sum, &src[offset], size);
+
+		/* Get drc hist roi0 stats from memory */
+		get_offsize(NEO_DRC_GLOBAL_HIST_ROI0_MAP, &offset, &size);
+		memcpy(&lstats->mems.drc.drc_global_hist_roi0, &src[offset], size);
+
+		/* Get drc hist roi1 stats from memory */
+		get_offsize(NEO_DRC_GLOBAL_HIST_ROI1_MAP, &offset, &size);
+		memcpy(&lstats->mems.drc.drc_global_hist_roi1, &src[offset], size);
+		break;
+	}
+
+	case V4L2_META_FMT_NEO_ISP_EXT_STATS: {
+		struct v4l2_isp_stats_buffer *ext_stats =
+			(struct v4l2_isp_stats_buffer *)get_vaddr(buf);
+
+		ext_stats->version = V4L2_ISP_VERSION_V1;
+		offset = 0;
+		blk_list = (u32 *)neoisp_ext_stats_blocks_v1;
+		count = ARRAY_SIZE(neoisp_ext_stats_blocks_v1);
+		for (int i = 0; i < count; i++)
+			neoisp_ctx_get_stats_blk(neoispd, blk_list[i], src, ext_stats, &offset);
+
+		ext_stats->data_size = offset;
+		break;
+	}
+	default:
+		dev_err(neoispd->dev, "Error: unknown stats fmt (%#x)\n",
+			node->neoisp_format->fourcc);
+		break;
 	}
 }
+

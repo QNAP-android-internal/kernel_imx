@@ -1,16 +1,20 @@
-// SPDX-License-Identifier: GPL-2.0+
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * NEOISP supported formats definition
  *
- * Copyright 2023-2025 NXP
+ * Copyright 2023-2026 NXP
  *
  */
 
+#ifndef __NXP_NEOISP_FMT_H
+#define __NXP_NEOISP_FMT_H
+
 #include <linux/bits.h>
 #include <linux/videodev2.h>
+
 #include "neoisp.h"
 
-const struct v4l2_frmsize_stepwise neoisp_frmsize_stepwise = {
+static const struct v4l2_frmsize_stepwise neoisp_frmsize_stepwise = {
 	.min_width = NEOISP_MIN_W,
 	.min_height = NEOISP_MIN_H,
 	.max_width = NEOISP_MAX_W,
@@ -19,7 +23,7 @@ const struct v4l2_frmsize_stepwise neoisp_frmsize_stepwise = {
 	.step_height = 1UL << NEOISP_ALIGN_H,
 };
 
-const struct neoisp_fmt_s formats_vcap[NEOISP_FMT_VCAP_COUNT] = {
+static const struct neoisp_fmt_s formats_vcap[] = {
 	{
 		.fourcc = V4L2_PIX_FMT_BGR24,     /* 24-bit BGR 8-8-8 */
 		.align = 32,
@@ -217,7 +221,7 @@ const struct neoisp_fmt_s formats_vcap[NEOISP_FMT_VCAP_COUNT] = {
 	}
 };
 
-const struct neoisp_fmt_s formats_vcap_ir[NEOISP_FMT_VCAP_IR_COUNT] = {
+static const struct neoisp_fmt_s formats_vcap_ir[] = {
 	{
 		.fourcc = V4L2_PIX_FMT_GREY,   /* 8-bit Greyscale */
 		.align = 32,
@@ -239,7 +243,7 @@ const struct neoisp_fmt_s formats_vcap_ir[NEOISP_FMT_VCAP_IR_COUNT] = {
 	}
 };
 
-const struct neoisp_fmt_s formats_vout[NEOISP_FMT_VOUT_COUNT] = {
+static const struct neoisp_fmt_s formats_vout[] = {
 	{
 		.fourcc = V4L2_PIX_FMT_SRGGB8,   /* 8-bit Bayer RGRG/GBGB */
 		.align = 32,
@@ -468,8 +472,7 @@ const struct neoisp_fmt_s formats_vout[NEOISP_FMT_VOUT_COUNT] = {
 	}
 };
 
-/* META OUTPUT */
-const struct neoisp_fmt_s formats_mout[NEOISP_FMT_MOUT_COUNT] = {
+static const struct neoisp_fmt_s formats_mout[] = {
 	{
 		.fourcc = V4L2_META_FMT_NEO_ISP_PARAMS, /* NXP neoisp 3A parameters */
 		.align = 32,
@@ -486,8 +489,7 @@ const struct neoisp_fmt_s formats_mout[NEOISP_FMT_MOUT_COUNT] = {
 	}
 };
 
-/* META CAPTURE */
-const struct neoisp_fmt_s formats_mcap[NEOISP_FMT_MCAP_COUNT] = {
+static const struct neoisp_fmt_s formats_mcap[] = {
 	{
 		.fourcc = V4L2_META_FMT_NEO_ISP_STATS, /* NXP neoisp 3A Statistics */
 		.align = 32,
@@ -503,3 +505,5 @@ const struct neoisp_fmt_s formats_mcap[NEOISP_FMT_MCAP_COUNT] = {
 		.type = NEOISP_FMT_META_CAPTURE
 	}
 };
+
+#endif /* __NXP_NEOISP_FMT_H */

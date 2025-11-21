@@ -2,20 +2,21 @@
 /*
  * NXP NEOISP userspace API
  *
- * Copyright 2023-2025 NXP
+ * Copyright 2023-2026 NXP
  */
 
-#ifndef UAPI_NXP_NEOISP_H
-#define UAPI_NXP_NEOISP_H
+#ifndef __UAPI_NXP_NEOISP_H
+#define __UAPI_NXP_NEOISP_H
 
+#include <linux/media/v4l2-isp.h>
 #include <linux/types.h>
 #include <linux/v4l2-controls.h>
 
 /*
  * Check Documentation/admin-guide/media/nxp-neoisp.rst for control details.
  */
-#define V4L2_CID_NEOISP_QUERYCAP (V4L2_CID_USER_NEOISP_BASE + 0)
-#define V4L2_CID_NEOISP_META_API_VERSION (V4L2_CID_USER_NEOISP_BASE + 1)
+#define V4L2_CID_NEOISP_SUPPORTED_PARAMS_BLOCKS (V4L2_CID_USER_NEOISP_BASE + 0)
+#define V4L2_CID_NEOISP_QUERYCAP (V4L2_CID_USER_NEOISP_BASE + 1)
 
 /* Values for Neoisp 'capabilities' in custom QUERYCAP */
 #define NEO_CAP_ALIGNMENT_MSB (1u << 0)
@@ -23,25 +24,25 @@
 /* Local memories sizes (words size) */
 
 /* CTemp statistics - 256 bytes - 64 x 32bits words */
-#define NEO_CTEMP_R_SUM_CNT (64)
-#define NEO_CTEMP_G_SUM_CNT (64)
-#define NEO_CTEMP_B_SUM_CNT (64)
+#define NEO_CTEMP_R_SUM_CNT 64
+#define NEO_CTEMP_G_SUM_CNT 64
+#define NEO_CTEMP_B_SUM_CNT 64
 /* CTemp statistics pixel count - 128 bytes - 64 x 16bits words */
-#define NEO_CTEMP_PIX_CNT_CNT (64)
+#define NEO_CTEMP_PIX_CNT_CNT 64
 /* RGBIR histogram - 1024 bytes - 256 x 32bits words */
-#define NEO_RGBIR_HIST_CNT (256)
+#define NEO_RGBIR_HIST_CNT 256
 /* Histograms/Statistics - 2048 bytes - 512 x 32bits words */
-#define NEO_HIST_STAT_CNT (512)
+#define NEO_HIST_STAT_CNT 512
 /* DRC Global histograms - 1664 bytes - 416 x 32bits words */
-#define NEO_DRC_GLOBAL_HIST_ROI_CNT (416)
+#define NEO_DRC_GLOBAL_HIST_ROI_CNT 416
 /* DRC local sum - 4096 - 1024 x 32bits words */
-#define NEO_DRC_LOCAL_SUM_CNT (1024)
+#define NEO_DRC_LOCAL_SUM_CNT 1024
 /* Vignetting look up table - 6144 bytes - 3072 x 16bits words */
-#define NEO_VIGNETTING_TABLE_SIZE (3072)
+#define NEO_VIGNETTING_TABLE_SIZE 3072
 /* DRC Global Tonemap - 832 bytes - 416 x 16bits words */
-#define NEO_DRC_GLOBAL_TONEMAP_SIZE (416)
+#define NEO_DRC_GLOBAL_TONEMAP_SIZE 416
 /* DRC Local Tonemap - 1024 bytes - 1024 x 8bits words */
-#define NEO_DRC_LOCAL_TONEMAP_SIZE (1024)
+#define NEO_DRC_LOCAL_TONEMAP_SIZE 1024
 
 /**
  * enum neoisp_version_e - NXP NEO ISP variants
@@ -54,19 +55,6 @@ enum neoisp_version_e {
 	NEOISP_HW_V1 = 1,
 	NEOISP_HW_V2,
 	NEOISP_HW_MAX = NEOISP_HW_V2,
-};
-
-/**
- * enum neoisp_meta_buffer_version_e - Neoisp meta buffer version
- *
- * @NEOISP_LEGACY_META_BUFFER:		Legacy version of Neoisp meta buffers
- * @NEOISP_EXT_META_BUFFER_V1:		First version of Neoisp extensible meta buffers
- * @NEOISP_META_BUFFER_VERSION_COUNT:	Neoisp meta buffer versions count
- */
-enum neoisp_meta_buffer_version_e {
-	NEOISP_LEGACY_META_BUFFER = 0,
-	NEOISP_EXT_META_BUFFER_V1,
-	NEOISP_META_BUFFER_VERSION_COUNT,
 };
 
 /**
@@ -1080,66 +1068,6 @@ enum neoisp_param_block_type_e {
 	NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP,
 };
 
-/* Flags for parameters 'flags' field */
-/* No action, the current block can be ignored */
-#define NEOISP_EXT_PARAMS_BLK_FL_NONE (0)
-/* Indicate a block must be configured with associated parameters */
-#define NEOISP_EXT_PARAMS_BLK_FL_UPDATE (1u << 0)
-
-/**
- * struct neoisp_ext_params_block_header_s - Neoisp extensible parameters block header
- *
- * This structure represents the common part of all the ISP configuration
- * blocks. Each parameters block embeds an instance of this structure type
- * as its first member, followed by the block-specific configuration data. The
- * driver inspects this common header to discern the block type and its size and
- * properly handle the block content by casting it to the correct block-specific
- * type.
- *
- * The @type field is one of the values enumerated by
- * :c:type:`neoisp_param_block_type_e` and specifies how the data should be
- * interpreted by the driver. The @size field specifies the size of the
- * parameters block and is used by the driver for validation purposes. The
- * @flags field holds a bitmask of per-block flags NEOISP_EXT_PARAMS_BLK_FL_*.
- *
- * If userspace wants to apply a new configuration, it shall fully populate the
- * ISP block and set the @flag field to NEOISP_EXT_PARAMS_BLK_FL_UPDATE. If it
- * wants a block to be ignored, the NEOISP_EXT_PARAMS_BLK_FL_NONE bit should be
- * set in the @flags field. In that case userspace may optionally omit the
- * remainder of the configuration block, which will in any case be ignored by
- * the driver. It actually behaves the same as if the configuration block is
- * missing.
- *
- * Userspace is responsible for correctly populating the parameters block header
- * fields (@type, @flags and @size) and correctly populate the block-specific
- * parameters.
- *
- * For example:
- *
- * .. code-block:: c
- *
- *	void populate_head_color(struct neoisp_ext_params_block_header_s *block) {
- *		struct neoisp_head_color_cfg_es *hc =
- *			(struct neoisp_head_color_cfg_es *)block;
- *
- *		hc->header.type = NEOISP_PARAM_BLK_HEAD_COLOR;
- *		hc->header.flags = NEOISP_EXT_PARAMS_BLK_FL_UPDATE;
- *		hc->header.size = sizeof(struct neoisp_head_color_cfg_es);
- *
- *		hc->cfg.ctrl_hoffset = hoffset_;
- *		hc->cfg.ctrl_voffset = voffset_;
- *	}
- *
- * @type: The parameters block type from :c:type:`neoisp_param_block_type_e`
- * @flags: Bitmask of block flags
- * @size: Size (in bytes) of the parameters block
- */
-struct neoisp_ext_params_block_header_s {
-	__u16 type;
-	__u16 flags;
-	__u32 size;
-} __attribute__((aligned(8)));
-
 /**
  * struct neoisp_pipe_conf_cfg_es - Neoisp extensible params pipeline configuration
  *
@@ -1147,12 +1075,12 @@ struct neoisp_ext_params_block_header_s {
  * Identified by :c:type:`NEOISP_PARAM_BLK_PIPE_CONF`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Pipeline configuration, see
  *		:c:type:`neoisp_pipe_conf_cfg_s`
  */
 struct neoisp_pipe_conf_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_pipe_conf_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1163,12 +1091,12 @@ struct neoisp_pipe_conf_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_HEAD_COLOR`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Head color configuration, see
  *		:c:type:`neoisp_head_color_cfg_s`
  */
 struct neoisp_head_color_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_head_color_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1179,12 +1107,12 @@ struct neoisp_head_color_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_HDR_DECOMPRESS0`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	HDR Decompression configuration for line path 0, see
  *		:c:type:`neoisp_hdr_decompress0_cfg_s`
  */
 struct neoisp_hdr_decompress0_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_hdr_decompress0_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1195,12 +1123,12 @@ struct neoisp_hdr_decompress0_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_HDR_DECOMPRESS1`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	HDR Decompression configuration for line path 1, see
  *		:c:type:`neoisp_hdr_decompress1_cfg_s`
  */
 struct neoisp_hdr_decompress1_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_hdr_decompress1_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1213,12 +1141,12 @@ struct neoisp_hdr_decompress1_cfg_es {
  * or :c:type:`NEOISP_PARAM_BLK_OBWB2`
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Optical Black correction and White Balance configuration, see
  *		:c:type:`neoisp_obwb_cfg_s`
  */
 struct neoisp_obwb_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_obwb_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1229,12 +1157,12 @@ struct neoisp_obwb_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_HDR_MERGE`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	HDR merge configuration, see
  *		:c:type:`neoisp_hdr_merge_cfg_s`
  */
 struct neoisp_hdr_merge_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_hdr_merge_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1245,12 +1173,12 @@ struct neoisp_hdr_merge_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_RGBIR`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	RGBIR to RGGB and IR unit configuration, see
  *		:c:type:`neoisp_rgbir_cfg_s`
  */
 struct neoisp_rgbir_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_rgbir_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1261,12 +1189,12 @@ struct neoisp_rgbir_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_STAT`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Statistics and Histogram unit configuration, see
  *		:c:type:`neoisp_stat_cfg_s`
  */
 struct neoisp_stat_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_stat_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1277,12 +1205,12 @@ struct neoisp_stat_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_IR_COMP`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Infra-red Compression configuration, see
  *		:c:type:`neoisp_ir_compress_cfg_s`
  */
 struct neoisp_ir_compress_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_ir_compress_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1293,12 +1221,12 @@ struct neoisp_ir_compress_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_BNR`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Bayer Noise Reduction configuration, see
  *		:c:type:`neoisp_bnr_cfg_s`
  */
 struct neoisp_bnr_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_bnr_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1309,12 +1237,12 @@ struct neoisp_bnr_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_VIGNETTING_CTRL`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Vignetting unit configuration, see
  *		:c:type:`neoisp_vignetting_ctrl_cfg_s`
  */
 struct neoisp_vignetting_ctrl_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_vignetting_ctrl_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1325,12 +1253,12 @@ struct neoisp_vignetting_ctrl_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_CTEMP`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Color Temperature unit configuration, see
  *		:c:type:`neoisp_ctemp_cfg_s`
  */
 struct neoisp_ctemp_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_ctemp_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1341,12 +1269,12 @@ struct neoisp_ctemp_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_DEMOSAIC`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Demosaic unit configuration, see
  *		:c:type:`neoisp_demosaic_cfg_s`
  */
 struct neoisp_demosaic_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_demosaic_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1358,12 +1286,12 @@ struct neoisp_demosaic_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_RGB2YUV`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Color space conversion unit configuration, see
  *		:c:type:`neoisp_rgb2yuv_cfg_s`
  */
 struct neoisp_rgb2yuv_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_rgb2yuv_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1374,12 +1302,12 @@ struct neoisp_rgb2yuv_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_DR_COMP`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Dynamic Range Compression unit configuration, see
  *		:c:type:`neoisp_dr_comp_cfg_s`
  */
 struct neoisp_dr_comp_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_dr_comp_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1390,12 +1318,12 @@ struct neoisp_dr_comp_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_NR`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Noise Reduction unit configuration, see
  *		:c:type:`neoisp_nr_cfg_s`
  */
 struct neoisp_nr_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_nr_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1406,12 +1334,12 @@ struct neoisp_nr_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_AF`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	AutoFocus unit configuration, see
  *		:c:type:`neoisp_af_cfg_s`
  */
 struct neoisp_af_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_af_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1422,12 +1350,12 @@ struct neoisp_af_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_EE`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Edge Enhancement unit configuration, see
  *		:c:type:`neoisp_ee_cfg_s`
  */
 struct neoisp_ee_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_ee_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1438,12 +1366,12 @@ struct neoisp_ee_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_DF`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Direction Filter configuration, see
  *		:c:type:`neoisp_df_cfg_s`
  */
 struct neoisp_df_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_df_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1455,12 +1383,12 @@ struct neoisp_df_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_CONVMED`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Color Convolution and Median Filter unit configuration, see
  *		:c:type:`neoisp_convmed_cfg_s`
  */
 struct neoisp_convmed_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_convmed_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1471,12 +1399,12 @@ struct neoisp_convmed_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_CAS`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Color Adaptive Saturation unit configuration, see
  *		:c:type:`neoisp_cas_cfg_s`
  */
 struct neoisp_cas_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_cas_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1487,12 +1415,12 @@ struct neoisp_cas_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_GCM`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Gamma Correction Matrix configuration, see
  *		:c:type:`neoisp_gcm_cfg_s`
  */
 struct neoisp_gcm_cfg_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_gcm_cfg_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1503,12 +1431,12 @@ struct neoisp_gcm_cfg_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_VIGNETTING_TABLE`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	Vignetting LUT configuration, see
  *		:c:type:`neoisp_vignetting_table_mem_params_s`
  */
 struct neoisp_vignetting_table_mem_params_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_vignetting_table_mem_params_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1520,12 +1448,12 @@ struct neoisp_vignetting_table_mem_params_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_DRC_GLOBAL_TONEMAP`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	DRC Global Tonemap LUT configuration, see
  *		:c:type:`neoisp_drc_global_tonemap_mem_params_s`
  */
 struct neoisp_drc_global_tonemap_mem_params_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_drc_global_tonemap_mem_params_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1537,12 +1465,12 @@ struct neoisp_drc_global_tonemap_mem_params_es {
  * Identified by :c:type:`NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP`.
  *
  * @header:	The Neoisp extensible parameters header, see
- *		:c:type:`neoisp_ext_params_block_header_s`
+ *		:c:type:`v4l2_isp_params_block_header`
  * @cfg:	DRC Local tonemap LUT configuration, see
  *		:c:type:`neoisp_drc_local_tonemap_mem_params_s`
  */
 struct neoisp_drc_local_tonemap_mem_params_es {
-	struct neoisp_ext_params_block_header_s header;
+	struct v4l2_isp_params_block_header header;
 	struct neoisp_drc_local_tonemap_mem_params_s cfg;
 } __attribute__((aligned(8)));
 
@@ -1584,75 +1512,6 @@ struct neoisp_drc_local_tonemap_mem_params_es {
 	 sizeof(struct neoisp_vignetting_table_mem_params_es) +   \
 	 sizeof(struct neoisp_drc_global_tonemap_mem_params_es) + \
 	 sizeof(struct neoisp_drc_local_tonemap_mem_params_es))
-
-/**
- * struct neoisp_ext_params_s - Neoisp extensible parameters configuration
- *
- * This struct contains the configuration parameters of the Neoisp
- * algorithms, serialized by userspace into a data buffer. Each configuration
- * parameter block is represented by a block-specific structure. Userspace
- * populates the @data buffer with configuration parameters for the blocks that
- * it intends to configure.
- *
- * The parameters buffer is versioned by the @version field to allow modifying
- * and extending its definition. Userspace shall populate the @version field to
- * inform the driver about the version it intends to use. The driver will parse
- * and handle the @data buffer according to the data layout specific to the
- * indicated version and return an error if the desired version is not
- * supported.
- *
- * Currently the single NEOISP_EXT_META_BUFFER_V1 version is supported. A
- * mechanism for userspace to query the supported format versions is
- * implemented in the form of a V4L2 control. The highest compatible version
- * between driver and userspace is selected. If such control is not available,
- * userspace assumes only NEOISP_LEGACY_META_BUFFER is supported by the driver.
- *
- * For each ISP block that userspace wants to configure, a block-specific flag
- * should be set in the features control structure in the @data buffer.
- *
- * The expected memory layout of the parameters buffer is::
- *
- *	+-------------------- struct neoisp_ext_params_s ---------------------+
- *	| version = NEOISP_EXT_META_BUFFER_V1;                                |
- *	| data_size = sizeof(struct neoisp_head_color_cfg_es)                 |
- *	|              + sizeof(struct neoisp_hdr_decompress0_cfg_es);        |
- *	| +------------------------- data  ---------------------------------+ |
- *	| | +-------- struct neoisp_head_color_cfg_es  -------------------+ | |
- *	| | | +------- struct neoisp_ext_params_block_header_s header --+ | | |
- *	| | | |type = NEOISP_PARAM_BLK_HEAD_COLOR;                      | | | |
- *	| | | |flags = NEOISP_EXT_PARAMS_BLK_FL_UPDATE;                 | | | |
- *	| | | |size = sizeof(struct neoisp_head_color_cfg_es);          | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | | +------- struct neoisp_head_color_cfg_s cfg --------------+ | | |
- *	| | | |ctrl_hoffset = ...;                                      | | | |
- *	| | | |ctrl_voffset = ...;                                      | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | +-------------------------------------------------------------+ | |
- *	| | +-------- struct neoisp_hdr_decompress0_cfg_es ---------------+ | |
- *	| | | +------- struct neoisp_ext_params_block_header_s header --+ | | |
- *	| | | |type = NEOISP_PARAM_BLK_HDR_DECOMPRESS_INPUT0;           | | | |
- *	| | | |flags = NEOISP_EXT_PARAMS_BLK_FL_UPDATE;                 | | | |
- *	| | | |size = sizeof(struct neoisp_hdr_decompress0_cfg_es);     | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | | +------- struct neoisp_hdr_decompress0_cfg_s cfg ---------+ | | |
- *	| | | |ctrl_enable = ...;                                       | | | |
- *	| | | |knee_point1 = ...;                                       | | | |
- *	| | | |...                                                      | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | +-------------------------------------------------------------+ | |
- *	| +-----------------------------------------------------------------+ |
- *	+---------------------------------------------------------------------+
- *
- * @version:	The neoisp extensible parameters buffer version, see
- *		:c:type:`neoisp_meta_buffer_version_e`
- * @data_size:	Neoisp configuration data effective size, excluding this header
- * @data:	The Neoisp extensible configuration data blocks
- */
-struct neoisp_ext_params_s {
-	__u32 version;
-	__u32 data_size;
-	__u8 data[NEOISP_EXT_PARAMS_MAX_SIZE];
-};
 
 /*
  * Statistics
@@ -1913,58 +1772,6 @@ enum neoisp_stats_block_type_e {
 	NEOISP_STATS_BLK_MDRC,
 };
 
-/*
- * Flags for statistics 'flags' field
- *
- * There is currently no specific flag used for statistics. But keep placeholder
- * for possible future addition, and to align with extended params.
- */
-/* No action */
-#define NEOISP_EXT_STATS_BLK_FL_NONE (0)
-
-/**
- * struct neoisp_ext_stats_block_header_s - Neoisp extensible statistics block header
- *
- * This structure represents the common part of all the ISP statistic blocks.
- * Each statistics block embeds an instance of this structure type as its first
- * member, followed by the block-specific statistics data. The userspace
- * inspects this common header to discern the block type and its size and
- * properly handle the block content by casting it to the correct block-specific
- * type.
- *
- * The @type field is one of the values enumerated by
- * :c:type:`neoisp_stats_block_type_e` and specifies how the data should be
- * interpreted by the userspace. The @size field specifies the size of the
- * statistics blocks and is used by the userspace for validation purposes. The
- * @flags field holds a bitmask of per-block flags NEOISP_STATS_BLK_FL_*.
- *
- * Driver is responsible for correctly populating the statistics block header
- * fields (@type, @flags and @size) and correctly populate the block-specific
- * statistics, so that userspace can fetch statistics.
- *
- * For example:
- *
- * .. code-block:: c
- *
- *	void fetch_rctemp_stats(struct neoisp_ext_stats_block_header_s *block) {
- *		struct neoisp_ctemp_reg_stats_es *ctemp =
- *			(struct neoisp_ctemp_reg_stats_es *)block;
- *
- *		cnt_white_white_ = ctemp->stat.cnt_white_white;
- *		sumr_sum_l_ = ctemp->stat.sumr_sum_l;
- *		...
- *	}
- *
- * @type: The statistics block type from :c:type:`neoisp_stats_block_type_e`
- * @flags: Bitmask of block flags
- * @size: Size (in bytes) of the statistics block
- */
-struct neoisp_ext_stats_block_header_s {
-	__u16 type;
-	__u16 flags;
-	__u32 size;
-} __attribute__((aligned(8)));
-
 /**
  * struct neoisp_ctemp_reg_stats_es - Neoisp extensible pipeline configuration
  *
@@ -1972,12 +1779,12 @@ struct neoisp_ext_stats_block_header_s {
  * Identified by :c:type:`NEOISP_STATS_BLK_RCTEMP`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_ctemp_reg_stats_s`
  */
 struct neoisp_ctemp_reg_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_ctemp_reg_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -1988,12 +1795,12 @@ struct neoisp_ctemp_reg_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_RDRC`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_drc_reg_stats_s`
  */
 struct neoisp_drc_reg_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_drc_reg_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2004,12 +1811,12 @@ struct neoisp_drc_reg_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_RAF`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_af_reg_stats_s`
  */
 struct neoisp_af_reg_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_af_reg_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2020,12 +1827,12 @@ struct neoisp_af_reg_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_RBNR`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_bnr_reg_stats_s`
  */
 struct neoisp_bnr_reg_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_bnr_reg_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2036,12 +1843,12 @@ struct neoisp_bnr_reg_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_RNR`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_nr_reg_stats_s`
  */
 struct neoisp_nr_reg_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_nr_reg_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2052,12 +1859,12 @@ struct neoisp_nr_reg_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_REE`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_ee_reg_stats_s`
  */
 struct neoisp_ee_reg_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_ee_reg_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2068,12 +1875,12 @@ struct neoisp_ee_reg_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_RDF`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_df_reg_stats_s`
  */
 struct neoisp_df_reg_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_df_reg_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2084,12 +1891,12 @@ struct neoisp_df_reg_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_MCTEMP`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_ctemp_mem_stats_s`
  */
 struct neoisp_ctemp_mem_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_ctemp_mem_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2100,12 +1907,12 @@ struct neoisp_ctemp_mem_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_MRGBIR`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_rgbir_mem_stats_s`
  */
 struct neoisp_rgbir_mem_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_rgbir_mem_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2116,12 +1923,12 @@ struct neoisp_rgbir_mem_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_MHIST`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_hist_mem_stats_s`
  */
 struct neoisp_hist_mem_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_hist_mem_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2132,12 +1939,12 @@ struct neoisp_hist_mem_stats_es {
  * Identified by :c:type:`NEOISP_STATS_BLK_MDRC`.
  *
  * @header:	The Neoisp extensible statistics header, see
- *		:c:type:`neoisp_ext_stats_block_header_s`
+ *		:c:type:`v4l2_isp_stats_block_header`
  * @stat:	Pipeline configuration, see
  *		:c:type:`neoisp_drc_mem_stats_s`
  */
 struct neoisp_drc_mem_stats_es {
-	struct neoisp_ext_stats_block_header_s header;
+	struct v4l2_isp_stats_block_header header;
 	struct neoisp_drc_mem_stats_s stat;
 } __attribute__((aligned(8)));
 
@@ -2162,48 +1969,4 @@ struct neoisp_drc_mem_stats_es {
 	 sizeof(struct neoisp_hist_mem_stats_es) +  \
 	 sizeof(struct neoisp_drc_mem_stats_es))
 
-/**
- * struct neoisp_ext_stats_s - Neoisp extensible meta data statistics structure
- *
- * The expected memory layout of the statistics buffer is::
- *
- *	+-------------------- struct neoisp_ext_stats_s ----------------------+
- *	| version = NEOISP_EXT_META_BUFFER_V1;                                |
- *	| data_size = NEOISP_EXT_STATS_MAX_SIZE;                              |
- *	| +------------------------- data  ---------------------------------+ |
- *	| | +-------- struct neoisp_ctemp_reg_stats_es  ------------------+ | |
- *	| | | +------- struct neoisp_ext_stats_block_header_s header ---+ | | |
- *	| | | |type = NEOISP_STATS_BLK_RCTEMP;                          | | | |
- *	| | | |flags = NEOISP_EXT_STATS_BLK_FL_NONE;                    | | | |
- *	| | | |size = sizeof(struct neoisp_ctemp_reg_stats_es);         | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | | +------- struct neoisp_ctemp_reg_stats_es stat -----------+ | | |
- *	| | | | ...                                                     | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | +-------------------------------------------------------------+ | |
- *	| | +-------- struct neoisp_drc_reg_stats_es ---------------------+ | |
- *	| | | +------- struct neoisp_ext_stats_block_header_s header----+ | | |
- *	| | | |type = NEOISP_STATS_BLK_RDRC;                            | | | |
- *	| | | |flags = NEOISP_EXT_STATS_BLK_FL_NONE;                    | | | |
- *	| | | |size = sizeof(struct neoisp_drc_reg_stats_es);           | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | | +------- struct neoisp_drc_reg_stats_s stat --------------+ | | |
- *	| | | | ...                                                     | | | |
- *	| | | +---------------------------------------------------------+ | | |
- *	| | +-------------------------------------------------------------+ | |
- *	| | ...                                                             | |
- *	| +-----------------------------------------------------------------+ |
- *	+---------------------------------------------------------------------+
- *
- * @version:	The neoisp extensible statistics buffer version, see
- *		:c:type:`neoisp_meta_buffer_version_e`
- * @data_size:	Neoisp statistics data effective size, excluding this header
- * @data:	The Neoisp extensible statistics data blocks
- */
-struct neoisp_ext_stats_s {
-	__u32 version;
-	__u32 data_size;
-	__u8 data[NEOISP_EXT_STATS_MAX_SIZE];
-};
-
-#endif /* UAPI_NXP_NEOISP_H */
+#endif /* __UAPI_NXP_NEOISP_H */
