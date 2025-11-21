@@ -188,6 +188,23 @@ config TINYDRM_PIXPAPER
 
 	  If M is selected, the module will be built as pixpaper.ko.
 
+config TINYDRM_PIXPAPER426M
+	tristate "DRM support for PIXPAPER426M display panels"
+	depends on DRM && SPI
+	select DRM_CLIENT_SELECTION
+	select DRM_KMS_HELPER
+	select DRM_GEM_DMA_HELPER
+	help
+	  DRM driver for the Mayqueen Pixpaper e-ink display panel.
+
+	  This driver supports small e-paper displays connected over SPI,
+	  with a resolution of 800x480 and XRGB8888 framebuffer format.
+	  It is intended for low-power embedded applications.
+
+	  If M is selected, the module will be built as pixpaper.ko.
+
+
+
 config TINYDRM_REPAPER
 	tristate "DRM support for Pervasive Displays RePaper panels (V231)"
 	depends on DRM && SPI
