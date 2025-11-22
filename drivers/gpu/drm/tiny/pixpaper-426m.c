@@ -224,6 +224,7 @@ static void pixpaper_fb_to_mono(void *src, void *dst, int height,
 		uint8_t *dst_row = dst_pixels + y * dst_pitch;
 
 		for (int x = 0; x < width; x++) {
+			int src_x = width - 1 - x;
 			uint8_t r, g, b;
 			int bit_pos = x % 8;
 			int byte_pos = x / 8;
@@ -231,7 +232,7 @@ static void pixpaper_fb_to_mono(void *src, void *dst, int height,
 
 			if (format == DRM_FORMAT_XRGB8888 || format == DRM_FORMAT_ARGB8888) {
 				uint32_t *src_pixels = src;
-				uint32_t pixel = src_pixels[y * width + x];
+				uint32_t pixel = src_pixels[y * width + src_x];
 				r = (pixel >> 16) & 0xFF;
 				g = (pixel >> 8) & 0xFF;
 				b = pixel & 0xFF;
