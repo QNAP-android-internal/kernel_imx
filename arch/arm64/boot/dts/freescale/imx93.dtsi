@@ -170,7 +170,7 @@
 			 <&clk IMX93_CLK_CAM_PIX>;
 		clock-names = "per", "pixel";
 		assigned-clocks = <&clk IMX93_CLK_CAM_PIX>;
-		assigned-clock-parents = <&clk IMX93_CLK_VIDEO_PLL>;
+		assigned-clock-parents = <&clk IMX93_CLK_SYS_PLL_PFD0>;
 		assigned-clock-rates = <140000000>;
 		phys = <&dphy_rx>;
 		phy-names = "dphy-rx";

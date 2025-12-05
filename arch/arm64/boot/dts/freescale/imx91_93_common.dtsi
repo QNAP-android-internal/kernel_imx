@@ -1158,7 +1158,7 @@
 				 <&clk IMX93_CLK_MEDIA_APB>;
 			clock-names = "pixel", "ipg";
 			assigned-clocks = <&clk IMX93_CLK_CAM_PIX>;
-			assigned-clock-parents = <&clk IMX93_CLK_VIDEO_PLL>;
+			assigned-clock-parents = <&clk IMX93_CLK_SYS_PLL_PFD0>;
 			assigned-clock-rates = <140000000>;
 			power-domains = <&media_blk_ctrl IMX93_MEDIABLK_PD_MIPI_CSI>;
 			status = "disabled";
