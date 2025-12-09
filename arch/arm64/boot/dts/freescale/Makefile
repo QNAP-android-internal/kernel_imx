@@ -1243,7 +1243,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-frdm-pro-waveshare-7inch-c-panel.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-tja1104-rgmii.dtb imx952-evk-tja1104-rmii.dtb \
-			  imx952-evk-sgmii.dtb
+			  imx952-evk-sgmii.dtb imx952-evk-netc-rpmsg.dtb
 
 imx952-evk-ap1302-csi0-2lanes-dtbs := imx952-evk.dtb \
 				      imx952-evk-ap1302-csi0-2lanes.dtbo
