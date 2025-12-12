@@ -131,6 +131,7 @@ enum imx_pcie_variants {
 #define IMX_PCIE_FLAG_8GT_ECN_ERR051586		BIT(11)
 #define IMX_PCIE_FLAG_SKIP_L23_READY		BIT(12)
 #define IMX_PCIE_FLAG_LINK_NOTIFY		BIT(13)
+#define IMX_PCIE_FLAG_PM_RUNTIME		BIT(14)
 
 #define imx_check_flag(pci, val)	(pci->drvdata->flags & val)
 
@@ -2020,6 +2021,16 @@ static int imx_pcie_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	if (imx_pcie->drvdata->flags & IMX_PCIE_FLAG_PM_RUNTIME) {
+		ret = pm_runtime_set_active(dev);
+		if (ret < 0)
+			dev_err_probe(dev, ret, "failed to activate runtime PM\n");
+		pm_runtime_no_callbacks(dev);
+		ret = devm_pm_runtime_enable(dev);
+		if (ret < 0)
+			dev_err_probe(dev, ret, "failed to enable runtime PM\n");
+	}
+
 	pci->quirk_flag = imx_pcie->drvdata->quirk;
 	pci->use_parent_dt_ranges = true;
 	if (imx_pcie->drvdata->mode == DW_PCIE_EP_TYPE) {
@@ -2108,6 +2119,9 @@ static void imx_pcie_shutdown(struct platform_device *pdev)
 
 	/* bring down link, so bootloader gets clean state in case of reboot */
 	imx_pcie_assert_core_reset(imx_pcie);
+
+	if (imx_pcie->drvdata->flags & IMX_PCIE_FLAG_PM_RUNTIME)
+		pm_runtime_put_sync(&pdev->dev);
 }
 
 static const struct imx_pcie_drvdata drvdata[] = {
@@ -2221,6 +2235,7 @@ static const struct imx_pcie_drvdata drvdata[] = {
 			 IMX_PCIE_FLAG_HAS_LUT |
 			 IMX_PCIE_FLAG_8GT_ECN_ERR051586 |
 			 IMX_PCIE_FLAG_LINK_NOTIFY |
+			 IMX_PCIE_FLAG_PM_RUNTIME |
 			 IMX_PCIE_FLAG_SUPPORTS_SUSPEND,
 		.ltssm_off = IMX95_PE0_GEN_CTRL_3,
 		.ltssm_mask = IMX95_PCIE_LTSSM_EN,
