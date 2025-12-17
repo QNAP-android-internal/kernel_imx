@@ -380,7 +380,6 @@ struct vsi_v4l2_ctx {
 	struct cropinfo *crophead;
 	struct cropinfo *croptail;
 
-	u32 src_change;
 	u32 reschange_cnt;
 	bool reschanged_need_notify;
 	bool reschange_notified;

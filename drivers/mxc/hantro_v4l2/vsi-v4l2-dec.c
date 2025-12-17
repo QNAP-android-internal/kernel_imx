@@ -311,10 +311,10 @@ static int vsi_dec_streamon(struct file *filp, void *priv, enum v4l2_buf_type ty
 	if (mutex_lock_interruptible(&ctx->ctxlock))
 		return -EBUSY;
 	trace_vsiv4l2_stream_on(ctx, type);
-	dev_dbg(ctx->dev->dev, "[%llx] %s streamon, source change %d, %d, %d, %d, need %d, %d\n",
+	dev_dbg(ctx->dev->dev, "[%llx] %s streamon, source change %d, %d, %d, need %d, %d\n",
 		ctx->ctxid,
 		V4L2_TYPE_IS_OUTPUT(type) ? "output" : "capture",
-		ctx->src_change, ctx->reschange_cnt,
+		ctx->reschange_cnt,
 		ctx->reschanged_need_notify, ctx->reschange_notified,
 		ctx->need_output_on, ctx->need_capture_on);
 	v4l2_klog(LOGLVL_BRIEF, "%llx %s:%d in status %d", ctx->ctxid, __func__, type, ctx->status);
@@ -373,7 +373,7 @@ void vsi_dec_update_reso(struct vsi_v4l2_ctx *ctx)
 	pcfg->sizeimagedst[3] = 0;
 
 	if (change)
-		ctx->src_change |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		v4l2_klog(LOGLVL_BRIEF, "%llx resoultion change\n", ctx->ctxid);
 }
 
 static void vsi_dec_return_queued_buffers(struct vb2_queue *q)
@@ -418,10 +418,10 @@ static int vsi_dec_streamoff(
 
 	trace_vsiv4l2_stream_off(ctx, type);
 	dev_dbg(ctx->dev->dev,
-		"[%llx] %s streamoff, change %d, %d, %d, %d, need %d, %d, %lld->%lld->%lld\n",
+		"[%llx] %s streamoff, change %d, %d, %d, need %d, %d, %lld->%lld->%lld\n",
 		ctx->ctxid,
 		V4L2_TYPE_IS_OUTPUT(type) ? "output" : "capture",
-		ctx->src_change, ctx->reschange_cnt,
+		ctx->reschange_cnt,
 		ctx->reschanged_need_notify, ctx->reschange_notified,
 		ctx->need_output_on, ctx->need_capture_on,
 		ctx->performance.input_buf_num,
