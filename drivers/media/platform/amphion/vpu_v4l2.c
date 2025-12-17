@@ -101,12 +101,12 @@ static int vpu_notify_eos(struct vpu_inst *inst)
 
 int vpu_notify_source_change(struct vpu_inst *inst)
 {
-	const struct v4l2_event ev = {
+	static const struct v4l2_event ev = {
 		.type = V4L2_EVENT_SOURCE_CHANGE,
-		.u.src_change.changes = inst->changes
+		.u.src_change.changes = V4L2_EVENT_SRC_CH_RESOLUTION
 	};
 
-	vpu_trace(inst->dev, "[%d] source change 0x%x\n", inst->id, inst->changes);
+	vpu_trace(inst->dev, "[%d]\n", inst->id);
 	v4l2_event_queue_fh(&inst->fh, &ev);
 	return 0;
 }

@@ -369,16 +369,12 @@ static void vdec_handle_resolution_change(struct vpu_inst *inst)
 	if (!vdec->source_change)
 		return;
 
-	if (inst->changes) {
-		vpu_notify_source_change(inst);
-		inst->changes = 0;
-	}
-
 	q = v4l2_m2m_get_dst_vq(inst->fh.m2m_ctx);
 	if (!list_empty(&q->done_list))
 		return;
 
 	vdec->source_change--;
+	vpu_notify_source_change(inst);
 	vpu_set_last_buffer_dequeued(inst, false);
 }
 
@@ -962,7 +958,6 @@ static bool vdec_check_source_change(struct vpu_inst *inst, struct vpu_dec_codec
 {
 	struct vdec_t *vdec = inst->priv;
 	const struct vpu_format *sibling;
-	u32 changes = 0;
 
 	if (!inst->fh.m2m_ctx)
 		return false;
@@ -975,37 +970,32 @@ static bool vdec_check_source_change(struct vpu_inst *inst, struct vpu_dec_codec
 		hdr->pixfmt = inst->cap_format.pixfmt;
 
 	if (!vb2_is_streaming(v4l2_m2m_get_dst_vq(inst->fh.m2m_ctx)))
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (inst->cap_format.pixfmt != hdr->pixfmt)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (inst->cap_format.width != hdr->decoded_width)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (inst->cap_format.height != hdr->decoded_height)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (vpu_get_num_buffers(inst, inst->cap_format.type) < inst->min_buffer_cap)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (inst->crop.left != hdr->offset_x)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (inst->crop.top != hdr->offset_y)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (inst->crop.width != hdr->width)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (inst->crop.height != hdr->height)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 	if (!hdr->progressive)
-		changes |= V4L2_EVENT_SRC_CH_RESOLUTION;
+		return true;
 
 	if (vdec->seq_hdr_found &&
 	    (hdr->color_primaries != vdec->codec_info.color_primaries ||
 	     hdr->transfer_chars != vdec->codec_info.transfer_chars ||
 	     hdr->matrix_coeffs != vdec->codec_info.matrix_coeffs ||
 	     hdr->full_range != vdec->codec_info.full_range))
-		changes |= V4L2_EVENT_SRC_CH_COLORSPACE;
-
-	if (changes) {
-		inst->changes |= changes;
 		return true;
-	}
 
 	return false;
 }
