@@ -529,6 +529,194 @@ static const struct imx708_reg mode_2x2binned_720p_regs[] = {
 	{0x3369, 0x00},
 };
 
+static const struct imx708_reg mode_2x2binned_1080p_low_fps_mode_regs[] = {
+	{0x0342, 0x1e},
+	{0x0343, 0x90},
+	{0x0340, 0x05},
+	{0x0341, 0x38},
+	{0x0344, 0x00},
+	{0x0345, 0x00},
+	{0x0346, 0x00},
+	{0x0347, 0x00},
+	{0x0348, 0x11},
+	{0x0349, 0xff},
+	{0x034a, 0x0a},
+	{0x034b, 0x1f},
+	{0x0220, 0x62},
+	{0x0222, 0x01},
+	{0x0900, 0x01},
+	{0x0901, 0x22},
+	{0x0902, 0x08},
+	{0x3200, 0x41},
+	{0x3201, 0x41},
+	{0x32d5, 0x00},
+	{0x32d6, 0x00},
+	{0x32db, 0x01},
+	{0x32df, 0x00},
+	{0x350c, 0x00},
+	{0x350d, 0x00},
+	{0x0408, 0x00},
+	{0x0409, 0x00},
+	{0x040a, 0x00},
+	{0x040b, 0x00},
+	{0x040c, 0x09},
+	{0x040d, 0x00},
+	{0x040e, 0x05},
+	{0x040f, 0x10},
+	{0x034c, 0x07},
+	{0x034d, 0x80},
+	{0x034e, 0x04},
+	{0x034f, 0x38},
+	{0x0301, 0x05},
+	{0x0303, 0x02},
+	{0x0305, 0x02},
+	{0x0306, 0x00},
+	{0x0307, 0x7a},
+	{0x030b, 0x02},
+	{0x030d, 0x04},
+	{0x0310, 0x01},
+	{0x3ca0, 0x00},
+	{0x3ca1, 0x3c},
+	{0x3ca4, 0x00},
+	{0x3ca5, 0x3c},
+	{0x3ca6, 0x00},
+	{0x3ca7, 0x00},
+	{0x3caa, 0x00},
+	{0x3cab, 0x00},
+	{0x3cb8, 0x00},
+	{0x3cb9, 0x1c},
+	{0x3cba, 0x00},
+	{0x3cbb, 0x08},
+	{0x3cbc, 0x00},
+	{0x3cbd, 0x1e},
+	{0x3cbe, 0x00},
+	{0x3cbf, 0x0a},
+	{0x0202, 0x05},
+	{0x0203, 0x08},
+	{0x0224, 0x01},
+	{0x0225, 0xf4},
+	{0x3116, 0x01},
+	{0x3117, 0xf4},
+	{0x0204, 0x00},
+	{0x0205, 0x70},
+	{0x0216, 0x00},
+	{0x0217, 0x70},
+	{0x0218, 0x01},
+	{0x0219, 0x00},
+	{0x020e, 0x01},
+	{0x020f, 0x00},
+	{0x3118, 0x00},
+	{0x3119, 0x70},
+	{0x311a, 0x01},
+	{0x311b, 0x00},
+	{0x341a, 0x00},
+	{0x341b, 0x00},
+	{0x341c, 0x00},
+	{0x341d, 0x00},
+	{0x341e, 0x00},
+	{0x341f, 0x90},
+	{0x3420, 0x00},
+	{0x3421, 0x6c},
+	{0x3366, 0x00},
+	{0x3367, 0x00},
+	{0x3368, 0x00},
+	{0x3369, 0x00},
+};
+
+static const struct imx708_reg mode_2x2binned_720p_low_fps_mode_regs[] = {
+	{0x0342, 0x18},
+	{0x0343, 0x48},
+	{0x0340, 0x04},
+	{0x0341, 0xde},
+	{0x0344, 0x03},
+	{0x0345, 0x00},
+	{0x0346, 0x01},
+	{0x0347, 0xb0},
+	{0x0348, 0x11},
+	{0x0349, 0xff},
+	{0x034a, 0x0a},
+	{0x034b, 0x1f},
+	{0x0220, 0x62},
+	{0x0222, 0x01},
+	{0x0900, 0x01},
+	{0x0901, 0x22},
+	{0x0902, 0x08},
+	{0x3200, 0x41},
+	{0x3201, 0x41},
+	{0x32d5, 0x00},
+	{0x32d6, 0x00},
+	{0x32db, 0x01},
+	{0x32df, 0x00},
+	{0x350c, 0x00},
+	{0x350d, 0x00},
+	{0x0408, 0x00},
+	{0x0409, 0x00},
+	{0x040a, 0x00},
+	{0x040b, 0x00},
+	{0x040c, 0x06},
+	{0x040d, 0x00},
+	{0x040e, 0x03},
+	{0x040f, 0x60},
+	{0x034c, 0x06},
+	{0x034d, 0x00},
+	{0x034e, 0x03},
+	{0x034f, 0x60},
+	{0x0301, 0x05},
+	{0x0303, 0x02},
+	{0x0305, 0x02},
+	{0x0306, 0x00},
+	{0x0307, 0x76},
+	{0x030b, 0x02},
+	{0x030d, 0x04},
+	{0x0310, 0x01},
+	{0x3ca0, 0x00},
+	{0x3ca1, 0x3c},
+	{0x3ca4, 0x00},
+	{0x3ca5, 0x3c},
+	{0x3ca6, 0x00},
+	{0x3ca7, 0x00},
+	{0x3caa, 0x00},
+	{0x3cab, 0x00},
+	{0x3cb8, 0x00},
+	{0x3cb9, 0x1c},
+	{0x3cba, 0x00},
+	{0x3cbb, 0x08},
+	{0x3cbc, 0x00},
+	{0x3cbd, 0x1e},
+	{0x3cbe, 0x00},
+	{0x3cbf, 0x0a},
+	{0x0202, 0x05},
+	{0x0203, 0x08},
+	{0x0224, 0x01},
+	{0x0225, 0xf4},
+	{0x3116, 0x01},
+	{0x3117, 0xf4},
+	{0x0204, 0x00},
+	{0x0205, 0x70},
+	{0x0216, 0x00},
+	{0x0217, 0x70},
+	{0x0218, 0x01},
+	{0x0219, 0x00},
+	{0x020e, 0x01},
+	{0x020f, 0x00},
+	{0x3118, 0x00},
+	{0x3119, 0x70},
+	{0x311a, 0x01},
+	{0x311b, 0x00},
+	{0x341a, 0x00},
+	{0x341b, 0x00},
+	{0x341c, 0x00},
+	{0x341d, 0x00},
+	{0x341e, 0x00},
+	{0x341f, 0x90},
+	{0x3420, 0x00},
+	{0x3421, 0x6c},
+	{0x3366, 0x00},
+	{0x3367, 0x00},
+	{0x3368, 0x00},
+	{0x3369, 0x00},
+};
+
 static const struct imx708_reg mode_hdr_regs[] = {
 	{0x0342, 0x14},
 	{0x0343, 0x60},
@@ -695,6 +883,51 @@ static const struct imx708_mode supported_modes_10bit_no_hdr[] = {
 	},
 };
 
+static const struct imx708_mode supported_modes_10bit_no_hdr_low_fps_mode[] = {
+	{
+		.width = 1920,
+		.height = 1080,
+		.line_length_pix = 0x1e90,
+		.crop = {
+			.left = IMX708_PIXEL_ARRAY_LEFT + 384,
+			.top = IMX708_PIXEL_ARRAY_TOP+ 216,
+			.width = 3840,
+			.height = 2160,
+		},
+		.vblank_min = 40,
+		.vblank_default = 256,
+		.reg_list = {
+			.num_of_regs = ARRAY_SIZE(mode_2x2binned_1080p_low_fps_mode_regs),
+			.regs = mode_2x2binned_1080p_low_fps_mode_regs,
+		},
+		.pixel_rate = 585600000,
+		.exposure_lines_min = 4,
+		.exposure_lines_step = 2,
+		.hdr = false
+	},
+	{
+		.width = 1536,
+		.height = 864,
+		.line_length_pix = 0x1848,
+		.crop = {
+			.left = IMX708_PIXEL_ARRAY_LEFT + 768,
+			.top = IMX708_PIXEL_ARRAY_TOP + 432,
+			.width = 3072,
+			.height = 1728,
+		},
+		.vblank_min = 40,
+		.vblank_default = 2755,
+		.reg_list = {
+			.num_of_regs = ARRAY_SIZE(mode_2x2binned_720p_low_fps_mode_regs),
+			.regs = mode_2x2binned_720p_low_fps_mode_regs,
+		},
+		.pixel_rate = 566400000,
+		.exposure_lines_min = 4,
+		.exposure_lines_step = 2,
+		.hdr = false
+	},
+};
+
 static const struct imx708_mode supported_modes_10bit_hdr[] = {
 	{
 		/* There's only one HDR mode, which is 2x2 downscaled */
@@ -819,6 +1052,8 @@ struct imx708 {
 	unsigned int long_exp_shift;
 
 	unsigned int link_freq_idx;
+
+	bool low_fps_mode;
 };
 
 static inline struct imx708 *to_imx708(struct v4l2_subdev *_sd)
@@ -826,7 +1061,8 @@ static inline struct imx708 *to_imx708(struct v4l2_subdev *_sd)
 	return container_of(_sd, struct imx708, sd);
 }
 
-static inline void get_mode_table(const struct imx708_mode **mode_list,
+static inline void get_mode_table(struct imx708 *imx708,
+				  const struct imx708_mode **mode_list,
 				  unsigned int *num_modes,
 				  bool hdr_enable)
 {
@@ -834,8 +1070,13 @@ static inline void get_mode_table(const struct imx708_mode **mode_list,
 		*mode_list = supported_modes_10bit_hdr;
 		*num_modes = ARRAY_SIZE(supported_modes_10bit_hdr);
 	} else {
-		*mode_list = supported_modes_10bit_no_hdr;
-		*num_modes = ARRAY_SIZE(supported_modes_10bit_no_hdr);
+		if (imx708->low_fps_mode) {
+			*mode_list = supported_modes_10bit_no_hdr_low_fps_mode;
+			*num_modes = ARRAY_SIZE(supported_modes_10bit_no_hdr_low_fps_mode);
+		} else {
+			*mode_list = supported_modes_10bit_no_hdr;
+			*num_modes = ARRAY_SIZE(supported_modes_10bit_no_hdr);
+		}
 	}
 }
 
@@ -1148,7 +1389,7 @@ static int imx708_set_ctrl(struct v4l2_ctrl *ctrl)
 				       imx708->notify_gains->p_new.p_u32[3]);
 		break;
 	case V4L2_CID_WIDE_DYNAMIC_RANGE:
-		get_mode_table(&mode_list, &num_modes, ctrl->val);
+		get_mode_table(imx708, &mode_list, &num_modes, ctrl->val);
 		imx708->mode = v4l2_find_nearest_size(mode_list,
 						      num_modes,
 						      width, height,
@@ -1197,7 +1438,7 @@ static int imx708_enum_frame_size(struct v4l2_subdev *sd,
 	const struct imx708_mode *mode_list;
 	unsigned int num_modes;
 
-	get_mode_table(&mode_list, &num_modes, imx708->hdr_mode->val);
+	get_mode_table(imx708, &mode_list, &num_modes, imx708->hdr_mode->val);
 
 	if (fse->index >= num_modes)
 		return -EINVAL;
@@ -1271,7 +1512,7 @@ static int imx708_set_pad_format(struct v4l2_subdev *sd,
 	/* Bayer order varies with flips */
 	fmt->format.code = imx708_get_format_code(imx708);
 
-	get_mode_table(&mode_list, &num_modes, imx708->hdr_mode->val);
+	get_mode_table(imx708, &mode_list, &num_modes, imx708->hdr_mode->val);
 
 	mode = v4l2_find_nearest_size(mode_list, num_modes, width, height,
 				      fmt->format.width, fmt->format.height);
@@ -1831,6 +2072,8 @@ static int imx708_probe(struct i2c_client *client)
 	/* Check the hardware configuration in device tree */
 	if (imx708_check_hwcfg(dev, imx708))
 		return -EINVAL;
+
+	imx708->low_fps_mode = device_property_read_bool(dev, "imx708,low-fps-mode");
 
 	/* Get system clock (xclk) */
 	imx708->xclk = devm_clk_get(dev, NULL);
