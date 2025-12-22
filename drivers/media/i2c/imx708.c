@@ -6,7 +6,7 @@
  * Based on Sony imx477 camera driver
  * Copyright (C) 2020 Raspberry Pi Ltd
  */
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
@@ -155,6 +155,10 @@ struct imx708_mode {
 
 	/* HDR flag, currently not used at runtime */
 	bool hdr;
+};
+
+static const s64 imx708_link_freq_menu[] = {
+	450000000,
 };
 
 /* Default PDAF pixel correction gains */
@@ -772,6 +776,7 @@ struct imx708 {
 	struct v4l2_ctrl *pixel_rate;
 	struct v4l2_ctrl *exposure;
 	struct v4l2_ctrl *vflip;
+	struct v4l2_ctrl *link_freq;
 	struct v4l2_ctrl *hflip;
 	struct v4l2_ctrl *vblank;
 	struct v4l2_ctrl *hblank;
@@ -922,7 +927,7 @@ static int imx708_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct imx708 *imx708 = to_imx708(sd);
 	struct v4l2_mbus_framefmt *try_fmt_img =
-		v4l2_subdev_get_try_format(sd, fh->state, 0);
+		v4l2_subdev_state_get_format(fh->state, 0);
 	struct v4l2_rect *try_crop;
 
 	mutex_lock(&imx708->mutex);
@@ -939,7 +944,7 @@ static int imx708_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	try_fmt_img->field = V4L2_FIELD_NONE;
 
 	/* Initialize try_crop */
-	try_crop = v4l2_subdev_get_try_crop(sd, fh->state, 0);
+	try_crop = v4l2_subdev_state_get_crop(fh->state, 0);
 	try_crop->left = IMX708_PIXEL_ARRAY_LEFT;
 	try_crop->top = IMX708_PIXEL_ARRAY_TOP;
 	try_crop->width = IMX708_PIXEL_ARRAY_WIDTH;
@@ -1082,6 +1087,10 @@ static int imx708_set_ctrl(struct v4l2_ctrl *ctrl)
 				       IMX708_REG_VALUE_16BIT,
 				       imx708_test_pattern_val[ctrl->val]);
 		break;
+	case V4L2_CID_HBLANK:
+		ret = imx708_write_reg(imx708, IMX708_REG_FRAME_LENGTH,
+					IMX708_REG_VALUE_16BIT, ctrl->val);
+		break;
 	case V4L2_CID_TEST_PATTERN_RED:
 		ret = imx708_write_reg(imx708, IMX708_REG_TEST_PATTERN_R,
 				       IMX708_REG_VALUE_16BIT, ctrl->val);
@@ -1214,8 +1223,7 @@ static int imx708_get_pad_format(struct v4l2_subdev *sd,
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
 		struct v4l2_mbus_framefmt *try_fmt =
-			v4l2_subdev_get_try_format(&imx708->sd, sd_state,
-						   fmt->pad);
+			v4l2_subdev_state_get_format(sd_state, fmt->pad);
 		/* update the code which could change due to vflip or hflip */
 		try_fmt->code = imx708_get_format_code(imx708);
 		fmt->format = *try_fmt;
@@ -1250,7 +1258,7 @@ static int imx708_set_pad_format(struct v4l2_subdev *sd,
 	imx708_update_image_pad_format(imx708, mode, fmt);
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-		framefmt = v4l2_subdev_get_try_format(sd, sd_state, fmt->pad);
+		framefmt = v4l2_subdev_state_get_format(sd_state, fmt->pad);
 		*framefmt = fmt->format;
 	} else {
 		imx708->mode = mode;
@@ -1268,7 +1276,7 @@ __imx708_get_pad_crop(struct imx708 *imx708, struct v4l2_subdev_state *sd_state,
 {
 	switch (which) {
 	case V4L2_SUBDEV_FORMAT_TRY:
-		return v4l2_subdev_get_try_crop(&imx708->sd, sd_state, pad);
+		return v4l2_subdev_state_get_crop(sd_state, pad);
 	case V4L2_SUBDEV_FORMAT_ACTIVE:
 		return &imx708->mode->crop;
 	}
@@ -1619,6 +1627,13 @@ static int imx708_init_controls(struct imx708 *imx708)
 					       imx708->mode->pixel_rate,
 					       imx708->mode->pixel_rate, 1,
 					       imx708->mode->pixel_rate);
+	imx708->link_freq =
+		v4l2_ctrl_new_int_menu(ctrl_hdlr, &imx708_ctrl_ops,
+				       V4L2_CID_LINK_FREQ, 0, 0,
+				       imx708_link_freq_menu);
+
+	if (imx708->link_freq)
+		imx708->link_freq->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
 	/*
 	 * Create the controls here, but mode specific limits are setup
@@ -1626,6 +1641,7 @@ static int imx708_init_controls(struct imx708 *imx708)
 	 */
 	imx708->vblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx708_ctrl_ops,
 					   V4L2_CID_VBLANK, 0, 0xffff, 1, 0);
+
 	imx708->hblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx708_ctrl_ops,
 					   V4L2_CID_HBLANK, 0, 0xffff, 1, 0);
 
@@ -1878,7 +1894,7 @@ error_power_off:
 	return ret;
 }
 
-static int imx708_remove(struct i2c_client *client)
+static void imx708_remove(struct i2c_client *client)
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct imx708 *imx708 = to_imx708(sd);
@@ -1891,8 +1907,6 @@ static int imx708_remove(struct i2c_client *client)
 	if (!pm_runtime_status_suspended(&client->dev))
 		imx708_power_off(&client->dev);
 	pm_runtime_set_suspended(&client->dev);
-
-	return 0;
 }
 
 static const struct of_device_id imx708_dt_ids[] = {
@@ -1912,7 +1926,7 @@ static struct i2c_driver imx708_i2c_driver = {
 		.of_match_table	= imx708_dt_ids,
 		.pm = &imx708_pm_ops,
 	},
-	.probe_new = imx708_probe,
+	.probe = imx708_probe,
 	.remove = imx708_remove,
 };
 
