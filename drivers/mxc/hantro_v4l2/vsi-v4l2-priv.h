@@ -386,6 +386,7 @@ struct vsi_v4l2_ctx {
 	bool reschange_notified;
 	bool need_capture_on;
 	bool need_output_on;
+	bool capture_pend_output_buffer;
 
 	u32 out_sequence;
 	u32 cap_sequence;

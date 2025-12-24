@@ -202,8 +202,11 @@ static int vsi_dec_qbuf(struct file *filp, void *priv, struct v4l2_buffer *buf)
 			set_bit(BUF_FLAG_TIMESTAMP_INVALID, &ctx->srcvbufflag[buf->index]);
 		ret = vb2_qbuf(&ctx->input_que, vdev->v4l2_dev->mdev, buf);
 	}
-	if (ret == 0)
+	if (ret == 0 && ctx->need_output_on) {
 		ret = vsi_dec_output_on(ctx);
+		if (!ctx->need_output_on && ctx->need_capture_on && ctx->capture_pend_output_buffer)
+			vsi_dec_capture_on(ctx);
+	}
 	mutex_unlock(&ctx->ctxlock);
 	return ret;
 }
@@ -257,8 +260,21 @@ int vsi_dec_capture_on(struct vsi_v4l2_ctx *ctx)
 
 	if (ctx->reschange_notified && !vb2_is_streaming(&ctx->input_que)) {
 		v4l2_klog(LOGLVL_BRIEF, "handle seek first, then source change\n");
+		dev_dbg(ctx->dev->dev,
+			"[%llx] handle seek first, then source change\n",
+			ctx->ctxid);
 		return 0;
 	}
+
+	if (ctx->reschange_notified && ctx->need_output_on) {
+		v4l2_klog(LOGLVL_BRIEF, "handle seek (waiting buffer) first, then source change\n");
+		dev_dbg(ctx->dev->dev,
+			"[%llx] handle seek (waiting buffer) first, then source change\n",
+			ctx->ctxid);
+		ctx->capture_pend_output_buffer = true;
+		return 0;
+	}
+	ctx->capture_pend_output_buffer = false;
 
 	ret = vb2_streamon(&ctx->output_que, V4L2_BUF_TYPE_VIDEO_CAPTURE);
 	if (ret)
