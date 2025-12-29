@@ -94,6 +94,20 @@ static const uint32_t pixpaper_formats[] = {
 	DRM_FORMAT_ARGB8888,
 };
 
+static inline u8 pixpaper_quantize_map_level(u8 gray)
+{
+	u8 lvl = gray >> 5;
+	int m;
+
+	m = pixpaper_gray_map[lvl];
+	if (m < 0)
+		m = 0;
+	else if (m > 7)
+		m = 7;
+
+	return (u8)m;
+}
+
 static inline struct pixpaper_panel *to_pixpaper_panel(struct drm_device *drm)
 {
 	return container_of(drm, struct pixpaper_panel, drm);
@@ -251,13 +265,30 @@ init_fail:
 	return 1;
 }
 
-static void pixpaper_fb_to_mono(void *src, void *dst, int height,
-				int width, int dst_pitch, uint32_t format)
+static void pixpaper_fb_to_bitplane(void *src, void *dst, int height,
+				int width, int dst_pitch, uint32_t format,
+				u8 mask)
 {
 	uint8_t *dst_pixels = dst;
+	int bit_idx;
 
 	if (dst == NULL || src == NULL)
 		return;
+
+	switch (mask) {
+		case 0x80:
+			bit_idx = 2;
+			break;
+		case 0x40:
+			bit_idx = 1;
+			break;
+		case 0x20:
+			bit_idx = 0;
+			break;
+		default:
+			bit_idx = 2;
+			break;
+	}
 
 	for (int y = 0; y < height; y++) {
 		uint8_t *dst_row = dst_pixels + y * dst_pitch;
@@ -281,12 +312,21 @@ static void pixpaper_fb_to_mono(void *src, void *dst, int height,
 
 			gray_val = (r * 299 + g * 587 + b * 114 + 500) / 1000;
 
-			if (gray_val < 112)
-				dst_row[byte_pos] &= ~(1 << (7 - bit_pos));
+			u8 mapped = pixpaper_quantize_map_level(gray_val);
+			u8 bit = (mapped >> bit_idx) & 0x1;
+
+			if (bit)
+				dst_row[byte_pos] |= BIT(7 - bit_pos);
 			else
-				dst_row[byte_pos] |= (1 << (7 - bit_pos));
+				dst_row[byte_pos] &= ~BIT(7 - bit_pos);
 		}
 	}
+}
+
+static void pixpaper_fb_to_mono(void *src, void *dst, int height, int width,
+			       int dst_pitch, uint32_t format)
+{
+	pixpaper_fb_to_bitplane(src, dst, height, width, dst_pitch, format, 0x80);
 }
 
 static int pixpaper_plane_helper_atomic_check(struct drm_plane *plane,
