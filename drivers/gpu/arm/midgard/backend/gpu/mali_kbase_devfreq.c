@@ -445,8 +445,6 @@ static int kbase_devfreq_init_core_mask_table(struct kbase_device *kbdev)
 
 	if (!opp_node)
 		return 0;
-	if (!of_device_is_compatible(opp_node, "operating-points-v2-mali"))
-		return 0;
 
 	count = dev_pm_opp_get_opp_count(kbdev->dev);
 	kbdev->devfreq_table =
