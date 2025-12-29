@@ -38,6 +38,7 @@ MODULE_IMPORT_NS("DMA_BUF");
 #define PIXPAPER_LUT_IDX_CMD03       105
 #define PIXPAPER_LUT_IDX_CMD04_START 106
 
+int pixpaper_grayscale = 1;
 static int pixpaper_gray_map[8] = { 3, 2, 1, 0, 7, 6, 5, 4 };
 
 static const u8 pixpaper_lut_color1_update[] = {
@@ -499,7 +500,7 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 		struct drm_framebuffer *fb = plane_state->fb;
 		struct iosys_map map = shadow_plane_state->data[0];
 		void *vaddr = map.vaddr;
-		int i, idx;
+		int i, idx, pass;
 		struct pixpaper_error_ctx err = { .errno_code = 0 };
 		uint32_t dst_pitch;
 		void *dst;
@@ -533,36 +534,61 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 			goto update_cleanup;
 		}
 
-		memset(dst, 0xff, dst_pitch * fb->height);
-		pixpaper_fb_to_mono(vaddr, dst, fb->height, fb->width, dst_pitch, fb->format->format);
-
-
-		pixpaper_send_cmd(panel, 0x24, &err);
-		if (err.errno_code)
-			goto update_cleanup;
-
-		msleep(50);
-
-		for (i = 0; i < dst_pitch * fb->height; i++) {
-			uint8_t data = ((uint8_t *)dst)[i];
-			pixpaper_send_data(panel, data, &err);
+		if (pixpaper_grayscale) {
+			pixpaper_full_clear(panel, dst_pitch, fb->height, &err);
 			if (err.errno_code)
-				break;
+				goto update_cleanup;
+
+			for (pass = 0; pass < 3; pass++) {
+				const u8 *lut = NULL;
+				u8 mask = pixpaper_pass_mask[pass];
+
+				if (pass == 1)
+					lut = pixpaper_lut_color1_update;
+				else if (pass == 2)
+					lut = pixpaper_lut_color2_update;
+
+				memset(dst, 0x00, dst_pitch * fb->height);
+				pixpaper_fb_to_bitplane(vaddr, dst, fb->height, fb->width,
+						dst_pitch, fb->format->format, mask);
+
+				pixpaper_upload_lut(panel, lut, &err);
+				pixpaper_reset_ram_counters(panel, &err);
+
+				pixpaper_send_cmd(panel, 0x24, &err);
+				if (err.errno_code)
+					goto update_cleanup;
+
+				for (u32 i = 0; i < dst_pitch * fb->height; i++) {
+					pixpaper_send_data(panel, ((u8 *)dst)[i], &err);
+					if (err.errno_code)
+						goto update_cleanup;
+				}
+
+				pixpaper_kick_pass(panel, pass, &err);
+				if (err.errno_code)
+					goto update_cleanup;
+			}
+		} else {
+			memset(dst, 0x00, dst_pitch * fb->height);
+			pixpaper_fb_to_bitplane(vaddr, dst, fb->height, fb->width,
+					dst_pitch, fb->format->format, 0x80);
+
+			pixpaper_reset_ram_counters(panel, &err);
+			pixpaper_send_cmd(panel, 0x24, &err);
+			if (err.errno_code)
+				goto update_cleanup;
+
+			for (u32 i = 0; i < dst_pitch * fb->height; i++) {
+				pixpaper_send_data(panel, ((u8 *)dst)[i], &err);
+				if (err.errno_code)
+					goto update_cleanup;
+			}
+
+			pixpaper_kick_pass(panel, 0, &err);
+			if (err.errno_code)
+				goto update_cleanup;
 		}
-
-		pixpaper_send_cmd(panel, 0x21, &err);
-		pixpaper_send_data(panel, 0x40, &err);
-		pixpaper_send_data(panel, 0x00, &err);
-
-		pixpaper_send_cmd(panel, 0x22, &err);
-		pixpaper_send_data(panel, 0xF7, &err);
-
-		pixpaper_send_cmd(panel, 0x20, &err);
-
-		pixpaper_wait_busy(panel);
-		printk("end frame update\n");
-		msleep(1000);
-
 	update_cleanup:
 		if (err.errno_code && err.errno_code != -ETIMEDOUT)
 			printk("Frame update function failed with error %d\n", err.errno_code);
