@@ -38,7 +38,6 @@ MODULE_IMPORT_NS("DMA_BUF");
 #define PIXPAPER_LUT_IDX_CMD03       105
 #define PIXPAPER_LUT_IDX_CMD04_START 106
 
-int pixpaper_grayscale = 1;
 static int pixpaper_gray_map[8] = { 3, 2, 1, 0, 7, 6, 5, 4 };
 
 static const u8 pixpaper_lut_color1_update[] = {
@@ -88,6 +87,8 @@ struct pixpaper_panel {
 	struct gpio_desc *reset;
 	struct gpio_desc *busy;
 	struct gpio_desc *dc;
+
+	bool grayscale;
 };
 
 static const uint32_t pixpaper_formats[] = {
@@ -534,7 +535,7 @@ static void pixpaper_plane_atomic_update(struct drm_plane *plane,
 			goto update_cleanup;
 		}
 
-		if (pixpaper_grayscale) {
+		if (panel->grayscale) {
 			pixpaper_full_clear(panel, dst_pitch, fb->height, &err);
 			if (err.errno_code)
 				goto update_cleanup;
@@ -785,6 +786,10 @@ static int pixpaper_probe(struct spi_device *spi)
 	panel->dc = devm_gpiod_get(dev, "dc", GPIOD_OUT_HIGH);
 	if (IS_ERR(panel->dc))
 		return PTR_ERR(panel->dc);
+
+	panel->grayscale =
+	device_property_read_bool(&panel->spi->dev,
+		"pixpaper,grayscale");
 
 	ret = pixpaper_panel_hw_init(panel);
 	if (ret) {
