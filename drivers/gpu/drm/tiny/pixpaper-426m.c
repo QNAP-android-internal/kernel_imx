@@ -179,6 +179,93 @@ static void pixpaper_send_data(struct pixpaper_panel *panel, u8 data,
 	pixpaper_spi_sync(panel->spi, &msg, err);
 }
 
+static void pixpaper_upload_lut(struct pixpaper_panel *panel, const u8 *lut,
+				struct pixpaper_error_ctx *err)
+{
+	int i;
+
+	if (err->errno_code)
+		return;
+
+	if (!lut)
+		return;
+
+	pixpaper_send_cmd(panel, 0x03, err);
+	pixpaper_send_data(panel, lut[PIXPAPER_LUT_IDX_CMD03], err);
+
+	pixpaper_send_cmd(panel, 0x04, err);
+	for (i = 0; i < 3; i++)
+		pixpaper_send_data(panel,
+				   lut[PIXPAPER_LUT_IDX_CMD04_START + i], err);
+
+	pixpaper_send_cmd(panel, 0x32, err);
+	for (i = 0; i < PIXPAPER_LUT_WF_BYTES; i++)
+		pixpaper_send_data(panel, lut[i], err);
+
+	pixpaper_wait_busy(panel);
+
+	pixpaper_send_cmd(panel, 0x22, err);
+	pixpaper_send_data(panel, 0xC0, err);
+	pixpaper_send_cmd(panel, 0x20, err);
+	pixpaper_wait_busy(panel);
+}
+
+static void pixpaper_reset_ram_counters(struct pixpaper_panel *panel,
+				        struct pixpaper_error_ctx *err)
+{
+	if (err->errno_code)
+		return;
+
+	pixpaper_send_cmd(panel, 0x4E, err);
+	pixpaper_send_data(panel, 0x00, err);
+	pixpaper_send_data(panel, 0x00, err);
+
+	pixpaper_send_cmd(panel, 0x4F, err);
+	pixpaper_send_data(panel, 0x00, err);
+	pixpaper_send_data(panel, 0x00, err);
+}
+
+static void pixpaper_kick_pass(struct pixpaper_panel *panel, int pass,
+			       struct pixpaper_error_ctx *err)
+{
+	if (err->errno_code)
+		return;
+
+	if (pass == 0) {
+		pixpaper_send_cmd(panel, 0x22, err);
+		pixpaper_send_data(panel, 0xF4, err);
+		pixpaper_send_cmd(panel, 0x20, err);
+	} else {
+		pixpaper_send_cmd(panel, 0x21, err);
+		pixpaper_send_data(panel, 0x40, err);
+		pixpaper_send_data(panel, 0x00, err);
+
+		pixpaper_send_cmd(panel, 0x22, err);
+		pixpaper_send_data(panel, 0xCF, err);
+		pixpaper_send_cmd(panel, 0x20, err);
+	}
+
+	pixpaper_wait_busy(panel);
+}
+
+static void pixpaper_full_clear(struct pixpaper_panel *panel,
+				u32 dst_pitch, u32 height,
+				struct pixpaper_error_ctx *err)
+{
+	u32 i, len = dst_pitch * height;
+
+	if (err->errno_code)
+		return;
+
+	pixpaper_reset_ram_counters(panel, err);
+
+	pixpaper_send_cmd(panel, 0x24, err);
+	for (i = 0; i < len; i++)
+		pixpaper_send_data(panel, 0xFF, err);
+
+	pixpaper_kick_pass(panel, 0, err);
+}
+
 static int pixpaper_panel_hw_init(struct pixpaper_panel *panel)
 {
 	struct device *dev = &panel->spi->dev;
