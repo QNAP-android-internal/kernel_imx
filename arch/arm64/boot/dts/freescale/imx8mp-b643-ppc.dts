@@ -475,7 +475,7 @@
 };
 
 &mipi_dsi {
-	status = "okay";
+	status = "disabled";
 };
 
 &snvs_pwrkey {
