@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2026 Jason Yang <jasonyang@ieiworld.com>
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+
+/dts-v1/;
+/plugin/;
+
+&i2c3 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	pca9555@21 {
+		a_ur_sw2 {
+			/delete-property/ output-high;
+			output-low;
+		};
+
+		b_ur_sw2 {
+			/delete-property/ output-high;
+			output-low;
+		};
+	};
+};
