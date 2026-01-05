@@ -2259,9 +2259,32 @@ static struct platform_driver cp210x_platform_dev_driver = {
 	}
 };
 
-module_platform_driver(cp210x_platform_dev_driver);
+static int __init cp210x_init(void)
+{
+	int ret;
 
-module_usb_serial_driver(serial_drivers, id_table);
+	ret = platform_driver_register(&cp210x_platform_dev_driver);
+	if (ret)
+		return ret;
 
+	ret = usb_serial_register_drivers(serial_drivers, "cp210x", id_table);
+	if (ret)
+		goto failed_usb_register;
+
+	return 0;
+
+failed_usb_register:
+	platform_driver_unregister(&cp210x_platform_dev_driver);
+	return ret;
+}
+
+static void __exit cp210x_exit(void)
+{
+	usb_serial_deregister_drivers(serial_drivers);
+	platform_driver_unregister(&cp210x_platform_dev_driver);
+}
+
+module_init(cp210x_init);
+module_exit(cp210x_exit);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL v2");
