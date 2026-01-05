@@ -227,7 +227,7 @@ error_check_func:
 	return rc;
 }
 
-static int  mxc_bt_rfkill_remove(struct platform_device *pdev)
+static void mxc_bt_rfkill_remove(struct platform_device *pdev)
 {
 	struct mxc_bt_rfkill_data *data = platform_get_drvdata(pdev);
 	struct rfkill *rfk = platform_get_drvdata(pdev);
@@ -240,7 +240,6 @@ static int  mxc_bt_rfkill_remove(struct platform_device *pdev)
 	}
 	mxc_bt_rfkill_power_change(data, 0);
 	kfree(data);
-	return 0;
 }
 
 static struct platform_driver mxc_bt_rfkill_driver = {
