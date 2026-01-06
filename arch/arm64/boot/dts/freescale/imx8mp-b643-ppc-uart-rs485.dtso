@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2026 Jason Yang <jasonyang@ieiworld.com>
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include "imx8mp-pinfunc.h"
+
+/dts-v1/;
+/plugin/;
+
+&{/} {
+	cp210x@0 {
+		compatible = "silabs,cp210x";
+		rs485-enable;
+		status = "okay";
+	};
+};
+
+&uart3 {
+	/delete-property/ fsl,uart-has-rtscts;
+
+	linux,rs485-enabled-at-boot-time;
+	rs485-rts-active-high;
+	rs485-rx-during-tx;
+	status = "okay";
+};
+
+&i2c3 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	pca9555@21 {
+		a_ur_sw1 {
+			/delete-property/ output-low;
+			output-high;
+		};
+
+		b_ur_sw1 {
+			/delete-property/ output-low;
+			output-high;
+		};
+	};
+};
+
+&iomuxc {
+	pinctrl_uart3: uart3grp {
+		fsl,pins = <
+			MX8MP_IOMUXC_ECSPI1_SCLK__UART3_DCE_RX      0x140
+			MX8MP_IOMUXC_ECSPI1_MOSI__UART3_DCE_TX      0x140
+			MX8MP_IOMUXC_ECSPI1_SS0__UART3_DCE_RTS      0x140
+			MX8MP_IOMUXC_ECSPI1_MISO__UART3_DCE_CTS     0x140
+		>;
+	};
+
+};
