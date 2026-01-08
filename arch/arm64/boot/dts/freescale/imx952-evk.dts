@@ -333,6 +333,13 @@
 	status = "okay";
 };
 
+&displaymix_irqsteer {
+	status = "okay";
+};
+
+&dpu {
+	status = "okay";
+};
 
 /* pin conflict with PDM */
 &flexcan1 {
