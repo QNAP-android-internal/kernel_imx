@@ -1241,6 +1241,9 @@ dtb-$(CONFIG_ARCH_MXC) += imx952-evk-i3c.dtb
 imx952-evk-root-dtbs := imx952-evk.dtb imx952-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-root.dtb imx952-jailhouse-inmate.dtb
 
+imx952-evk-pcie-keym-dtbs := imx952-evk.dtb imx952-evk-pcie-keym.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-pcie-keym.dtb
+
 imx8mm-kontron-dl-dtbs			:= imx8mm-kontron-bl.dtb imx8mm-kontron-dl.dtbo
 imx8mm-kontron-bl-lte-dtbs		:= imx8mm-kontron-bl.dtb imx8mm-kontron-bl-lte.dtbo
 
