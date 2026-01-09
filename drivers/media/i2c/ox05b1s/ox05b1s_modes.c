@@ -154,6 +154,7 @@ const struct ox05b1s_reglist os08a20_reglist_1080p_10b[] = {
 #define OX05B1S_REG_MIPI_CORE_REG02	CCI_REG8(0x4802)
 #define OX05B1S_REG_MIPI_CORE_REG1B	CCI_REG8(0x481b)
 #define OX05B1S_REG_PCLK_PERIOD		CCI_REG8(0x4837)
+#define OX05B1S_REG_ISP_REG01		CCI_REG8(0x5001)
 
 /* OX05B1S 2592 x 1944 @30fps GRBG10 */
 static const struct cci_reg_sequence ovx5b_init_setting_2592x1944[] = {
@@ -194,6 +195,7 @@ static const struct cci_reg_sequence ovx5b_init_setting_2592x1944[] = {
 	{OX05B1S_REG_MIPI_CORE_REG02, 0x00},
 	{OX05B1S_REG_MIPI_CORE_REG1B, 0x3c},
 	{OX05B1S_REG_PCLK_PERIOD, 0x19},
+	{OX05B1S_REG_ISP_REG01, 0x00},
 };
 
 const struct ox05b1s_reglist ox05b1s_reglist_2592x1944[] = {
