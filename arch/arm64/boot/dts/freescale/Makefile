@@ -1234,6 +1234,8 @@ imx95-19x19-frdm-pro-waveshare-7inch-c-panel-dtbs := imx95-19x19-frdm-pro.dtb \
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-frdm-pro-waveshare-7inch-c-panel.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-tja1104-rgmii.dtb imx952-evk-tja1104-rmii.dtb \
+			  imx952-evk-sgmii.dtb
 
 imx952-evk-i3c-dtbs += imx952-evk.dtb imx952-evk-i3c.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-i3c.dtb
