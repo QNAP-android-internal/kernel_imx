@@ -1245,6 +1245,10 @@ dtb-$(CONFIG_ARCH_MXC) += imx952-evk.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-tja1104-rgmii.dtb imx952-evk-tja1104-rmii.dtb \
 			  imx952-evk-sgmii.dtb
 
+imx952-evk-ap1302-csi0-2lanes-dtbs := imx952-evk.dtb \
+				      imx952-evk-ap1302-csi0-2lanes.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-ap1302-csi0-2lanes.dtb
+
 imx952-evk-i3c-dtbs += imx952-evk.dtb imx952-evk-i3c.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-i3c.dtb
 
