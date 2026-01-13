@@ -1259,6 +1259,9 @@ dtb-$(CONFIG_ARCH_MXC) += imx952-evk-i3c.dtb
 imx952-evk-root-dtbs := imx952-evk.dtb imx952-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-root.dtb imx952-jailhouse-inmate.dtb
 
+imx952-evk-adv7535-dtbs := imx952-evk.dtb imx952-evk-adv7535.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-adv7535.dtb
+
 imx952-evk-it6263-lvds0-dtbs := imx952-evk.dtb imx952-evk-it6263-lvds0.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0.dtb
 
@@ -1279,6 +1282,9 @@ dtb-$(CONFIG_ARCH_MXC) += imx952-evk-pcie-keym.dtb
 
 imx952-evk-pcie-ep-dtbs +=  imx952-evk.dtb imx-pcie0-ep.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-pcie-ep.dtb
+
+imx952-evk-rm692c9-dtbs := imx952-evk.dtb imx952-evk-rm692c9.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-rm692c9.dtb
 
 imx952-evk-crrm-dtbs := imx952-evk.dtb imx952-evk-crrm.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-crrm.dtb
