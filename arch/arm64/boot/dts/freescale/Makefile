@@ -1259,6 +1259,21 @@ dtb-$(CONFIG_ARCH_MXC) += imx952-evk-i3c.dtb
 imx952-evk-root-dtbs := imx952-evk.dtb imx952-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-root.dtb imx952-jailhouse-inmate.dtb
 
+imx952-evk-it6263-lvds0-dtbs := imx952-evk.dtb imx952-evk-it6263-lvds0.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0.dtb
+
+imx952-evk-it6263-lvds1-dtbs := imx952-evk.dtb imx952-evk-it6263-lvds1.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds1.dtb
+
+imx952-evk-it6263-lvds-two-disp-dtbs := imx952-evk.dtb imx952-evk-it6263-lvds0.dtbo imx952-evk-it6263-lvds1.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds-two-disp.dtb
+
+imx952-evk-it6263-lvds-dual-dtbs := imx952-evk.dtb imx952-evk-it6263-lvds-dual.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds-dual.dtb
+
+imx952-evk-jdi-wuxga-lvds-panel-dtbs := imx952-evk.dtb imx952-evk-jdi-wuxga-lvds-panel.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-jdi-wuxga-lvds-panel.dtb
+
 imx952-evk-pcie-keym-dtbs := imx952-evk.dtb imx952-evk-pcie-keym.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-pcie-keym.dtb
 
