@@ -457,7 +457,7 @@ static int imx952_dsi2_phy_get_timing(void *priv_data, unsigned int lane_mbps,
 
 	/* empirical fixup for 4Kp30/25 with 4 data lanes */
 	if (lane_mbps == 1782 && cfg->lanes == 4)
-		tmp *= 3;
+		tmp *= 20;
 
 	tmp = DIV_ROUND_CLOSEST_ULL((tmp * hstx_clk) << 16, USEC_PER_SEC);
 	timing->data_hs2lp = tmp;
