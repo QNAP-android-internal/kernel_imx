@@ -12,6 +12,7 @@
 #define WORD_SIZE   4
 
 #include <linux/file.h>
+#include <linux/types.h>
 #include <linux/fdtable.h>
 #include <linux/sync_file.h>
 #include <linux/dma-fence.h>
@@ -41,7 +42,7 @@ struct dpu_bliteng {
 	u64 context;
 
 	void *buffer_addr_virt;
-	u32 buffer_addr_phy;
+	phys_addr_t buffer_addr_phy;
 
 	u32 *cmd_list;
 

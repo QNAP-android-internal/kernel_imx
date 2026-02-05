@@ -246,6 +246,7 @@
 #define CMDSEQ_LOCKUNLOCK_LOCKUNLOCK__UNLOCK_KEY    0x691DB936U
 
 #define CMDSEQ_BUFFERADDRESS                        ((uint32_t)(0x10188))
+#define CMDSEQ_BUFFERADDRESSMSB                     ((uint32_t)(0x1018c))
 #define CMDSEQ_BUFFERSIZE                           ((uint32_t)(0x10190))
 
 #define CMDSEQ_CONTROL                              ((uint32_t)(0x10198))

@@ -71,17 +71,18 @@ static void dpu95_cs_wait_idle(struct dpu_bliteng *dpu_be)
 
 static int dpu95_cs_alloc_command_buffer(struct dpu_bliteng *dpu_be)
 {
-	/* command buffer need 32 bit address */
+	dma_addr_t dma_handle;
+
+	/* command buffer need 40 bit address */
 	dpu_be->buffer_addr_virt =
-		alloc_pages_exact(COMMAND_BUFFER_SIZE,
-			GFP_KERNEL | GFP_DMA | GFP_DMA32 | __GFP_ZERO);
+		dma_alloc_coherent(dpu_be->dev, COMMAND_BUFFER_SIZE,
+			&dma_handle, GFP_KERNEL | __GFP_ZERO);
 	if (!dpu_be->buffer_addr_virt) {
 		dev_err(dpu_be->dev, "memory alloc failed for dpu command buffer\n");
 		return -ENOMEM;
 	}
 
-	dpu_be->buffer_addr_phy =
-		(u32)virt_to_phys(dpu_be->buffer_addr_virt);
+	dpu_be->buffer_addr_phy = dma_handle;
 
 	return 0;
 }
@@ -95,7 +96,8 @@ static void dpu95_cs_static_setup(struct dpu_bliteng *dpu_be)
 		CMDSEQ_CONTROL);
 
 	/* BufferAddress and BufferSize */
-	dpu95_be_write(dpu_be, dpu_be->buffer_addr_phy, CMDSEQ_BUFFERADDRESS);
+	dpu95_be_write(dpu_be, lower_32_bits(dpu_be->buffer_addr_phy), CMDSEQ_BUFFERADDRESS);
+	dpu95_be_write(dpu_be, upper_32_bits(dpu_be->buffer_addr_phy), CMDSEQ_BUFFERADDRESSMSB);
 	dpu95_be_write(dpu_be, COMMAND_BUFFER_SIZE / WORD_SIZE,
 		CMDSEQ_BUFFERSIZE);
 }
@@ -590,8 +592,10 @@ static void dpu95_bliteng_fini(struct dpu_bliteng *dpu_bliteng)
 		free_irq(dpu_bliteng->irq_comctrl_sw[i], dpu_bliteng);
 
 	if (dpu_bliteng->buffer_addr_virt)
-		free_pages_exact(dpu_bliteng->buffer_addr_virt,
-				 COMMAND_BUFFER_SIZE);
+		dma_free_coherent(dpu_bliteng->dev,
+					COMMAND_BUFFER_SIZE,
+					dpu_bliteng->buffer_addr_virt,
+					dpu_bliteng->buffer_addr_phy);
 }
 
 static int imx_drm_dpu95_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
