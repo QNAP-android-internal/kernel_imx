@@ -3,6 +3,7 @@
 #
 
 obj-y += hantrodec/
+obj-y += hantroenc/
 obj-y += memory_usage/
 obj-y += coda980/
 obj-y += wave511/
