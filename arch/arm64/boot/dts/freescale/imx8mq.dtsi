@@ -817,6 +817,7 @@
 						clocks = <&clk IMX8MQ_CLK_VPU_DEC_ROOT>,
 							 <&clk IMX8MQ_CLK_VPU_G1_ROOT>,
 							 <&clk IMX8MQ_CLK_VPU_G2_ROOT>;
+						clock-names = "root", "g1", "g2";
 						assigned-clocks = <&clk IMX8MQ_CLK_VPU_G1>,
 								  <&clk IMX8MQ_CLK_VPU_G2>,
 								  <&clk IMX8MQ_CLK_VPU_BUS>,
