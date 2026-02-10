@@ -796,7 +796,7 @@ int vsi_v4l2_handle_cropchange(struct vsi_v4l2_msg *pmsg)
 	return 0;
 }
 
-static bool vsi_v4l2_dec_in_source_change(struct vsi_v4l2_ctx *ctx)
+bool vsi_v4l2_dec_in_source_change(struct vsi_v4l2_ctx *ctx)
 {
 	if (test_bit(CTX_FLAG_DELAY_SRCCHANGED_BIT, &ctx->flag))
 		return true;

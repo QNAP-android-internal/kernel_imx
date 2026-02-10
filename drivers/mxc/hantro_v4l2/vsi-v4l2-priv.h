@@ -416,6 +416,7 @@ struct vsi_v4l2_ctx *vsi_create_ctx(void);
 void vsi_set_ctx_error(struct vsi_v4l2_ctx *ctx, s32 error);
 void wakeup_ctxqueues(void);
 int vsi_v4l2_reset_ctx(struct vsi_v4l2_ctx *ctx);
+bool vsi_v4l2_dec_in_source_change(struct vsi_v4l2_ctx *ctx);
 int vsi_v4l2_send_reschange(struct vsi_v4l2_ctx *ctx);
 int vsi_v4l2_notify_reschange(struct vsi_v4l2_msg *pmsg);
 int vsi_v4l2_handle_linear_alloc(struct vsi_v4l2_msg *pmsg);
