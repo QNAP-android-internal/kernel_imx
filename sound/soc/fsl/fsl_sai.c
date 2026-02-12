@@ -484,8 +484,8 @@ static int fsl_sai_set_bclk(struct snd_soc_dai *dai, bool tx, u32 freq)
 		 * so we set it to maximum ratio, then scale the frequency
 		 * below 300Mhz, but above stay above lowest ratio
 		 */
-		clk_rate = freq * 512;
-		while (clk_rate >= pll_max_freq*1000*1000 && clk_rate >= freq*2)
+		clk_rate = (unsigned long)freq * 512;
+		while (clk_rate >= pll_max_freq*1000*1000 && clk_rate >= (unsigned long)freq*2)
 			clk_rate /= 2;
 
 		ret = clk_set_rate(sai->mclk_clk[id], clk_rate);
