@@ -1912,9 +1912,11 @@ enum qman_cb_dqrr_result {
 	/* Like qman_cb_dqrr_stop, but consumes the current entry. */
 	qman_cb_dqrr_consume_stop
 };
+
 typedef enum qman_cb_dqrr_result (*qman_cb_dqrr)(struct qman_portal *qm,
-					struct qman_fq *fq,
-					const struct qm_dqrr_entry *dqrr);
+						 struct qman_fq *fq,
+						 const struct qm_dqrr_entry *dqrr,
+						 bool sched_napi);
 
 /* This callback type is used when handling ERNs, FQRNs and FQRLs via MR. They
  * are always consumed after the callback returns. */

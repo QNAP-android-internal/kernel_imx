@@ -431,10 +431,10 @@ static void __hot _dpa_tx_conf(struct net_device	*net_dev,
 	dev_kfree_skb(skb);
 }
 
-static enum qman_cb_dqrr_result
-priv_rx_error_dqrr(struct qman_portal		*portal,
-		      struct qman_fq			*fq,
-		      const struct qm_dqrr_entry	*dq)
+static enum qman_cb_dqrr_result priv_rx_error_dqrr(struct qman_portal *portal,
+						   struct qman_fq *fq,
+						   const struct qm_dqrr_entry *dq,
+						   bool sched_napi)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -447,7 +447,7 @@ priv_rx_error_dqrr(struct qman_portal		*portal,
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
 	count_ptr = raw_cpu_ptr(priv->percpu_count);
 
-	if (dpaa_eth_napi_schedule(percpu_priv, portal))
+	if (dpaa_eth_napi_schedule(percpu_priv, portal, sched_napi))
 		return qman_cb_dqrr_stop;
 
 	if (unlikely(dpaa_eth_refill_bpools(priv->dpa_bp, count_ptr)))
@@ -463,9 +463,8 @@ priv_rx_error_dqrr(struct qman_portal		*portal,
 }
 
 static enum qman_cb_dqrr_result __hot
-priv_rx_default_dqrr(struct qman_portal		*portal,
-			struct qman_fq			*fq,
-			const struct qm_dqrr_entry	*dq)
+priv_rx_default_dqrr(struct qman_portal *portal, struct qman_fq *fq,
+		     const struct qm_dqrr_entry *dq, bool sched_napi)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -484,7 +483,7 @@ priv_rx_default_dqrr(struct qman_portal		*portal,
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
 	count_ptr = raw_cpu_ptr(priv->percpu_count);
 
-	if (unlikely(dpaa_eth_napi_schedule(percpu_priv, portal)))
+	if (unlikely(dpaa_eth_napi_schedule(percpu_priv, portal, sched_napi)))
 		return qman_cb_dqrr_stop;
 
 	/* Vale of plenty: make sure we didn't run out of buffers */
@@ -503,9 +502,8 @@ priv_rx_default_dqrr(struct qman_portal		*portal,
 }
 
 static enum qman_cb_dqrr_result
-priv_tx_conf_error_dqrr(struct qman_portal		*portal,
-		      struct qman_fq			*fq,
-		      const struct qm_dqrr_entry	*dq)
+priv_tx_conf_error_dqrr(struct qman_portal *portal, struct qman_fq *fq,
+		        const struct qm_dqrr_entry *dq, bool sched_napi)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -516,7 +514,7 @@ priv_tx_conf_error_dqrr(struct qman_portal		*portal,
 
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
 
-	if (dpaa_eth_napi_schedule(percpu_priv, portal))
+	if (dpaa_eth_napi_schedule(percpu_priv, portal, sched_napi))
 		return qman_cb_dqrr_stop;
 
 	_dpa_tx_error(net_dev, priv, percpu_priv, &dq->fd, fq->fqid);
@@ -525,9 +523,8 @@ priv_tx_conf_error_dqrr(struct qman_portal		*portal,
 }
 
 static enum qman_cb_dqrr_result __hot
-priv_tx_conf_default_dqrr(struct qman_portal		*portal,
-			struct qman_fq			*fq,
-			const struct qm_dqrr_entry	*dq)
+priv_tx_conf_default_dqrr(struct qman_portal *portal, struct qman_fq *fq,
+			  const struct qm_dqrr_entry *dq, bool sched_napi)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -542,7 +539,7 @@ priv_tx_conf_default_dqrr(struct qman_portal		*portal,
 	/* Non-migratable context, safe to use raw_cpu_ptr */
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
 
-	if (dpaa_eth_napi_schedule(percpu_priv, portal))
+	if (dpaa_eth_napi_schedule(percpu_priv, portal, sched_napi))
 		return qman_cb_dqrr_stop;
 
 	_dpa_tx_conf(net_dev, priv, percpu_priv, &dq->fd, fq->fqid);

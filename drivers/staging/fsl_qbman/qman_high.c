@@ -461,7 +461,8 @@ void qman_enable_irqs(void)
 #define SLOW_POLL_BUSY   10
 static u32 __poll_portal_slow(struct qman_portal *p, u32 is);
 static inline unsigned int __poll_portal_fast(struct qman_portal *p,
-					unsigned int poll_limit);
+					      unsigned int poll_limit,
+					      bool sched_napi);
 
 /* Portal interrupt handler */
 static irqreturn_t portal_isr(__always_unused int irq, void *ptr)
@@ -473,7 +474,7 @@ static irqreturn_t portal_isr(__always_unused int irq, void *ptr)
 
 	/* DQRR-handling if it's interrupt-driven */
 	if (is & QM_PIRQ_DQRI) {
-		__poll_portal_fast(p, CONFIG_FSL_QMAN_POLL_LIMIT);
+		__poll_portal_fast(p, CONFIG_FSL_QMAN_POLL_LIMIT, true);
 		clear = QM_DQAVAIL_MASK | QM_PIRQ_DQRI;
 	}
 
@@ -1232,7 +1233,8 @@ static inline void safe_copy_dqrr(struct qm_dqrr_entry *dst,
  * sole API that could be invoking the callback through this function).
  */
 static inline unsigned int __poll_portal_fast(struct qman_portal *p,
-					unsigned int poll_limit)
+					      unsigned int poll_limit,
+					      bool sched_napi)
 {
 	const struct qm_dqrr_entry *dq;
 	struct qman_fq *fq;
@@ -1275,7 +1277,7 @@ loop:
 		/* this is duplicated from the SDQCR code, but we have stuff to
 		 * do before *and* after this callback, and we don't want
 		 * multiple if()s in the critical path (SDQCR). */
-		res = fq->cb.dqrr(p, fq, dq);
+		res = fq->cb.dqrr(p, fq, dq, sched_napi);
 		if (res == qman_cb_dqrr_stop)
 			goto done;
 		/* Check for VDQCR completion */
@@ -1296,7 +1298,7 @@ loop:
 		}
 
 		/* Now let the callback do its stuff */
-		res = fq->cb.dqrr(p, fq, dq);
+		res = fq->cb.dqrr(p, fq, dq, sched_napi);
 
 		/* The callback can request that we exit without consuming this
 		 * entry nor advancing; */
@@ -1450,7 +1452,7 @@ int qman_p_poll_dqrr(struct qman_portal *p, unsigned int limit)
 #endif
 	{
 		BUG_ON(p->irq_sources & QM_PIRQ_DQRI);
-		ret = __poll_portal_fast(p, limit);
+		ret = __poll_portal_fast(p, limit, false);
 	}
 	return ret;
 }
@@ -1512,7 +1514,7 @@ void qman_p_poll(struct qman_portal *p)
 		}
 	}
 	if ((~p->irq_sources) & QM_PIRQ_DQRI)
-		__poll_portal_fast(p, CONFIG_FSL_QMAN_POLL_LIMIT);
+		__poll_portal_fast(p, CONFIG_FSL_QMAN_POLL_LIMIT, false);
 }
 EXPORT_SYMBOL(qman_p_poll);
 

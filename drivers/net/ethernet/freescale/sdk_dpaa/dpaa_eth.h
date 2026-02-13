@@ -438,13 +438,10 @@ int dpa_enable_tx_csum(struct dpa_priv_s *priv,
 	struct sk_buff *skb, struct qm_fd *fd, char *parse_results);
 
 static inline int dpaa_eth_napi_schedule(struct dpa_percpu_priv_s *percpu_priv,
-			struct qman_portal *portal)
+					 struct qman_portal *portal,
+					 bool sched_napi)
 {
-	/* In case of threaded ISR for RT enable kernel,
-	 * in_irq() does not return appropriate value, so use
-	 * in_serving_softirq to distinguish softirq or irq context.
-	 */
-	if (unlikely(in_irq() || !in_serving_softirq())) {
+	if (sched_napi) {
 		/* Disable QMan IRQ and invoke NAPI */
 		int ret = qman_p_irqsource_remove(portal, QM_PIRQ_DQRI);
 		if (likely(!ret)) {
