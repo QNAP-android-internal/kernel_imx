@@ -654,7 +654,8 @@ static void dwc_csi_device_ipi_config(struct dwc_csi_device *csidev)
 	val &= ~CSI2RX_IPI_MODE_CONTROLLER;
 	val = (dwc_color_16bit_enable == true) ?
 		(val | CSI2RX_IPI_MODE_COLOR_MODE16) :
-		(val & CSI2RX_IPI_MODE_COLOR_MODE16);
+		(val & ~CSI2RX_IPI_MODE_COLOR_MODE16);
+
 	val |= CSI2RX_IPI_MODE_CUT_THROUGH;
 	dwc_csi_write(csidev, CSI2RX_IPI_MODE, val);
 }
