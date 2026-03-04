@@ -690,6 +690,8 @@ dtb-$(CONFIG_ARCH_MXC) += imx93w-evk-i3c.dtb
 imx93w-evk-rm67199-dtbs := imx93w-evk.dtb imx93-11x11-evk-rm67199.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx93w-evk-rm67199.dtb
 
+dtb-$(CONFIG_ARCH_MXC) += imx93w-frdm.dtb
+
 dtb-$(CONFIG_ARCH_MXC) += imx93-11x11-frdm.dtb imx93-11x11-frdm-8mic-reve.dtb \
 			  imx93-11x11-frdm-aud-hat.dtb imx93-11x11-frdm-ld.dtb \
 			  imx93-11x11-frdm-mt9m114.dtb imx93-11x11-frdm-lpuart.dtb
