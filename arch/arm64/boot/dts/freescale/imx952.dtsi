@@ -991,7 +991,7 @@
 			};
 
 			usdhc1: mmc@42c20000 {
-				compatible = "fsl,imx95-usdhc", "fsl,imx8mm-usdhc";
+				compatible = "fsl,imx952-usdhc", "fsl,imx8mm-usdhc";
 				reg = <0x42c20000 0x10000>;
 				interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&scmi_clk IMX952_CLK_BUSWAKEUP>,
@@ -1008,7 +1008,7 @@
 			};
 
 			usdhc2: mmc@42c30000 {
-				compatible = "fsl,imx95-usdhc", "fsl,imx8mm-usdhc";
+				compatible = "fsl,imx952-usdhc", "fsl,imx8mm-usdhc";
 				reg = <0x42c30000 0x10000>;
 				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&scmi_clk IMX952_CLK_BUSWAKEUP>,
@@ -1025,7 +1025,7 @@
 			};
 
 			usdhc3: mmc@42c40000 {
-				compatible = "fsl,imx95-usdhc", "fsl,imx8mm-usdhc";
+				compatible = "fsl,imx952-usdhc", "fsl,imx8mm-usdhc";
 				reg = <0x42c40000 0x10000>;
 				interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&scmi_clk IMX952_CLK_BUSWAKEUP>,
