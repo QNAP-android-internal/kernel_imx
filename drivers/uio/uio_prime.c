@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2025 NXP
+ * Copyright 2025-2026 NXP
  */
 
 #include <linux/io.h>
@@ -32,7 +32,7 @@ static int prime_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct device *dev = &pdev->dev;
 	struct device_node *rmem_np;
-	int ret, len;
+	int ret;
 
 	prime_priv = devm_kzalloc(dev, sizeof(struct uio_prime), GFP_KERNEL);
 	if (!prime_priv)
@@ -49,12 +49,9 @@ static int prime_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	len = resource_size(res);
-	prime_priv->regs = devm_ioremap(dev, res->start, len);
-	if (!prime_priv->regs) {
-		dev_err(dev, "Can't remap PRIME I/O address range\n");
-		return -EIO;
-	}
+	prime_priv->regs = devm_ioremap_resource(dev, res);
+	if (IS_ERR(prime_priv->regs))
+		return PTR_ERR(prime_priv->regs);
 
 	/* Fill UIO info */
 	uio->name = "PRIME UIO";
