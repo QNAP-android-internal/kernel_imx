@@ -15,56 +15,58 @@
 #include <linux/slab.h>
 #include <linux/uio_driver.h>
 
-#define MU_BUF_OFFSET	0x8000
-
 /*
  * This structure holds the private data associated with a UIO device,
  * typically used in a platform that exposes hardware to userspace via the UIO framework
  */
-struct uio_fce_dev {
-	struct uio_info *info;		// Ptr to  UIO info structure registered with the kernel
-	void __iomem *fce_io_vaddr;	// Virtual address of the memory-mapped I/O region
-	u32 irq;			// IRQ number assigned to the device
+struct uio_prime {
+	struct uio_info *uio;	// Ptr to  UIO info structure registered with the kernel
+	void __iomem *regs;	// Virtual address of the memory-mapped I/O region
+	u32 irq;		// IRQ number assigned to the device
 };
 
-static int fce_probe(struct platform_device *pdev)
+static int prime_probe(struct platform_device *pdev)
 {
-	struct uio_fce_dev *fce_dev;
-	struct uio_info *info;
-	struct resource *regs_fce_io;
-	int ret, len;
+	struct uio_prime *prime_priv;
+	struct uio_info *uio;
+	struct resource *res;
 	struct device *dev = &pdev->dev;
 	struct device_node *rmem_np;
+	int ret, len;
 
-	fce_dev = devm_kzalloc(dev, sizeof(struct uio_fce_dev), GFP_KERNEL);
-	if (!fce_dev)
+	prime_priv = devm_kzalloc(dev, sizeof(struct uio_prime), GFP_KERNEL);
+	if (!prime_priv)
 		return -ENOMEM;
 
-	fce_dev->info = devm_kzalloc(dev, sizeof(struct uio_info), GFP_KERNEL);
-	if (!fce_dev->info)
+	uio = devm_kzalloc(dev, sizeof(struct uio_info), GFP_KERNEL);
+	if (!uio)
 		return -ENOMEM;
 
-	regs_fce_io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!regs_fce_io || !regs_fce_io->start) {
-		dev_err(dev, "NO FCE I/O reseource specified\n");
+	/* MMIO resource 0: device registers */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res || !res->start) {
+		dev_err(dev, "no MMIO resource\n");
 		return -ENODEV;
 	}
 
-	len = resource_size(regs_fce_io);
-	fce_dev->fce_io_vaddr = devm_ioremap(dev, regs_fce_io->start, len);
-	if (!fce_dev->fce_io_vaddr) {
-		dev_err(dev, "Can't remap FCE I/O  address range\n");
+	len = resource_size(res);
+	prime_priv->regs = devm_ioremap(dev, res->start, len);
+	if (!prime_priv->regs) {
+		dev_err(dev, "Can't remap PRIME I/O address range\n");
 		return -EIO;
 	}
 
-	/* Register UIO device */
-	info = fce_dev->info;
-	info->mem[0].name = "V2X FCE SHE0 MU";
-	info->mem[0].addr = regs_fce_io->start;
-	info->mem[0].offs = MU_BUF_OFFSET;
-	info->mem[0].size = resource_size(regs_fce_io);
-	info->mem[0].memtype = UIO_MEM_PHYS;
-	info->mem[0].internal_addr = fce_dev->fce_io_vaddr;
+	/* Fill UIO info */
+	uio->name = "PRIME UIO";
+	uio->version = "PRIME UIO Driver 1.0";
+	uio->priv = prime_priv;
+
+	/* Map the register window to userspace */
+	uio->mem[0].name = "PRIME MMIO";
+	uio->mem[0].addr = res->start;
+	uio->mem[0].size = resource_size(res);
+	uio->mem[0].memtype = UIO_MEM_PHYS;
+	uio->mem[0].internal_addr = prime_priv->regs;
 
 	rmem_np = of_parse_phandle(dev->of_node, "memory-region", 0);
 	if (rmem_np) {
@@ -72,55 +74,53 @@ static int fce_probe(struct platform_device *pdev)
 
 		of_node_put(rmem_np);
 		if (rmem) {
-			info->mem[1].name = "V2X PRIME Reserved Memory";
-			info->mem[1].addr = rmem->base;
-			info->mem[1].size = rmem->size;
-			info->mem[1].memtype = UIO_MEM_PHYS;
-			info->mem[1].internal_addr = NULL;
+			uio->mem[1].name = "PRIME Reserved Memory";
+			uio->mem[1].addr = rmem->base;
+			uio->mem[1].size = rmem->size;
+			uio->mem[1].memtype = UIO_MEM_PHYS;
+			uio->mem[1].internal_addr = NULL;
 		} else
 			dev_warn(dev, "Reserved memory not found; map1 not created\n");
 	}
 
-	info->name = "FCE UIO";
-	info->version = "UIO V2X FCE Driver 1.0";
-	info->priv = fce_dev;
-
-	ret = devm_uio_register_device(dev, info);
+	ret = devm_uio_register_device(dev, uio);
 	if (ret) {
-		dev_err(dev, "UIO V2X FCE register failed\n");
+		dev_err(dev, "UIO register failed: %d\n", ret);
 		return ret;
 	}
 
 	ret = of_reserved_mem_device_init(dev);
 	if (ret) {
-		dev_err(dev, "failed to init reserved memory region\n");
+		dev_err(dev, "reserved mem init failed: %d\n", ret);
 		return ret;
 	}
 
-	platform_set_drvdata(pdev, fce_dev);
-	dev_info(dev, "%s initialized\n", info->name);
+	prime_priv->uio = uio;
+	platform_set_drvdata(pdev, prime_priv);
+	dev_info(dev, "%s initialized (mmio=%pa..%pa)\n",
+		 uio->name, &res->start, &res->end);
 
 	return 0;
 }
 
-static const struct of_device_id uio_fce_ids[] = {
-	{ .compatible = "fsl,imx94-mu-v2x-fce", },
+static const struct of_device_id prime_of_match[] = {
+	{ .compatible = "fsl,imx94-mu-prime", },
 	{ .compatible = "fsl,imx95-mu-prime", },
 	{},
 };
 
-MODULE_DEVICE_TABLE(of, uio_fce_ids);
+MODULE_DEVICE_TABLE(of, prime_of_match);
 
-static struct platform_driver uio_fce_driver = {
+static struct platform_driver prime_drv = {
 	.driver = {
-		.name = "uio_v2x_fce",
-		.of_match_table = uio_fce_ids,
+		.name = "prime-uio",
+		.of_match_table = prime_of_match,
 	},
-	.probe = fce_probe,
+	.probe = prime_probe,
 };
 
-module_platform_driver(uio_fce_driver);
+module_platform_driver(prime_drv);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("NXP");
-MODULE_DESCRIPTION("UIO V2X FCE Driver");
+MODULE_DESCRIPTION("PRIME UIO Driver");
