@@ -15,6 +15,11 @@
 #include <linux/slab.h>
 #include <linux/uio_driver.h>
 
+#define GIER_OFFSET	0x110  /* Global Interrupt Enable Register offset */
+#define GSR_OFFSET	0x118  /* Global Status Register offset */
+#define IRQ_BIT		BIT(0) /* Status bit asserted on IRQ (example) */
+#define GIER_ENABLE	BIT(0) /* Enable mask for global interrupt */
+
 /*
  * This structure holds the private data associated with a UIO device,
  * typically used in a platform that exposes hardware to userspace via the UIO framework
@@ -24,6 +29,64 @@ struct uio_prime {
 	void __iomem *regs;	// Virtual address of the memory-mapped I/O region
 	u32 irq;		// IRQ number assigned to the device
 };
+
+static irqreturn_t prime_irqhandler(int irq, struct uio_info *uio)
+{
+	struct uio_prime *priv = uio->priv;
+	u32 st = readl(priv->regs + GSR_OFFSET);
+
+	/* IRQ guard: only handle if our bit is set */
+	if (!(st & IRQ_BIT))
+		return IRQ_NONE;
+
+	/* MASK further device interrupts until userspace re-enables */
+	writel(0, priv->regs + GIER_OFFSET);
+
+	/* ACK interrupt */
+	writel(IRQ_BIT, priv->regs + GSR_OFFSET);
+	readl(priv->regs + GSR_OFFSET);  // flush
+
+	return IRQ_HANDLED;
+}
+
+/* IRQ Control: called when user writes 0 or 1 to /dev/uioX */
+static int prime_irqcontrol(struct uio_info *uio, s32 irq_on)
+{
+	struct uio_prime *priv = uio->priv;
+
+	if (irq_on)
+		writel(GIER_ENABLE, priv->regs + GIER_OFFSET);
+	else
+		writel(0, priv->regs + GIER_OFFSET);
+
+	return 0;
+}
+
+static int prime_open(struct uio_info *uio, struct inode *inode)
+{
+	struct uio_prime *priv = uio->priv;
+
+	/* Clear any stale status bits */
+	u32 st = readl(priv->regs + GSR_OFFSET);
+
+	if (st)
+		writel(st, priv->regs + GSR_OFFSET);
+
+	/* Enable interrupt */
+	writel(GIER_ENABLE, priv->regs + GIER_OFFSET);
+
+	return 0;
+}
+
+static int prime_release(struct uio_info *uio, struct inode *inode)
+{
+	struct uio_prime *priv = uio->priv;
+
+	/* Disable interrupt */
+	writel(0, priv->regs + GIER_OFFSET);
+
+	return 0;
+}
 
 static int prime_probe(struct platform_device *pdev)
 {
@@ -53,6 +116,13 @@ static int prime_probe(struct platform_device *pdev)
 	if (IS_ERR(prime_priv->regs))
 		return PTR_ERR(prime_priv->regs);
 
+	/* Fetch IRQ from DT (or board init) */
+	prime_priv->irq = platform_get_irq(pdev, 0);
+	if (prime_priv->irq < 0) {
+		dev_err(dev, "get irq failed\n");
+		return prime_priv->irq;
+	}
+
 	/* Fill UIO info */
 	uio->name = "PRIME UIO";
 	uio->version = "PRIME UIO Driver 1.0";
@@ -64,6 +134,14 @@ static int prime_probe(struct platform_device *pdev)
 	uio->mem[0].size = resource_size(res);
 	uio->mem[0].memtype = UIO_MEM_PHYS;
 	uio->mem[0].internal_addr = prime_priv->regs;
+
+	/* IRQ for UIO */
+	uio->irq =  prime_priv->irq;
+	uio->irq_flags = IRQF_SHARED;
+	uio->handler = prime_irqhandler;
+	uio->irqcontrol = prime_irqcontrol;
+	uio->open = prime_open;
+	uio->release = prime_release;
 
 	rmem_np = of_parse_phandle(dev->of_node, "memory-region", 0);
 	if (rmem_np) {
@@ -94,8 +172,8 @@ static int prime_probe(struct platform_device *pdev)
 
 	prime_priv->uio = uio;
 	platform_set_drvdata(pdev, prime_priv);
-	dev_info(dev, "%s initialized (mmio=%pa..%pa)\n",
-		 uio->name, &res->start, &res->end);
+	dev_info(dev, "%s initialized (irq=%d, mmio=%pa..%pa)\n",
+		 uio->name, prime_priv->irq, &res->start, &res->end);
 
 	return 0;
 }
@@ -120,4 +198,4 @@ module_platform_driver(prime_drv);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("NXP");
-MODULE_DESCRIPTION("PRIME UIO Driver");
+MODULE_DESCRIPTION("PRIME UIO Driver with IRQ support");
