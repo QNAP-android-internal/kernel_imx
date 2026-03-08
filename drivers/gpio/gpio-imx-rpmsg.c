@@ -105,8 +105,7 @@ static int gpio_send_message(struct imx_rpmsg_gpio_port *port,
 	int err;
 
 	if (!info->rpdev) {
-		dev_dbg(&info->rpdev->dev,
-			"rpmsg channel not ready, m4 image ready?\n");
+		pr_debug("rpmsg io channel not ready, m4 image ready?\n");
 		return -EINVAL;
 	}
 
