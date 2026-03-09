@@ -15,6 +15,7 @@
 
 #include <drm/bridge/dw_mipi_dsi.h>
 #include <drm/drm_bridge.h>
+#include <drm/drm_edid.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_modes.h>
 #include <drm/drm_modeset_helper_vtables.h>
@@ -39,6 +40,7 @@ struct dw_mipi_dsi_imx {
 
 	u32 lanes;
 	u32 format;
+	unsigned long mode_flags;
 
 	struct dw_mipi_dsi *dmd;
 	struct dw_mipi_dsi_plat_data pdata;
@@ -173,22 +175,77 @@ dw_mipi_dsi_imx_mode_valid(void *priv_data,
 	return __dw_mipi_dsi_imx_mode_valid(priv_data, mode, &phy_cfg);
 }
 
+static bool dw_mipi_dsi_mode_needs_adjust_4dlane_24bpp(struct drm_display_mode *adjusted_mode,
+						       int bpp, unsigned int lanes,
+						       unsigned long flags)
+{
+	int i, vic;
+
+	if ((flags & MIPI_DSI_MODE_VIDEO_BURST) != 0 || lanes != 4 || bpp != 24)
+		return false;
+
+	/* Workarounds for modes that need to round htotal up when
+	 * using 4 data lanes and 24 bpp. The standard horizontal timings
+	 * cannot display correctly for these modes due to rounding:
+	 *    VIC 2,3   -> 720x480 @ 60 Hz
+	 *    VIC 48,49 -> 720x480 @ 120 Hz
+	 *    VIC 56,57 -> 720x480 @ 240 Hz
+	 *    VIC 32,72 -> 1920x1080 @ 24 Hz
+	 */
+	const u8 fixup_modes[] = {2, 3, 48, 49, 56, 57, 32, 72};
+
+	vic = drm_match_cea_mode(adjusted_mode);
+	if (vic) {
+		for (i = 0; i < ARRAY_SIZE(fixup_modes); i++) {
+			if (fixup_modes[i] == vic)
+				return true;
+		}
+	}
+
+	return false;
+}
+
 static bool dw_mipi_dsi_mode_fixup(void *priv_data,
 				   const struct drm_display_mode *mode,
 				   struct drm_display_mode *adjusted_mode)
 {
 	struct dw_mipi_dsi_imx *dsi = priv_data;
 	unsigned long pixel_clock_rate;
-	unsigned long rounded_rate;
-
-	pixel_clock_rate = mode->clock * 1000;
-	rounded_rate = clk_round_rate(dsi->pixel_clk, pixel_clock_rate);
+	union phy_configure_opts phycfg;
+	int bpp;
+	int ret;
+	bool adjusted = false;
 
 	memcpy(adjusted_mode, mode, sizeof(*mode));
-	adjusted_mode->clock = rounded_rate / 1000;
 
-	DRM_DEV_DEBUG(dsi->dev, "adj clock %d for mode " DRM_MODE_FMT "\n",
-		      adjusted_mode->clock, DRM_MODE_ARG(mode));
+	ret = dw_mipi_dsi_phy_validate_helper(priv_data,
+					      &bpp,
+					      mode,
+					      &phycfg);
+	if (!ret) {
+		DRM_DEV_DEBUG(dsi->dev,
+			      "dw_mipi_dsi_phy_validate_helper() failed\n");
+		return false;
+	}
+
+	pixel_clock_rate = phycfg.mipi_dphy.hs_clk_rate * dsi->lanes / bpp;
+	adjusted_mode->clock = pixel_clock_rate / MSEC_PER_SEC;
+
+	/* Workarounds for modes that need to round htotal up. */
+	if (dw_mipi_dsi_mode_needs_adjust_4dlane_24bpp(adjusted_mode, bpp, dsi->lanes,
+						       dsi->mode_flags)) {
+		adjusted_mode->hsync_start += 2;
+		adjusted_mode->hsync_end   += 2;
+		adjusted_mode->htotal      += 2;
+		adjusted = true;
+	}
+
+	drm_mode_set_crtcinfo(adjusted_mode, 0);
+
+	DRM_DEV_DEBUG(dsi->dev,
+		      "mode= %s lanes= %u bpp= %d dsi flags= 0x%08lx hs_clk_rate= %lu adjusted mode clock= %lu htotal was adjusted= %d\n",
+		      adjusted_mode->name, dsi->lanes, bpp, dsi->mode_flags,
+		      phycfg.mipi_dphy.hs_clk_rate, pixel_clock_rate, adjusted);
 
 	return true;
 }
