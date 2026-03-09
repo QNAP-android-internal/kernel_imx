@@ -44,6 +44,61 @@ struct dw_mipi_dsi_imx {
 	struct dw_mipi_dsi_plat_data pdata;
 };
 
+static bool dw_mipi_dsi_phy_validate_helper(void *priv_data,
+					    int *bpp,
+					    const struct drm_display_mode *mode,
+					    union phy_configure_opts *phycfg)
+{
+	struct dw_mipi_dsi_imx *dsi = priv_data;
+	int ret;
+
+	*bpp = mipi_dsi_pixel_format_to_bpp(dsi->format);
+	if (*bpp < 0) {
+		DRM_DEV_DEBUG(dsi->dev, "failed to get bpp for pixel format %d\n",
+			      dsi->format);
+		return false;
+	}
+
+	ret = phy_mipi_dphy_get_default_config(mode->clock * MSEC_PER_SEC,
+					       *bpp, dsi->lanes,
+					       &phycfg->mipi_dphy);
+	if (ret < 0) {
+		DRM_DEV_DEBUG(dsi->dev, "failed to get default phy cfg %d\n", ret);
+		return false;
+	}
+
+	ret = phy_validate(dsi->phy, PHY_MODE_MIPI_DPHY, 0, phycfg);
+	if (ret < 0) {
+		DRM_DEV_DEBUG(dsi->dev, "failed to validate phy cfg %d\n", ret);
+		return false;
+	}
+
+	return true;
+}
+
+static bool dw_mipi_dsi_imx_is_mode_clock_valid(int clock)
+{
+	int i;
+	const int valid_mode_clocks[] = {
+		25175, 25200, 27000, 27027, 28320,
+		31500,
+		40000, 49500,
+		50000, 54000, 54054, 59341, 59400,
+		65000,
+		74176, 74250, 78750,
+		108000, 108108,
+		132000,
+		148352, 148500,
+	};
+
+	for (i = 0; i < ARRAY_SIZE(valid_mode_clocks); i++) {
+		if (clock == valid_mode_clocks[i])
+			return true;
+	}
+
+	return false;
+}
+
 static enum drm_mode_status
 __dw_mipi_dsi_imx_mode_valid(void *priv_data,
 			     const struct drm_display_mode *mode,
@@ -54,6 +109,35 @@ __dw_mipi_dsi_imx_mode_valid(void *priv_data,
 	struct drm_bridge *bridge;
 	int bpp;
 	int ret;
+	unsigned long pixel_clock_rate = mode->clock * 1000;
+	unsigned long adjusted_clock_rate;
+
+	if (!dw_mipi_dsi_imx_is_mode_clock_valid(mode->clock))
+		return MODE_ERROR;
+
+	ret = dw_mipi_dsi_phy_validate_helper(priv_data,
+					      &bpp,
+					      mode,
+					      phy_cfg);
+	if (!ret) {
+		DRM_DEV_DEBUG(dsi->dev,
+			      "dw_mipi_dsi_phy_validate_helper() failed for clock %d kHz\n",
+			      mode->clock);
+		return MODE_ERROR;
+	}
+
+	adjusted_clock_rate = phy_cfg->mipi_dphy.hs_clk_rate * dsi->lanes / bpp;
+	DRM_DEV_DEBUG(dsi->dev,
+		      "hs_clk_rate %lu, adjusted_clock_rate %lu, crtc clock %u\n",
+		      phy_cfg->mipi_dphy.hs_clk_rate, adjusted_clock_rate,
+		      mode->crtc_clock);
+
+	if (adjusted_clock_rate < pixel_clock_rate * 995 / 1000 ||
+	    adjusted_clock_rate > pixel_clock_rate * 1005 / 1000) {
+		DRM_DEV_DEBUG(dev, "adjusted clk rate error is too high: " DRM_MODE_FMT "\n",
+			      DRM_MODE_ARG(mode));
+		return MODE_NOCLOCK;
+	}
 
 	bridge = dw_mipi_dsi_get_bridge(dsi->dmd);
 
@@ -63,38 +147,16 @@ __dw_mipi_dsi_imx_mode_valid(void *priv_data,
 
 	if ((bridge->ops & DRM_BRIDGE_OP_DETECT) &&
 	    (bridge->ops & DRM_BRIDGE_OP_EDID)) {
-		unsigned long pixel_clock_rate = mode->clock * 1000;
 		unsigned long rounded_rate;
 
 		/* Allow +/-0.5% pixel clock rate deviation */
-		rounded_rate = clk_round_rate(dsi->pixel_clk, pixel_clock_rate);
-		if (rounded_rate < pixel_clock_rate * 995 / 1000 ||
-		    rounded_rate > pixel_clock_rate * 1005 / 1000) {
+		rounded_rate = clk_round_rate(dsi->pixel_clk, adjusted_clock_rate);
+		if (rounded_rate < adjusted_clock_rate * 995 / 1000 ||
+		    rounded_rate > adjusted_clock_rate * 1005 / 1000) {
 			DRM_DEV_DEBUG(dev, "failed to round clock for mode " DRM_MODE_FMT "\n",
 				      DRM_MODE_ARG(mode));
 			return MODE_NOCLOCK;
 		}
-	}
-
-	bpp = mipi_dsi_pixel_format_to_bpp(dsi->format);
-	if (bpp < 0) {
-		DRM_DEV_DEBUG(dev, "failed to get bpp for pixel format %d\n",
-			      dsi->format);
-		return MODE_ERROR;
-	}
-
-	ret = phy_mipi_dphy_get_default_config(mode->clock * MSEC_PER_SEC,
-					       bpp, dsi->lanes,
-					       &phy_cfg->mipi_dphy);
-	if (ret < 0) {
-		DRM_DEV_DEBUG(dev, "failed to get default phy cfg %d\n", ret);
-		return MODE_ERROR;
-	}
-
-	ret = phy_validate(dsi->phy, PHY_MODE_MIPI_DPHY, 0, phy_cfg);
-	if (ret < 0) {
-		DRM_DEV_DEBUG(dev, "failed to validate phy cfg %d\n", ret);
-		return MODE_ERROR;
 	}
 
 	return MODE_OK;
