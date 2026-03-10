@@ -485,6 +485,7 @@ struct vpu_device {
 	struct dentry *debugfs;
 	struct kfifo irq_fifo;
 	spinlock_t irq_lock; /* lock irq fifo access */
+	struct imx_mur_node *recorder;
 };
 
 struct vpu_instance;
@@ -583,6 +584,7 @@ struct vpu_instance {
 	struct vpu_performance_info performance;
 	struct dentry *debugfs;
 	struct vpu_flow flow;
+	struct imx_mur_node *recorder;
 };
 
 struct vpu_state_trans_element {

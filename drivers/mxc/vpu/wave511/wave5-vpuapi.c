@@ -250,6 +250,8 @@ int wave5_vpu_dec_allocate_fbc_buffer(struct vpu_instance *inst, int index)
 		wave5_vpu_dec_reset_framebuffer(inst, index);
 
 	vframe->size = luma_size + chroma_size;
+	vframe->recorder = inst->recorder;
+	vframe->label = "fbc";
 	ret = wave5_vdi_allocate_dma_memory(inst->dev->dev, vframe);
 	if (ret) {
 		dev_dbg(inst->dev->dev,
@@ -303,6 +305,8 @@ int wave5_vpu_dec_allocate_aux_buffer(struct vpu_instance *inst, int index)
 
 	size = ALIGN(ALIGN(mv_col_size, 16), BUFFER_MARGIN) + BUFFER_MARGIN;
 	p_dec_info->vb_mv[index].size = size;
+	p_dec_info->vb_mv[index].recorder = inst->recorder;
+	p_dec_info->vb_mv[index].label = "mv";
 	ret = wave5_vdi_allocate_dma_memory(inst->dev->dev, &p_dec_info->vb_mv[index]);
 	if (ret)
 		return ret;
@@ -314,12 +318,16 @@ int wave5_vpu_dec_allocate_aux_buffer(struct vpu_instance *inst, int index)
 
 	size = ALIGN(fbc_y_tbl_size, BUFFER_MARGIN) + BUFFER_MARGIN;
 	p_dec_info->vb_fbc_y_tbl[index].size = size;
+	p_dec_info->vb_fbc_y_tbl[index].recorder = inst->recorder;
+	p_dec_info->vb_fbc_y_tbl[index].label = "y_tbl";
 	ret = wave5_vdi_allocate_dma_memory(inst->dev->dev, &p_dec_info->vb_fbc_y_tbl[index]);
 	if (ret)
 		goto free_mv_buffer;
 
 	size = ALIGN(fbc_c_tbl_size, BUFFER_MARGIN) + BUFFER_MARGIN;
 	p_dec_info->vb_fbc_c_tbl[index].size = size;
+	p_dec_info->vb_fbc_c_tbl[index].recorder = inst->recorder;
+	p_dec_info->vb_fbc_c_tbl[index].label = "c_tbl";
 	ret = wave5_vdi_allocate_dma_memory(inst->dev->dev, &p_dec_info->vb_fbc_c_tbl[index]);
 	if (ret)
 		goto free_fbc_y_tbl_buffer;
@@ -330,6 +338,8 @@ int wave5_vpu_dec_allocate_aux_buffer(struct vpu_instance *inst, int index)
 
 		if (vb_buf.size != p_dec_info->vb_task.size) {
 			wave5_vdi_free_dma_memory(&p_dec_info->vb_task);
+			vb_buf.recorder = inst->recorder;
+			vb_buf.label = "task_buf";
 			ret = wave5_vdi_allocate_dma_memory(inst->dev->dev, &vb_buf);
 			if (ret)
 				goto free_fbc_c_tbl_buffer;

@@ -1860,6 +1860,14 @@ static void wave5_vpu_dec_stop_streaming(struct vb2_queue *q)
 static int wave5_vpu_dec_buf_init(struct vb2_buffer *vb)
 {
 	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
+	struct vpu_instance *inst = vb2_get_drv_priv(vb->vb2_queue);
+
+	if (vb->memory == VB2_MEMORY_MMAP) {
+		for (int i = 0; i < vb->num_planes; i++)
+			imx_mur_long_new_and_add(inst->recorder, vb->planes[i].length,
+						 V4L2_TYPE_IS_OUTPUT(vb->type) ? "output" :
+										 "capture");
+	}
 
 	if (V4L2_TYPE_IS_CAPTURE(vb->type)) {
 		struct vpu_dst_buffer *vpu_buf = wave5_to_vpu_dst_buf(vbuf);
@@ -1872,10 +1880,23 @@ static int wave5_vpu_dec_buf_init(struct vb2_buffer *vb)
 	return 0;
 }
 
+static void wave5_vpu_dec_buf_cleanup(struct vb2_buffer *vb)
+{
+	struct vpu_instance *inst = vb2_get_drv_priv(vb->vb2_queue);
+
+	if (vb->memory == VB2_MEMORY_MMAP) {
+		for (int i = 0; i < vb->num_planes; i++)
+			imx_mur_long_sub_and_del_by_name(inst->recorder, vb->planes[i].length,
+							 V4L2_TYPE_IS_OUTPUT(vb->type) ? "output" :
+											 "capture");
+	}
+}
+
 static const struct vb2_ops wave5_vpu_dec_vb2_ops = {
 	.queue_setup = wave5_vpu_dec_queue_setup,
 	.buf_queue = wave5_vpu_dec_buf_queue,
 	.buf_init = wave5_vpu_dec_buf_init,
+	.buf_cleanup = wave5_vpu_dec_buf_cleanup,
 	.buf_prepare = wave5_vpu_dec_buf_prepare,
 	.start_streaming = wave5_vpu_dec_start_streaming,
 	.stop_streaming = wave5_vpu_dec_stop_streaming,
@@ -2123,6 +2144,7 @@ static int wave5_vpu_open_dec(struct file *filp)
 	atomic_set(&inst->feed_frame_cnt, 0);
 	atomic_set(&inst->queued_dec_cmd, 0);
 	INIT_LIST_HEAD(&inst->list);
+	inst->recorder = imx_mur_create_node(dev->recorder, "decoder instance");
 
 	inst->v4l2_m2m_dev = inst->dev->v4l2_m2m_dec_dev;
 	inst->v4l2_fh.m2m_ctx =
@@ -2140,6 +2162,7 @@ static int wave5_vpu_open_dec(struct file *filp)
 			  V4L2_CID_MPEG_VIDEO_DEC_DISPLAY_DELAY, 0, 0, 1, 0);
 	v4l2_ctrl_new_std(&inst->v4l2_ctrl_hdl, NULL,
 			  V4L2_CID_MPEG_VIDEO_DEC_DISPLAY_DELAY_ENABLE, 0, 1, 1, 0);
+	imx_mur_new_v4l2_ctrl(&inst->v4l2_ctrl_hdl, inst->recorder);
 
 	if (inst->v4l2_ctrl_hdl.error) {
 		ret = -ENODEV;

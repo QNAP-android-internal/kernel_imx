@@ -113,6 +113,7 @@ struct vpu_ctrl {
 	struct loger_t *loger;
 	struct dentry *debugfs;
 #endif
+	struct imx_mur_node *recorder;
 };
 
 static const struct vpu_ctrl_resource nxp_wave511_ctrl_data = {
@@ -135,6 +136,7 @@ static void wave5_vpu_ctrl_init_loger(struct vpu_ctrl *ctrl)
 	}
 	ctrl->loger = ctrl->loger_buf.vaddr;
 	ctrl->loger->size = TRACEBUF_SIZE - sizeof(struct loger_t);
+	imx_mur_long_new_and_add(ctrl->recorder, ctrl->loger_buf.size, "loger_buf");
 	dev_info(ctrl->dev, "sw uart at %pad, 0x%zx\n",
 		 &ctrl->loger_buf.daddr, ctrl->loger_buf.size);
 }
@@ -142,11 +144,13 @@ static void wave5_vpu_ctrl_init_loger(struct vpu_ctrl *ctrl)
 static void wave5_vpu_ctrl_free_loger(struct vpu_ctrl *ctrl)
 {
 	ctrl->loger = NULL;
-	if (ctrl->loger_buf.vaddr)
+	if (ctrl->loger_buf.vaddr) {
+		imx_mur_long_sub_and_del_by_name(ctrl->recorder, ctrl->loger_buf.size, "loger_buf");
 		dma_free_coherent(ctrl->dev,
 				  ctrl->loger_buf.size,
 				  ctrl->loger_buf.vaddr,
 				  ctrl->loger_buf.daddr);
+	}
 
 	memset(&ctrl->loger_buf, 0, sizeof(ctrl->loger_buf));
 }
@@ -501,6 +505,8 @@ static void wave5_vpu_ctrl_acquire_buffers(struct vpu_ctrl *ctrl)
 	for (i = 0; i < MAX_NUM_INSTANCE; i++) {
 		buf = &ctrl->buffers[i];
 		buf->size = WAVE517_WORKBUF_SIZE;
+		buf->recorder = ctrl->recorder;
+		buf->label = "work_buf";
 		if (wave5_vdi_allocate_dma_memory(ctrl->dev, buf))
 			return;
 
@@ -899,6 +905,17 @@ int wave5_vpu_ctrl_get_state(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(wave5_vpu_ctrl_get_state);
 
+struct imx_mur_node *wave5_vpu_ctrl_get_recorder(struct device *dev)
+{
+	struct vpu_ctrl *ctrl = dev_get_drvdata(dev);
+
+	if (!ctrl)
+		return NULL;
+
+	return ctrl->recorder;
+}
+EXPORT_SYMBOL_GPL(wave5_vpu_ctrl_get_recorder);
+
 static void wave5_vpu_ctrl_init_reserved_boot_region(struct vpu_ctrl *ctrl, struct resource mem)
 {
 	phys_addr_t phys_addr = mem.start;
@@ -923,6 +940,7 @@ static void wave5_vpu_ctrl_init_reserved_boot_region(struct vpu_ctrl *ctrl, stru
 		return;
 	}
 
+	imx_mur_long_new_and_add(ctrl->recorder, ctrl->boot_mem.size, "boot_mem");
 	dev_info(ctrl->dev, "boot phys_addr: %pad, dma_addr: %pad, size: 0x%zx\n",
 		 &phys_addr, &ctrl->boot_mem.daddr, ctrl->boot_mem.size);
 }
@@ -965,6 +983,7 @@ static int wave5_vpu_ctrl_probe(struct platform_device *pdev)
 	}
 
 	ctrl->num_clks = ret;
+	ctrl->recorder = imx_mur_create_node(NULL, "wave511-decoder");
 
 	np = of_parse_phandle(pdev->dev.of_node, "boot", 0);
 	if (np) {
@@ -1042,6 +1061,8 @@ static void wave5_vpu_ctrl_remove(struct platform_device *pdev)
 				   ctrl->boot_mem.size,
 				   DMA_BIDIRECTIONAL,
 				   0);
+	imx_mur_long_sub_and_del_by_name(ctrl->recorder, ctrl->boot_mem.size, "boot_mem");
+	imx_mur_destroy_node(ctrl->recorder);
 	mutex_destroy(&ctrl->ctrl_lock);
 }
 

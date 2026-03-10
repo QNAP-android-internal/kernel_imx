@@ -142,11 +142,18 @@ void wave5_update_output_format_info(struct vpu_instance *inst)
 
 void wave5_cleanup_instance(struct vpu_instance *inst, struct file *filp)
 {
+	long usage;
+
+	imx_mur_release_v4l2_ctrl(inst->recorder);
 	v4l2_ctrl_handler_free(&inst->v4l2_ctrl_hdl);
 	if (inst->v4l2_fh.vdev) {
 		v4l2_fh_del(&inst->v4l2_fh, filp);
 		v4l2_fh_exit(&inst->v4l2_fh);
 	}
+	usage = imx_mur_long_read(inst->recorder);
+	if (usage)
+		dev_err(inst->dev->dev, "[%d] leak memory, size is %ld\n", inst->id, usage);
+	imx_mur_destroy_node(inst->recorder);
 	kfree(inst->codec_info);
 	kfree(inst);
 }
