@@ -307,6 +307,7 @@ struct dpu95_data {
 
 	const enum dpu95_link_id *link_id_map;
 	const enum dpu95_link_id *link_id_fy;
+	const enum dpu95_link_id *link_id_fy_src;
 	const enum dpu95_link_id *link_id_fe;
 
 	int irq_cnt;

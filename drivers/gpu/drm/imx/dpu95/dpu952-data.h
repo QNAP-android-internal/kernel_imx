@@ -552,6 +552,7 @@ static const struct dpu95_data dpu952_data = {
 
 	.link_id_map = dpu952_link_id_map,
 	.link_id_fy = dpu952_link_id_fy,
+	.link_id_fy_src = dpu952_link_id_fe,
 	.link_id_fe = dpu952_link_id_fe,
 
 	.irq_cnt = DPU952_IRQ_CNT,

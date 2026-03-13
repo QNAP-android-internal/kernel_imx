@@ -19,35 +19,15 @@
 				 DPU95_FETCHUNIT_CAP_USE_VSCALER9 | \
 				 DPU95_FETCHUNIT_CAP_PACKED_YUV422)
 
-static const enum dpu95_link_id fy_srcs[4][2] = {
-	{
-		DPU95_LINK_ID_NONE,
-		DPU95_LINK_ID_FETCHECO0,
-	}, {
-		DPU95_LINK_ID_NONE,
-		DPU95_LINK_ID_FETCHECO1,
-	}, {
-		DPU95_LINK_ID_NONE,
-		DPU95_LINK_ID_FETCHECO2,
-	}, {
-		DPU95_LINK_ID_NONE,
-		DPU95_LINK_ID_FETCHECO9,
-	},
-};
-
 static void dpu95_fy_pec_dynamic_src_sel(struct dpu95_fetchunit *fu,
 					 enum dpu95_link_id src)
 {
 	struct dpu95_soc *dpu = fu->dpu;
 	const struct dpu95_data *data = dpu->data;
-	int i;
 
-	for (i = 0; i < ARRAY_SIZE(fy_srcs[fu->index]); i++) {
-		if (fy_srcs[fu->index][i] == src) {
-			dpu95_pec_fu_write(fu, PIXENGCFG_DYNAMIC,
-					   data->link_id_map[src]);
-			return;
-		}
+	if (data->link_id_fy_src[fu->index] == src || DPU95_LINK_ID_NONE == src) {
+		dpu95_pec_fu_write(fu, PIXENGCFG_DYNAMIC, data->link_id_map[src]);
+		return;
 	}
 
 	dev_err(dpu->dev, "%s - invalid source 0x%02x\n", fu->name, src);
