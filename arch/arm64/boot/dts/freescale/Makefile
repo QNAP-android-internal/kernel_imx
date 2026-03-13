@@ -671,6 +671,8 @@ dtb-$(CONFIG_ARCH_MXC) += imx93-11x11-evk-rm67199.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx93w-evk.dtb \
 			  imx93w-evk-rpmsg.dtb
 
+imx93w-evk-8mic-reve-dtbs := imx93w-evk.dtb imx93w-evk-8mic-reve.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx93w-evk-8mic-reve.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx93w-evk-inmate.dtb imx93w-evk-root.dtb
 
 imx93w-evk-boe-wxga-lvds-panel-dtbs := imx93w-evk.dtb imx93-11x11-evk-boe-wxga-lvds-panel.dtbo
