@@ -425,7 +425,6 @@ static inline void ctx_blk_write(enum isp_block_map_e map, u32 *ptr, u32 *dest)
 /*------------------------------------------------------------------------------
  * Extensible parameters format handling
  */
-
 static void
 neoisp_params_handler_pipe_conf(struct neoisp_context_s *ctx,
 				union neoisp_params_block_u *block)
@@ -1879,7 +1878,7 @@ void neoisp_ctx_set_default_context(struct neoisp_dev_s *neoispd, struct neoisp_
 void neoisp_ctx_update_buf_addr(struct neoisp_dev_s *neoispd)
 {
 	struct neoisp_job_s *job = &neoispd->queued_job;
-	struct neoisp_pipe_conf_s *cfg = &neoispd->context->hw.pipe_conf;
+	struct neoisp_pipe_conf_s *cfg = &job->node_group->context->hw.pipe_conf;
 	struct neoisp_buffer_s *buf_inp0 = job->buf[NEOISP_INPUT0_NODE];
 	struct neoisp_buffer_s *buf_inp1 = job->buf[NEOISP_INPUT1_NODE];
 	struct neoisp_buffer_s *buf_out = job->buf[NEOISP_FRAME_NODE];
@@ -1889,7 +1888,7 @@ void neoisp_ctx_update_buf_addr(struct neoisp_dev_s *neoispd)
 	dma_addr_t inp0_addr, inp1_addr;
 
 	/* Input0 specific */
-	nd = &neoispd->node[NEOISP_INPUT0_NODE];
+	nd = &job->node_group->node[NEOISP_INPUT0_NODE];
 	ibpp = (nd->neoisp_format->bit_depth + 7) / 8;
 	inp0_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
 
@@ -1897,7 +1896,7 @@ void neoisp_ctx_update_buf_addr(struct neoisp_dev_s *neoispd)
 	inp0_addr = get_addr(buf_inp0, 0) + (nd->crop.left * ibpp) + (nd->crop.top * inp0_stride);
 
 	/* Input 1 specific */
-	nd = &neoispd->node[NEOISP_INPUT1_NODE];
+	nd = &job->node_group->node[NEOISP_INPUT1_NODE];
 	ibpp = (nd->neoisp_format->bit_depth + 7) / 8;
 	inp1_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
 
@@ -1908,13 +1907,13 @@ void neoisp_ctx_update_buf_addr(struct neoisp_dev_s *neoispd)
 		NEO_PIPE_CONF_ADDR_SET(inp0_addr);
 
 	/* Handle hdr inputs */
-	nd = &neoispd->node[NEOISP_INPUT1_NODE];
+	nd = &job->node_group->node[NEOISP_INPUT1_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		cfg->img1_in_addr =
 			NEO_PIPE_CONF_ADDR_SET(inp1_addr);
 	}
 
-	nd = &neoispd->node[NEOISP_FRAME_NODE];
+	nd = &job->node_group->node[NEOISP_FRAME_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		/* Planar/multiplanar output image addresses */
 		switch (nd->format.fmt.pix_mp.pixelformat) {
@@ -1945,7 +1944,7 @@ void neoisp_ctx_update_buf_addr(struct neoisp_dev_s *neoispd)
 		}
 	}
 
-	nd = &neoispd->node[NEOISP_IR_NODE];
+	nd = &job->node_group->node[NEOISP_IR_NODE];
 	if (neoisp_node_link_is_enabled(nd))
 		cfg->outir_addr =
 			NEO_PIPE_CONF_ADDR_SET(get_addr(buf_ir, 0));
@@ -2128,10 +2127,11 @@ void neoisp_ctx_update_monochrome_fmt(struct neoisp_dev_s *neoispd,
 	}
 }
 
-void neoisp_ctx_update_packetizer(struct neoisp_dev_s *neoispd)
+void neoisp_ctx_update_packetizer(struct neoisp_node_group_s *node_group)
 {
-	struct neoisp_node_s *nd = &neoispd->node[NEOISP_FRAME_NODE];
-	struct neoisp_packetizer_s *pck = &neoispd->context->hw.packetizer;
+	struct neoisp_dev_s *neoispd = node_group->neoisp_dev;
+	struct neoisp_node_s *nd = &node_group->node[NEOISP_FRAME_NODE];
+	struct neoisp_packetizer_s *pck = &node_group->context->hw.packetizer;
 	u8 obpp, lsa, rsa, type, order0, order1, order2, a0s, subsample;
 	u32 pixfmt;
 
@@ -2334,14 +2334,14 @@ void neoisp_ctx_update_packetizer(struct neoisp_dev_s *neoispd)
  * Set pipe conf fixed settings: image size, bpp, line stride, and dummy
  * addresses.
  */
-void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
+void neoisp_ctx_update_pipe_conf(struct neoisp_node_group_s *node_group)
 {
-	struct neoisp_pipe_conf_s *cfg = &neoispd->context->hw.pipe_conf;
+	struct neoisp_pipe_conf_s *cfg = &node_group->context->hw.pipe_conf;
 	struct neoisp_node_s *nd;
 	u32 tmp, width, height, obpp, irbpp, inp0_stride, inp1_stride;
 
 	/* Input0 specific */
-	nd = &neoispd->node[NEOISP_INPUT0_NODE];
+	nd = &node_group->node[NEOISP_INPUT0_NODE];
 	width = nd->crop.width;
 	height = nd->crop.height;
 	inp0_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
@@ -2351,7 +2351,7 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 	cfg->img_conf = tmp;
 
 	/* Input 1 specific */
-	nd = &neoispd->node[NEOISP_INPUT1_NODE];
+	nd = &node_group->node[NEOISP_INPUT1_NODE];
 	inp1_stride = nd->format.fmt.pix_mp.plane_fmt[0].bytesperline;
 
 	tmp = cfg->img_conf & ~NEO_PIPE_CONF_IMG_CONF_CAM0_IBPP1_MASK;
@@ -2366,7 +2366,7 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 		NEO_PIPE_CONF_IMG0_IN_LS_CAM0_LS_SET(inp0_stride);
 
 	/* Handle hdr inputs */
-	nd = &neoispd->node[NEOISP_INPUT1_NODE];
+	nd = &node_group->node[NEOISP_INPUT1_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		cfg->img1_in_ls =
 			NEO_PIPE_CONF_IMG1_IN_LS_CAM0_LS_SET(inp1_stride);
@@ -2377,7 +2377,7 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 			NEO_PIPE_CONF_IMG1_IN_LS_CAM0_LS_SET(0u);
 	}
 
-	nd = &neoispd->node[NEOISP_FRAME_NODE];
+	nd = &node_group->node[NEOISP_FRAME_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		obpp = (nd->neoisp_format->bit_depth + 7) / 8;
 
@@ -2393,7 +2393,7 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 			 * - output1 on dummy buffer
 			 */
 			cfg->outch1_addr =
-				NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
+				NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
 
 			cfg->outch0_ls =
 				NEO_PIPE_CONF_OUTCH0_LS_CAM0_LS_SET(obpp * width);
@@ -2431,16 +2431,16 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 	} else {
 		/* Default dummy pixelformat is set to YUYV */
 		cfg->outch0_addr =
-			NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
+			NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
 		cfg->outch1_addr =
-			NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
+			NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
 		cfg->outch0_ls =
 			NEO_PIPE_CONF_OUTCH0_LS_CAM0_LS_SET(0u);
 		cfg->outch1_ls =
 			NEO_PIPE_CONF_OUTCH1_LS_CAM0_LS_SET(0u);
 	}
 
-	nd = &neoispd->node[NEOISP_IR_NODE];
+	nd = &node_group->node[NEOISP_IR_NODE];
 	if (neoisp_node_link_is_enabled(nd)) {
 		irbpp = (nd->neoisp_format->bit_depth + 7) / 8;
 
@@ -2448,7 +2448,7 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 			NEO_PIPE_CONF_OUTIR_LS_CAM0_LS_SET(irbpp * width);
 	} else {
 		cfg->outir_addr =
-			NEO_PIPE_CONF_ADDR_SET(neoispd->dummy_dma);
+			NEO_PIPE_CONF_ADDR_SET(node_group->dummy_dma);
 		cfg->outir_ls =
 			NEO_PIPE_CONF_OUTIR_LS_CAM0_LS_SET(0u);
 	}
@@ -2456,7 +2456,7 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 
 /*
  * neoisp_ctx_update_w_user_params is used to update the context of the
- * queued node with user space values.
+ * queued node_group with user space values.
  */
 void neoisp_ctx_update_w_user_params(struct neoisp_dev_s *neoispd)
 {
@@ -2487,7 +2487,7 @@ void neoisp_ctx_update_w_user_params(struct neoisp_dev_s *neoispd)
 		block_offset += block->header.size;
 
 		block_handler = &neoisp_block_handlers[block->header.type];
-		block_handler->handler(neoispd->context, block);
+		block_handler->handler(neoispd->queued_job.node_group->context, block);
 	}
 }
 
@@ -2503,7 +2503,8 @@ void neoisp_ctx_update_w_user_params(struct neoisp_dev_s *neoispd)
  */
 void neoisp_ctx_upload_context(struct neoisp_dev_s *neoispd)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_node_group_s *node_group = neoispd->queued_job.node_group;
+	struct neoisp_context_s *ctx = node_group->context;
 	u8 *src = (u8 *)(uintptr_t)&ctx->hw.pipe_conf.img_conf;
 	u8 *dst = (u8 *)(uintptr_t)(neoispd->mmio + NEO_PIPE_CONF_IMG_CONF_CAM0);
 	u32 *imem = (u32 *)(uintptr_t)neoispd->mmio_tcm;
@@ -2603,7 +2604,7 @@ static void neoisp_ctx_get_stats_blk(struct neoisp_dev_s *neoispd, u32 btype, u8
 
 void neoisp_ctx_get_stats(struct neoisp_dev_s *neoispd, struct neoisp_buffer_s *buf)
 {
-	struct neoisp_node_s *node = &neoispd->node[NEOISP_STATS_NODE];
+	struct neoisp_node_s *node = &neoispd->queued_job.node_group->node[NEOISP_STATS_NODE];
 	u8 *src = (u8 *)(uintptr_t)neoispd->mmio_tcm;
 	struct v4l2_isp_buffer *stats;
 	u32 offset, *blk_list, count;

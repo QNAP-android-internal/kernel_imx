@@ -66,8 +66,8 @@ void neoisp_ctx_update_head_color(struct neoisp_dev_s *neoispd,
 void neoisp_ctx_update_monochrome_fmt(struct neoisp_dev_s *neoispd,
 				      struct neoisp_context_s *context,
 				      u32 pixfmt);
-void neoisp_ctx_update_packetizer(struct neoisp_dev_s *neoispd);
-void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd);
+void neoisp_ctx_update_packetizer(struct neoisp_node_group_s *node_group);
+void neoisp_ctx_update_pipe_conf(struct neoisp_node_group_s *node_group);
 void neoisp_ctx_update_w_user_params(struct neoisp_dev_s *neoispd);
 
 void neoisp_ctx_upload_context(struct neoisp_dev_s *neoispd);

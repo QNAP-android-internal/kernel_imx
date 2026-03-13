@@ -20,6 +20,7 @@
 
 #define NEOISP_NAME			"neoisp"
 
+#define NEOISP_NODE_GROUPS_COUNT	8
 #define NEOISP_MIN_W			64U
 #define NEOISP_MIN_H			64U
 #define NEOISP_MAX_W			4096U
@@ -169,7 +170,7 @@ struct neoisp_node_s {
 	struct media_pad pad;
 	struct media_intf_devnode *intf_devnode;
 	struct media_link *intf_link;
-	struct neoisp_dev_s *neoisp;
+	struct neoisp_node_group_s *node_group;
 	/* Video device lock */
 	struct mutex node_lock;
 	/* vb2_queue lock */
@@ -179,6 +180,25 @@ struct neoisp_node_s {
 	struct v4l2_format format;
 	const struct neoisp_fmt_s *neoisp_format;
 	struct v4l2_rect crop;
+};
+
+struct neoisp_node_group_s {
+	u32 id;
+	u32 frame_sequence;
+	struct v4l2_device v4l2_dev;
+	struct v4l2_subdev sd;
+	struct v4l2_ctrl_handler hdl;
+	struct v4l2_ctrl *ctrls[NEOISP_CTRLS_COUNT];
+	struct media_device mdev;
+	struct neoisp_dev_s *neoisp_dev;
+	struct neoisp_node_s node[NEOISP_NODES_COUNT];
+	u32 streaming_map; /* Bitmap of which nodes are streaming */
+	struct media_pad pad[NEOISP_NODES_COUNT]; /* Output pads first */
+	dma_addr_t params_dma_addr;
+	u32 *dummy_buf;
+	dma_addr_t dummy_dma;
+	u32 dummy_size;
+	struct neoisp_context_s *context;
 };
 
 struct neoisp_buffer_s {
@@ -193,12 +213,14 @@ static inline struct neoisp_buffer_s *to_neoisp_buffer(struct vb2_v4l2_buffer *v
 
 /* Catch currently running or queued jobs on the neoisp hw */
 struct neoisp_job_s {
+	struct neoisp_node_group_s *node_group;
 	struct neoisp_buffer_s *buf[NEOISP_NODES_COUNT];
 };
 
 /* Records a job configuration */
 struct neoisp_job_desc_s {
 	struct list_head queue;
+	struct neoisp_node_group_s *node_group;
 	struct neoisp_buffer_s *buffers[NEOISP_NODES_COUNT];
 };
 
@@ -209,26 +231,13 @@ struct neoisp_dev_s {
 	void __iomem *mmio_tcm;
 	struct clk_bulk_data *clks;
 	s32 num_clks;
+	struct neoisp_node_group_s node_group[NEOISP_NODE_GROUPS_COUNT];
 	struct neoisp_job_s queued_job;
 	bool hw_busy; /* Non-zero if a job is queued or is being started */
 	u8 media_registered;
 	struct list_head job_queue;
 	/* Protects "hw_busy" flag, streaming_map and job_queue */
 	spinlock_t hw_lock;
-	u32 frame_sequence;
-	struct v4l2_device v4l2_dev;
-	struct v4l2_subdev sd;
-	struct v4l2_ctrl_handler hdl;
-	struct v4l2_ctrl *ctrls[NEOISP_CTRLS_COUNT];
-	struct media_device mdev;
-	struct neoisp_node_s node[NEOISP_NODES_COUNT];
-	u32 streaming_map; /* Bitmap of which nodes are streaming */
-	struct media_pad pad[NEOISP_NODES_COUNT]; /* Output pads first */
-	dma_addr_t params_dma_addr;
-	u32 *dummy_buf;
-	dma_addr_t dummy_dma;
-	u32 dummy_size;
-	struct neoisp_context_s *context;
 	struct dentry *debugfs_entry;
 	struct debugfs_regset32 *regset;
 };
