@@ -55,8 +55,6 @@
 		regulator-name = "audio-pwr";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c4_gpio_expander_21 1 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	reg_m2_pwr: regulator-m2-pwr {
@@ -64,8 +62,6 @@
 		regulator-name = "M.2-power";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c7_pcal6524 20 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 		/*
 		 * M.2 device only can be enabled(W_DISABLE1#) after all Power
 		 * Rails reach their minimum operating voltage (PCI Express M.2
@@ -81,8 +77,6 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		vin-supply = <&reg_m2_pwr>;
-		gpio = <&i2c7_pcal6524 6 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	reg_slot_pwr: regulator-slot-pwr {
@@ -90,8 +84,6 @@
 		regulator-name = "PCIe slot-power";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c7_pcal6524 14 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	reg_can1_stby: regulator-can1-stby {
@@ -99,8 +91,6 @@
 		regulator-name = "can1-stby";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c6_gpio_expander_21 5 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 		vin-supply = <&reg_can1_en>;
 	};
 
@@ -109,8 +99,6 @@
 		regulator-name = "can1-en";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c6_gpio_expander_21 6 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	reg_can2_stby: regulator-can2-stby {
@@ -118,8 +106,6 @@
 		regulator-name = "can2-stby";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c4_gpio_expander_21 3 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 		vin-supply = <&reg_can2_en>;
 	};
 
@@ -128,8 +114,6 @@
 		regulator-name = "can2-en";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c4_gpio_expander_21 4 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	reg_usdhc2_vmmc: regulator-usdhc2 {
@@ -156,8 +140,6 @@
 		regulator-name = "USB_VBUS";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
-		gpio = <&i2c7_pcal6524 3 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	sound-bt-sco {
@@ -218,8 +200,6 @@
 		regulator-name = "aqr-stby";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c5_gpio_expander_21 1 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	reg_aqr_en: regulator-aqr-en {
@@ -228,8 +208,6 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		vin-supply = <&reg_aqr_stby>;
-		gpio = <&i2c5_gpio_expander_21 0 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
 	};
 
 	reg_si5332_stby: regulator-si5332-stby {
@@ -237,7 +215,6 @@
 		regulator-name = "si5332-stby";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c7_pcal6524 13 GPIO_ACTIVE_LOW>;
 		regulator-always-on;
 	};
 
@@ -246,7 +223,6 @@
 		regulator-name = "mac-en";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&i2c5_gpio_expander_21 3 GPIO_ACTIVE_LOW>;
 	};
 };
 
@@ -468,7 +444,6 @@
 &pcie0 {
 	pinctrl-0 = <&pinctrl_pcie0>;
 	pinctrl-names = "default";
-	reset-gpio = <&i2c7_pcal6524 5 GPIO_ACTIVE_LOW>;
 	vpcie-supply = <&reg_pcie0>;
 	status = "okay";
 };
@@ -476,7 +451,6 @@
 &pcie1 {
 	pinctrl-0 = <&pinctrl_pcie1>;
 	pinctrl-names = "default";
-	reset-gpio = <&i2c7_pcal6524 16 GPIO_ACTIVE_LOW>;
 	vpcie-supply = <&reg_slot_pwr>;
 	status = "okay";
 };
