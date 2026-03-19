@@ -282,6 +282,10 @@
 	};
 };
 
+&gpio1 {
+	status = "okay";
+};
+
 &scmi_iomuxc {
 	pinctrl_flexspi1: flexspi1grp {
 		fsl,pins = <
