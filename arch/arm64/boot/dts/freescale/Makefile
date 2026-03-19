@@ -952,9 +952,11 @@ dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-tja1104-rgmii.dtb imx95-19x19-evk-tja1
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-netc-rpmsg.dtb
 
 imx95-19x19-evk-root-dtbs := imx95-19x19-evk.dtb imx95-jailhouse-root.dtbo
-dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-root.dtb imx95-19x19-evk-inmate.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-root.dtb
 imx95-15x15-evk-root-dtbs := imx95-15x15-evk.dtb imx95-jailhouse-root.dtbo
-dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-root.dtb imx95-15x15-evk-inmate.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-root.dtb
+
+dtb-$(CONFIG_ARCH_MXC) += imx95-jailhouse-inmate.dtb
 
 imx95-15x15-evk-ox03c10-dtbs := imx95-15x15-evk.dtb imx95-15x15-evk-ox03c10.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-ox03c10.dtb
@@ -1180,7 +1182,7 @@ imx95-19x19-verdin-rm692c9-dtbs := imx95-19x19-verdin.dtb imx95-19x19-verdin-rm6
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-verdin-rm692c9.dtb
 
 imx95-19x19-verdin-root-dtbs := imx95-19x19-verdin.dtb imx95-jailhouse-root.dtbo
-dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-verdin-root.dtb imx95-19x19-verdin-inmate.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-verdin-root.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm.dtb imx95-15x15-frdm-boe-wxga-lvds-panel.dtb
 
