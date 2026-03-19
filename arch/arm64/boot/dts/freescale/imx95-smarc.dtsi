@@ -129,15 +129,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lpi2c2>;
 	status = "okay";
-
-	adp5585: io-expander@34 {
-		compatible = "adi,adp5585-00", "adi,adp5585";
-		reg = <0x34>;
-		gpio-controller;
-		#gpio-cells = <2>;
-		gpio-reserved-ranges = <5 1>;
-		#pwm-cells = <3>;
-	};
 };
 
 &lpi2c3 {
@@ -145,14 +136,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lpi2c3>;
 	status = "okay";
-
-	i2c3_gpio_expander_20: i2c3-gpio-expander@20 {
-		compatible = "nxp,pcal6408";
-		#gpio-cells = <2>;
-		gpio-controller;
-		reg = <0x20>;
-		vcc-supply = <&reg_3p3v>;
-	};
 };
 
 &lpi2c5 {
@@ -160,14 +143,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lpi2c5>;
 	status = "okay";
-
-	i2c5_gpio_expander_21: i2c5-gpio-expander@21 {
-		compatible = "nxp,pcal6408";
-		#gpio-cells = <2>;
-		gpio-controller;
-		reg = <0x21>;
-		vcc-supply = <&reg_3p3v>;
-	};
 };
 
 &lpuart1 {
