@@ -873,7 +873,6 @@ dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-flexspi-m2.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-mqs.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-aud-hat.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-8mic-reve.dtb
-dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-root.dtb imx95-15x15-evk-inmate.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-ab2.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-i2c-spi-slave.dtb
 DTC_FLAGS_imx95-15x15-evk-boe-wxga-lvds0-panel := -@
@@ -948,10 +947,14 @@ dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-os08a20-isp-lvds-dual.dtb
 DTC_FLAGS_imx95-15x15-evk-rpmsg := -@
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-rpmsg.dtb
 
-dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk.dtb imx95-19x19-evk-root.dtb imx95-19x19-evk-inmate.dtb \
-			  imx95-19x19-evk-lpspi-slave.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk.dtb imx95-19x19-evk-lpspi-slave.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-tja1104-rgmii.dtb imx95-19x19-evk-tja1104-rmii.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-netc-rpmsg.dtb
+
+imx95-19x19-evk-root-dtbs := imx95-19x19-evk.dtb imx95-jailhouse-root.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-root.dtb imx95-19x19-evk-inmate.dtb
+imx95-15x15-evk-root-dtbs := imx95-15x15-evk.dtb imx95-jailhouse-root.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-root.dtb imx95-15x15-evk-inmate.dtb
 
 imx95-15x15-evk-ox03c10-dtbs := imx95-15x15-evk.dtb imx95-15x15-evk-ox03c10.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-ox03c10.dtb
@@ -1176,7 +1179,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-evk-rpmsg.dtb
 imx95-19x19-verdin-rm692c9-dtbs := imx95-19x19-verdin.dtb imx95-19x19-verdin-rm692c9.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-verdin-rm692c9.dtb
 
-imx95-19x19-verdin-root-dtbs := imx95-19x19-verdin.dtb imx95-19x19-verdin-root.dtbo
+imx95-19x19-verdin-root-dtbs := imx95-19x19-verdin.dtb imx95-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-verdin-root.dtb imx95-19x19-verdin-inmate.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm.dtb imx95-15x15-frdm-boe-wxga-lvds-panel.dtb
