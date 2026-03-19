@@ -129,6 +129,17 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lpi2c2>;
 	status = "okay";
+
+	i2c2_gpio_expander_20: i2c2-gpio-expander@20 {
+		compatible = "nxp,pcal6408";
+		reg = <0x20>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		vcc-supply = <&reg_3p3v>;
+		reset-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_i2c2_pcal6408>;
+	};
 };
 
 &lpi2c3 {
@@ -406,6 +417,13 @@
 			IMX95_PAD_SD1_DATA6__USDHC1_DATA6		0x13fe
 			IMX95_PAD_SD1_DATA7__USDHC1_DATA7		0x13fe
 			IMX95_PAD_SD1_STROBE__USDHC1_STROBE		0x15fe
+		>;
+	};
+
+	pinctrl_i2c2_pcal6408: i2c2pcal6408grp {
+		fsl,pins = <
+			IMX95_PAD_PDM_BIT_STREAM0__AONMIX_TOP_GPIO1_IO_BIT9		0x31e
+			IMX95_PAD_PDM_BIT_STREAM1__AONMIX_TOP_GPIO1_IO_BIT10		0x31e
 		>;
 	};
 };
