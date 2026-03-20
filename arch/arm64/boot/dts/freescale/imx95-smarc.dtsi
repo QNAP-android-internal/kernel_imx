@@ -73,6 +73,12 @@
 			reg = <0 0x88020000 0 0x100000>;
 			no-map;
 		};
+
+		neutron_mem: neutron_memory@100000000 {
+			compatible = "shared-dma-pool";
+			reusable;
+			reg = <0x1 0x00000000 0x1 0x00000000>;
+		};
 	};
 
 	reg_3p3v: regulator-3p3v {
@@ -182,6 +188,10 @@
 		reg = <1>;
 		realtek,clkout-disable;
 	};
+};
+
+&neutron {
+	memory-region = <&neutron_mem>;
 };
 
 &scmi_misc {
