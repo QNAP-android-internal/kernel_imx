@@ -223,10 +223,6 @@
 		};
 	};
 
-	rpmsg_sensor: rpmsg-sensor {
-		compatible = "nxp,rpmsg-iio-pedometer", "fsl,rpmsg-input";
-	};
-
 	rpmsg_audio: rpmsg_audio {
 		compatible = "fsl,imx7ulp-rpmsg-audio";
 		model = "wm8960-audio";
