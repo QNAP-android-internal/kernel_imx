@@ -453,26 +453,41 @@ static int imx95_ldb_probe(struct platform_device *pdev)
 		of_node_put(port1);
 		of_node_put(port2);
 
-		if (pixel_order == DRM_LVDS_DUAL_LINK_EVEN_ODD_PIXELS) {
-			dev_err(dev, "invalid dual link pixel order: %d\n", pixel_order);
+		if (pixel_order == DRM_LVDS_DUAL_LINK_ODD_EVEN_PIXELS) {
+			imx95_ldb->active_chno = 0;
+			imx95_ldb_ch = imx95_ldb->channel[0];
+			ldb_ch = &imx95_ldb_ch->base;
+			ldb_ch->link_type = LDB_CH_DUAL_LINK_ODD_EVEN_PIXELS;
+		} else if (pixel_order == -EINVAL) {
+			/*
+			 * We have to assume that we have 2 single links here because
+			 * drm_of_lvds_get_dual_link_pixel_order returns -EINVAL for
+			 * a non dual link configuration.
+			 */
+			for (i = 0; i < MAX_LDB_CHAN_NUM; i++) {
+				imx95_ldb_ch = imx95_ldb->channel[i];
+				ldb_ch = &imx95_ldb_ch->base;
+				ldb_ch->link_type = LDB_CH_SINGLE_LINK;
+			}
+		} else {
+			/*
+			 * Handle case when drm_of_lvds_get_dual_link_pixel_order
+			 * returns DRM_LVDS_DUAL_LINK_EVEN_ODD_PIXELS, -EPIPE or anything else
+			 */
+			dev_err(dev,
+				"unsupported dual link pixel order: %d\n", pixel_order);
 			return -EINVAL;
 		}
-
-		imx95_ldb->active_chno = 0;
-		imx95_ldb_ch = imx95_ldb->channel[0];
-		ldb_ch = &imx95_ldb_ch->base;
-		ldb_ch->link_type = pixel_order;
 	} else {
 		for (i = 0; i < MAX_LDB_CHAN_NUM; i++) {
 			imx95_ldb_ch = imx95_ldb->channel[i];
 			ldb_ch = &imx95_ldb_ch->base;
 
 			if (ldb_ch->is_available) {
-				imx95_ldb->active_chno = ldb_ch->chno;
+				ldb_ch->link_type = LDB_CH_SINGLE_LINK;
 				break;
 			}
 		}
-		ldb_ch->link_type = LDB_CH_SINGLE_LINK;
 	}
 
 	ret = imx95_ldb_get_phy(imx95_ldb);
