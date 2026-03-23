@@ -32,13 +32,25 @@
 
 	pca9555@21 {
 		a_ur_sw1 {
-			/delete-property/ output-low;
-			output-high;
+			status = "disabled";
 		};
 
 		b_ur_sw1 {
-			/delete-property/ output-low;
+			status = "disabled";
+		};
+
+		a_ur_sw1_hog {
+			gpio-hog;
+			gpios = <1 GPIO_ACTIVE_HIGH>;
 			output-high;
+			line-name = "A_UR_SW1";
+		};
+
+		b_ur_sw1_hog {
+			gpio-hog;
+			gpios = <4 GPIO_ACTIVE_HIGH>;
+			output-high;
+			line-name = "B_UR_SW1";
 		};
 	};
 };
