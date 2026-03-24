@@ -211,6 +211,7 @@ struct neoisp_dev_s {
 	s32 num_clks;
 	struct neoisp_job_s queued_job;
 	bool hw_busy; /* Non-zero if a job is queued or is being started */
+	u8 media_registered;
 	struct list_head job_queue;
 	/* Protects "hw_busy" flag, streaming_map and job_queue */
 	spinlock_t hw_lock;
@@ -219,7 +220,6 @@ struct neoisp_dev_s {
 	struct v4l2_subdev sd;
 	struct v4l2_ctrl_handler hdl;
 	struct v4l2_ctrl *ctrls[NEOISP_CTRLS_COUNT];
-	struct media_device mdev;
 	struct neoisp_node_s node[NEOISP_NODES_COUNT];
 	u32 streaming_map; /* Bitmap of which nodes are streaming */
 	struct media_pad pad[NEOISP_NODES_COUNT]; /* Output pads first */

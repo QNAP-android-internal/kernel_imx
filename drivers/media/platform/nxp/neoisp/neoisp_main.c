@@ -29,6 +29,7 @@
 #include <media/videobuf2-dma-contig.h>
 
 #include "neoisp.h"
+#include "neoisp_core.h"
 #include "neoisp_fmt.h"
 #include "neoisp_nodes.h"
 #include "neoisp_regs.h"
@@ -1551,31 +1552,25 @@ err_unregister_queue:
 	return ret;
 }
 
-static int neoisp_init_devices(struct neoisp_dev_s *neoispd)
+int neoisp_core_media_register(struct device *dev, struct v4l2_subdev *sd)
 {
+	struct neoisp_dev_s *neoispd = dev_get_drvdata(dev);
+	struct media_device *mdev = sd->v4l2_dev->mdev;
 	struct v4l2_device *v4l2_dev;
-	struct media_device *mdev;
 	u32 num_registered = 0;
 	int ret;
+
+	if (!neoispd)
+		return -EINVAL;
+
+	if (neoispd->media_registered)
+		return 0;
 
 	neoispd->streaming_map = 0;
 	neoispd->dummy_buf = NULL;
 
-	/* Register v4l2_device and media_device */
-	mdev = &neoispd->mdev;
-	mdev->dev = neoispd->dev;
-	strscpy(mdev->model, NEOISP_NAME, sizeof(mdev->model));
-	snprintf(mdev->bus_info, sizeof(mdev->bus_info),
-		 "platform:%s", dev_name(neoispd->dev));
-	media_device_init(mdev);
-
 	v4l2_dev = &neoispd->v4l2_dev;
-	v4l2_dev->mdev = &neoispd->mdev;
-	strscpy(v4l2_dev->name, NEOISP_NAME, sizeof(v4l2_dev->name));
-
-	ret = v4l2_device_register(mdev->dev, &neoispd->v4l2_dev);
-	if (ret)
-		goto err_media_dev_cleanup;
+	v4l2_dev->mdev = mdev;
 
 	/* Register the NEOISP subdevice. */
 	ret = neoisp_init_subdev(neoispd);
@@ -1589,37 +1584,53 @@ static int neoisp_init_devices(struct neoisp_dev_s *neoispd)
 			goto err_unregister_nodes;
 	}
 
-	ret = media_device_register(mdev);
+	ret = v4l2_device_register_subdev_nodes(v4l2_dev);
 	if (ret)
 		goto err_unregister_nodes;
 
-	ret = v4l2_device_register_subdev_nodes(&neoispd->v4l2_dev);
-	if (ret)
-		goto err_unregister_nodes;
-
-	neoispd->context = dma_alloc_coherent(mdev->dev,
-					      sizeof(struct neoisp_context_s),
-					      &neoispd->params_dma_addr, GFP_KERNEL);
-	if (!neoispd->context) {
-		dev_err(mdev->dev, "Unable to allocate cached context buffers.\n");
-		ret = -ENOMEM;
-		goto err_unregister_mdev;
-	}
+	neoispd->media_registered++;
 	return 0;
 
-err_unregister_mdev:
-	media_device_unregister(mdev);
 err_unregister_nodes:
+	media_entity_cleanup(&sd->entity);
 	while (num_registered-- > 0) {
 		video_unregister_device(&neoispd->node[num_registered].vfd);
 		vb2_queue_release(&neoispd->node[num_registered].queue);
 	}
-	v4l2_device_unregister_subdev(&neoispd->sd);
-	media_entity_cleanup(&neoispd->sd.entity);
+
 err_unregister_v4l2:
 	v4l2_device_unregister(v4l2_dev);
-err_media_dev_cleanup:
-	media_device_cleanup(mdev);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(neoisp_core_media_register);
+
+static int neoisp_init_devices(struct neoisp_dev_s *neoispd)
+{
+	struct v4l2_device *v4l2_dev;
+	int ret;
+
+	v4l2_dev = &neoispd->v4l2_dev;
+	strscpy(v4l2_dev->name, NEOISP_NAME, sizeof(v4l2_dev->name));
+
+	ret = v4l2_device_register(neoispd->dev, v4l2_dev);
+	if (ret)
+		return ret;
+
+	neoispd->streaming_map = 0;
+	neoispd->dummy_buf = NULL;
+	neoispd->context = dma_alloc_coherent(neoispd->dev,
+					      sizeof(struct neoisp_context_s),
+					      &neoispd->params_dma_addr, GFP_KERNEL);
+	if (!neoispd->context) {
+		dev_err(neoispd->dev, "Unable to allocate cached context buffers.\n");
+		ret = -ENOMEM;
+		goto err_unregister_v4l2;
+	}
+
+	return 0;
+
+err_unregister_v4l2:
+	v4l2_device_unregister(v4l2_dev);
 	return ret;
 }
 
@@ -1634,18 +1645,19 @@ static void neoisp_destroy_devices(struct neoisp_dev_s *neoispd)
 				  neoispd->params_dma_addr);
 	}
 
+	if (!neoispd->media_registered)
+		return;
+
 	dev_dbg(neoispd->dev, "Unregister from media controller\n");
 
 	v4l2_device_unregister_subdev(&neoispd->sd);
 	media_entity_cleanup(&neoispd->sd.entity);
-	media_device_unregister(&neoispd->mdev);
 
 	for (i = NEOISP_NODES_COUNT - 1; i >= 0; i--) {
 		video_unregister_device(&neoispd->node[i].vfd);
 		vb2_queue_release(&neoispd->node[i].queue);
 	}
 
-	media_device_cleanup(&neoispd->mdev);
 	v4l2_device_unregister(&neoispd->v4l2_dev);
 }
 
@@ -1728,7 +1740,7 @@ static int neoisp_probe(struct platform_device *pdev)
 
 	ret = neoisp_init_devices(neoispd);
 	if (ret)
-		goto disable_devs_err;
+		goto err_pm;
 
 	spin_lock_init(&neoispd->hw_lock);
 	neoisp_init_hw(neoispd);
@@ -1746,8 +1758,6 @@ static int neoisp_probe(struct platform_device *pdev)
 	dev_dbg(dev, "probe: done (%d) debugfs (%x)\n", ret, enable_debugfs);
 	return 0;
 
-disable_devs_err:
-	neoisp_destroy_devices(neoispd);
 err_pm:
 	pm_runtime_dont_use_autosuspend(dev);
 	pm_runtime_disable(dev);
