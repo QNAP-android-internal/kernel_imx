@@ -702,6 +702,7 @@ static int ox05b1s_s_ctrl(struct v4l2_ctrl *ctrl)
 	u32 h = sensor->mode->height;
 	int ret = 0;
 	u32 hts;
+	u32 long_exp, short_exp;
 
 	/* apply V4L2 controls values only if power is already up */
 	if (!pm_runtime_get_if_in_use(&client->dev))
@@ -735,8 +736,8 @@ static int ox05b1s_s_ctrl(struct v4l2_ctrl *ctrl)
 		ret = ret ? -EIO : 0;
 		break;
 	case V4L2_CID_EXPOSURE:
-		u32 long_exp = ctrl->val;
-		u32 short_exp = ctrl->val / OX05B1S_EXP_RATIO;
+		long_exp = ctrl->val;
+		short_exp = ctrl->val / OX05B1S_EXP_RATIO;
 
 		if (!hdr_ctrl->cur.val)
 			short_exp = 0;
