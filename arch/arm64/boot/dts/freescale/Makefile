@@ -1224,6 +1224,10 @@ dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-8mic-reve.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-frdm-pro.dtb imx95-19x19-frdm-pro-aud-hat.dtb
 
+imx95-19x19-frdm-pro-adv7535-dtbs := imx95-19x19-frdm-pro.dtb \
+				     imx95-19x19-frdm-pro-adv7535.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-frdm-pro-adv7535.dtb
+
 imx95-19x19-frdm-pro-root-dtbs := imx95-19x19-frdm-pro.dtb imx95-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-frdm-pro-root.dtb
 
