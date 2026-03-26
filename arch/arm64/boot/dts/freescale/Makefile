@@ -1222,6 +1222,17 @@ imx95-15x15-frdm-dual-os08a20-isp-dtbs := imx95-15x15-frdm.dtb \
 					  imx95-15x15-frdm-os08a20-combo.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-dual-os08a20-isp.dtb
 
+imx95-15x15-frdm-ox03c10-dtbs := imx95-15x15-frdm.dtb imx95-15x15-frdm-ox03c10.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-ox03c10.dtb
+
+imx95-15x15-frdm-ox03c10-combo-dtbs := imx95-15x15-frdm.dtb imx95-15x15-frdm-ox03c10-combo.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-ox03c10-combo.dtb
+
+imx95-15x15-frdm-ox03c10-dual-dtbs := imx95-15x15-frdm.dtb \
+				      imx95-15x15-frdm-ox03c10.dtbo \
+				      imx95-15x15-frdm-ox03c10-combo.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-ox03c10-dual.dtb
+
 imx95-15x15-frdm-lt9611uxc-dtbs := imx95-15x15-frdm.dtb \
 				   imx95-15x15-frdm-lt9611uxc.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-lt9611uxc.dtb
