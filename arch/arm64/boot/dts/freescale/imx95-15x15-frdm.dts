@@ -158,6 +158,14 @@
 		regulator-always-on;
 	};
 
+	reg_ext_12v: regulator-ext-12v {
+		compatible = "regulator-fixed";
+		regulator-max-microvolt = <12000000>;
+		regulator-min-microvolt = <12000000>;
+		regulator-name = "VCCEXT_12V";
+		vin-supply = <&reg_ext_5v>;
+	};
+
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
