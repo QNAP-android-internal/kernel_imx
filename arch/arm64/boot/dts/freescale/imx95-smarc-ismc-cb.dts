@@ -17,7 +17,6 @@
 		mmc1 = &usdhc2;
 		serial0 = &lpuart1;
 		ethernet0 = &enetc_port0;
-		ethernet1 = &enetc_port2;
 	};
 
 	chosen {
@@ -164,21 +163,6 @@
 				"IN1R", "AMIC";
 	};
 
-	reg_aqr_stby: regulator-aqr-stby {
-		compatible = "regulator-fixed";
-		regulator-name = "aqr-stby";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-	};
-
-	reg_aqr_en: regulator-aqr-en {
-		compatible = "regulator-fixed";
-		regulator-name = "aqr-en";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		vin-supply = <&reg_aqr_stby>;
-	};
-
 	reg_si5332_stby: regulator-si5332-stby {
 		compatible = "regulator-fixed";
 		regulator-name = "si5332-stby";
@@ -187,12 +171,6 @@
 		regulator-always-on;
 	};
 
-	reg_serdes_en: regulator-mac-en {
-		compatible = "regulator-fixed";
-		regulator-name = "mac-en";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-	};
 };
 
 &adc1 {
@@ -342,23 +320,6 @@
 	vmmc-supply = <&reg_usdhc2_vmmc>;
 	bus-width = <4>;
 	status = "okay";
-};
-
-&enetc_port2 {
-	phy-handle = <&ethphy2>;
-	phy-mode = "10gbase-r";
-	serdes-supply = <&reg_serdes_en>;
-	managed = "in-band-status";
-	status = "okay";
-};
-
-&netc_emdio {
-	phy-supply = <&reg_aqr_en>;
-
-	ethphy2: ethernet-phy@8 {
-		compatible = "ethernet-phy-ieee802.3-c45";
-		reg = <8>;
-	};
 };
 
 &usb2 {
