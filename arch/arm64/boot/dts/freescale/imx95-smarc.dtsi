@@ -247,9 +247,11 @@
 	pinctrl-0 = <&pinctrl_emdio>;
 	status = "okay";
 
-	ethphy0: ethernet-phy@1 {
-		reg = <1>;
-		realtek,clkout-disable;
+	ethphy0: ethernet-phy@0 {
+		reg = <0>;
+		reset-gpios = <&i2c2_gpio_expander_20 0 GPIO_ACTIVE_LOW>;
+		reset-assert-us = <35000>;
+		reset-deassert-us = <75000>;
 	};
 };
 
