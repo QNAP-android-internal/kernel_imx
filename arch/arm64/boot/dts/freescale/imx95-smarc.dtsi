@@ -215,6 +215,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lpi2c5>;
 	status = "okay";
+
+	i2c5_gpio_expander_20: i2c5-gpio-expander@20 {
+		compatible = "nxp,pcal6408";
+		reg = <0x20>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		vcc-supply = <&reg_3p3v>;
+	};
 };
 
 &lpuart1 {
