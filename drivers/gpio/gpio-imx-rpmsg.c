@@ -99,9 +99,9 @@ static struct imx_gpio_rpmsg_info gpio_rpmsg;
 
 static int gpio_send_message(struct imx_rpmsg_gpio_port *port,
 			     struct gpio_rpmsg_data *msg,
-			     struct imx_gpio_rpmsg_info *info,
-			     bool sync)
+			     struct imx_gpio_rpmsg_info *info)
 {
+	unsigned long ret;
 	int err;
 
 	if (!info->rpdev) {
@@ -122,28 +122,26 @@ static int gpio_send_message(struct imx_rpmsg_gpio_port *port,
 		goto err_out;
 	}
 
-	if (sync) {
-		err = wait_for_completion_timeout(&info->cmd_complete,
-					msecs_to_jiffies(RPMSG_TIMEOUT));
-		if (!err) {
-			dev_err(&info->rpdev->dev, "rpmsg_send timeout!\n");
-			err = -ETIMEDOUT;
-			goto err_out;
-		}
-
-		if (info->reply_msg->out.retcode != 0) {
-			dev_err(&info->rpdev->dev, "rpmsg not ack %d!\n",
-				info->reply_msg->out.retcode);
-			err = -EINVAL;
-			goto err_out;
-		}
-
-		/* copy the reply message */
-		memcpy(&port->gpio_pins[info->reply_msg->pin_idx].msg,
-		       info->reply_msg, sizeof(*info->reply_msg));
-
-		err = 0;
+	ret = wait_for_completion_timeout(&info->cmd_complete,
+				msecs_to_jiffies(RPMSG_TIMEOUT));
+	if (!ret) {
+		dev_err(&info->rpdev->dev, "rpmsg_send timeout!\n");
+		err = -ETIMEDOUT;
+		goto err_out;
 	}
+
+	if (info->reply_msg->out.retcode != 0) {
+		dev_err(&info->rpdev->dev, "rpmsg not ack %d!\n",
+			info->reply_msg->out.retcode);
+		err = -EINVAL;
+		goto err_out;
+	}
+
+	/* copy the reply message */
+	memcpy(&port->gpio_pins[info->reply_msg->pin_idx].msg,
+	       info->reply_msg, sizeof(*info->reply_msg));
+
+	err = 0;
 
 err_out:
 	cpu_latency_qos_remove_request(&info->pm_qos_req);
@@ -198,7 +196,7 @@ static int imx_rpmsg_gpio_get(struct gpio_chip *gc, unsigned int gpio)
 	msg->pin_idx = gpio;
 	msg->port_idx = port->idx;
 
-	ret = gpio_send_message(port, msg, &gpio_rpmsg, true);
+	ret = gpio_send_message(port, msg, &gpio_rpmsg);
 	if (!ret)
 		ret = !!port->gpio_pins[gpio].msg.in.value;
 
@@ -228,7 +226,7 @@ static int imx_rpmsg_gpio_direction_input(struct gpio_chip *gc,
 	msg->out.event = GPIO_RPMSG_TRI_IGNORE;
 	msg->in.wakeup = 0;
 
-	ret = gpio_send_message(port, msg, &gpio_rpmsg, true);
+	ret = gpio_send_message(port, msg, &gpio_rpmsg);
 
 	mutex_unlock(&gpio_rpmsg.lock);
 
@@ -260,7 +258,7 @@ static int imx_rpmsg_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
 
 	msg = gpio_get_pin_msg(port, gpio);
 	imx_rpmsg_gpio_direction_output_init(gc, gpio, val, msg);
-	ret = gpio_send_message(port, msg, &gpio_rpmsg, true);
+	ret = gpio_send_message(port, msg, &gpio_rpmsg);
 
 	mutex_unlock(&gpio_rpmsg.lock);
 
@@ -278,7 +276,7 @@ static int imx_rpmsg_gpio_direction_output(struct gpio_chip *gc,
 
 	msg = gpio_get_pin_msg(port, gpio);
 	imx_rpmsg_gpio_direction_output_init(gc, gpio, val, msg);
-	ret = gpio_send_message(port, msg, &gpio_rpmsg, true);
+	ret = gpio_send_message(port, msg, &gpio_rpmsg);
 
 	mutex_unlock(&gpio_rpmsg.lock);
 
@@ -420,7 +418,7 @@ static void imx_rpmsg_irq_bus_sync_unlock(struct irq_data *d)
 			msg->in.wakeup = port->gpio_pins[gpio_idx].irq_wake_enable;
 	}
 
-	gpio_send_message(port, msg, &gpio_rpmsg, false);
+	gpio_send_message(port, msg, &gpio_rpmsg);
 	mutex_unlock(&gpio_rpmsg.lock);
 }
 
