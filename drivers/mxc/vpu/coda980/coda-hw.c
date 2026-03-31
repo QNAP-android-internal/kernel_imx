@@ -1766,6 +1766,7 @@ int coda_hw_enc_get_result(struct vpu_instance *inst, struct coda_enc_output_inf
 	info->bitstream_wrap_around = vpu_read_reg(vpu->dev, RET_ENC_PIC_FLAG);
 	info->recon_frame_index = vpu_read_reg(vpu->dev, RET_ENC_PIC_FRAME_IDX);
 	info->frame_cycle = vpu_read_reg(vpu->dev, BIT_FRAME_CYCLE);
+	info->avg_ctu_qp = vpu_read_reg(vpu->dev, RET_ENC_PIC_AVG_QP);
 	info->enc_src_idx = p_enc_info->src_index;
 	info->bitstream_buf = p_enc_info->stream_rd_ptr;
 	info->bitstream_buf_size = p_enc_info->stream_wr_ptr - p_enc_info->stream_rd_ptr;

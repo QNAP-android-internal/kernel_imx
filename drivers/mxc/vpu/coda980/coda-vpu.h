@@ -21,6 +21,7 @@
 struct vpu_buffer {
 	struct v4l2_m2m_buffer v4l2_m2m_buf;
 	bool consumed;
+	u32 average_qp;
 };
 
 enum vpu_fmt_type {

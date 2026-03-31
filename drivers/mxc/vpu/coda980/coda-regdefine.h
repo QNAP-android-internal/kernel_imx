@@ -244,6 +244,7 @@ enum coda_param_change_enable {
 #define RET_ENC_PIC_SLICE_NUM           (BIT_BASE + 0x1CC)
 #define RET_ENC_PIC_FLAG                (BIT_BASE + 0x1D0)
 #define RET_ENC_PIC_SUCCESS             (BIT_BASE + 0x1D8)
+#define RET_ENC_PIC_AVG_QP              (BIT_BASE + 0x1DC)
 
 /************************************************************/
 /* ENCODER - PARAM_CHANGE                                   */

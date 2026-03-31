@@ -370,6 +370,7 @@ struct coda_enc_output_info {
 	u32 num_of_slice;
 	u32 bitstream_wrap_around;
 	u32 encoding_success;
+	u32 avg_ctu_qp;
 	struct coda_enc_report_info mb_info;
 	struct coda_enc_report_info mv_info;
 	struct coda_enc_report_info slice_info;
