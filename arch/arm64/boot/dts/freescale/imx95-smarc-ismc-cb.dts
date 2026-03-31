@@ -117,23 +117,6 @@
 		enable-active-low;
 	};
 
-	sound-wm8962 {
-		compatible = "fsl,imx-audio-wm8962";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_hp>;
-		model = "wm8962-audio";
-		audio-cpu = <&sai3>;
-		audio-codec = <&wm8962>;
-		hp-det-gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
-		audio-routing = "Headphone Jack", "HPOUTL",
-				"Headphone Jack", "HPOUTR",
-				"Ext Spk", "SPKOUTL",
-				"Ext Spk", "SPKOUTR",
-				"AMIC", "MICBIAS",
-				"IN3R", "AMIC",
-				"IN1R", "AMIC";
-	};
-
 	reg_si5332_stby: regulator-si5332-stby {
 		compatible = "regulator-fixed";
 		regulator-name = "si5332-stby";
@@ -178,35 +161,6 @@
 			linux,default-trigger = "none";
 		};
 	};
-};
-
-&lpi2c4 {
-	clock-frequency = <400000>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_lpi2c4>;
-	status = "okay";
-
-	wm8962: audio-codec@1a {
-		compatible = "wlf,wm8962";
-		reg = <0x1a>;
-		clocks = <&scmi_clk IMX95_CLK_SAI3>;
-		DCVDD-supply = <&reg_audio_pwr>;
-		DBVDD-supply = <&reg_audio_pwr>;
-		AVDD-supply = <&reg_audio_pwr>;
-		CPVDD-supply = <&reg_audio_pwr>;
-		MICVDD-supply = <&reg_audio_pwr>;
-		PLLVDD-supply = <&reg_audio_pwr>;
-		SPKVDD1-supply = <&reg_audio_pwr>;
-		SPKVDD2-supply = <&reg_audio_pwr>;
-		gpio-cfg = < 0x0000 /* 0:Default */
-			     0x0000 /* 1:Default */
-			     0x0000 /* 2:FN_DMICCLK */
-			     0x0000 /* 3:Default */
-			     0x0000 /* 4:FN_DMICCDAT */
-			     0x0000 /* 5:Default */
-			   >;
-	};
-
 };
 
 &lpi2c6 {
@@ -303,12 +257,6 @@
 };
 
 &scmi_iomuxc {
-	pinctrl_hp: hpgrp {
-		fsl,pins = <
-			IMX95_PAD_GPIO_IO11__GPIO2_IO_BIT11		0x31e
-		>;
-	};
-
 	pinctrl_lpuart5: lpuart5grp {
 		fsl,pins = <
 			IMX95_PAD_GPIO_IO00__LPUART5_TX		0x31e
@@ -357,13 +305,6 @@
 		fsl,pins = <
 			IMX95_PAD_I2C1_SCL__AONMIX_TOP_LPI2C1_SCL	0x40000b9e
 			IMX95_PAD_I2C1_SDA__AONMIX_TOP_LPI2C1_SDA	0x40000b9e
-		>;
-	};
-
-	pinctrl_lpi2c4: lpi2c4grp {
-		fsl,pins = <
-			IMX95_PAD_GPIO_IO30__LPI2C4_SDA			0x40000b9e
-			IMX95_PAD_GPIO_IO31__LPI2C4_SCL			0x40000b9e
 		>;
 	};
 
@@ -466,13 +407,6 @@
 	pinctrl_mipi_dsi_csi: mipidsigrp {
 		fsl,pins = <
 			IMX95_PAD_CCM_CLKO2__GPIO3_IO_BIT27			0x31e
-		>;
-	};
-
-	pinctrl_spdif: spdifgrp {
-		fsl,pins = <
-			IMX95_PAD_GPIO_IO22__SPDIF_IN				0x31e
-			IMX95_PAD_GPIO_IO23__SPDIF_OUT				0x31e
 		>;
 	};
 
