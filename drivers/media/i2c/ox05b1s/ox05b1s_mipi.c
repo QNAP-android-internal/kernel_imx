@@ -1139,7 +1139,7 @@ static int ox05b1s_s_stream(struct v4l2_subdev *sd, int enable)
 		pm_runtime_put_autosuspend(&client->dev);
 	}
 
-	return 0;
+	return ret;
 }
 
 static void ox05b1s_update_pad_format(const struct ox05b1s_mode *mode,
