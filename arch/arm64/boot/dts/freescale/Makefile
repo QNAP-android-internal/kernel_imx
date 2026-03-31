@@ -1430,6 +1430,28 @@ imx952-evk-it6263-lvds0-ox03c10-csi0-dtbs := imx952-evk.dtb \
 					     imx952-evk-ox03c10-csi0.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0-ox03c10-csi0.dtb
 
+imx952-evk-ox05b1s-csi0-2lanes-dtbs := imx952-evk.dtb imx952-evk-ox05b1s-csi0-2lanes.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0-ox05b1s-csi0-2lanes.dtb
+
+imx952-evk-it6263-lvds0-ox05b1s-csi0-2lanes-dtbs := imx952-evk.dtb \
+						    imx952-evk-it6263-lvds0.dtbo \
+						    imx952-evk-ox05b1s-csi0-2lanes.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0-ox05b1s-csi0-2lanes.dtb
+
+imx952-evk-ox05b1s-csi1-2lanes-dtbs := imx952-evk.dtb imx952-evk-ox05b1s-csi1-2lanes.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0-ox05b1s-csi1-2lanes.dtb
+
+imx952-evk-it6263-lvds0-ox05b1s-csi1-2lanes-dtbs := imx952-evk.dtb \
+						    imx952-evk-it6263-lvds0.dtbo \
+						    imx952-evk-ox05b1s-csi1-2lanes.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0-ox05b1s-csi1-2lanes.dtb
+
+imx952-evk-it6263-lvds0-ox05b1s-dual-dtbs := imx952-evk.dtb \
+					     imx952-evk-it6263-lvds0.dtbo \
+					     imx952-evk-ox05b1s-csi0-2lanes.dtbo \
+					     imx952-evk-ox05b1s-csi1-2lanes.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx952-evk-it6263-lvds0-ox05b1s-dual.dtb
+
 imx8mm-kontron-dl-dtbs			:= imx8mm-kontron-bl.dtb imx8mm-kontron-dl.dtbo
 imx8mm-kontron-bl-lte-dtbs		:= imx8mm-kontron-bl.dtb imx8mm-kontron-bl-lte.dtbo
 
