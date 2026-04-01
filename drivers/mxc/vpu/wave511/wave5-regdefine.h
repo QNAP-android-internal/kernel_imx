@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - wave5 register definitions
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #ifndef __WAVE5_REGISTER_DEFINE_H__

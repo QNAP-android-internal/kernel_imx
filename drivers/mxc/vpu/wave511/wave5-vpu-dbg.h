@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause) */
 /*
- * Wave5 series multi-standard codec IP - decoder interface
+ * Wave5 series multi-standard codec IP - debug interface
  *
- * Copyright (C) 2025-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #ifndef __WAVE5_VPU_DBG_H__

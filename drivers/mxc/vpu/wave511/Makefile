@@ -14,5 +14,5 @@ wave5-ctrl-objs := wave5-vpu-ctrl.o \
 obj-$(CONFIG_MXC_VIDEO_WAVE511_CTRL) += wave5-ctrl.o
 obj-$(CONFIG_MXC_VIDEO_WAVE511) += wave5.o
 
-EXTRA_CFLAGS += -Wframe-larger-than=1024
-# EXTRA_CFLAGS += -Wstack-usage=256
+ccflags-y += "-Wframe-larger-than=1024"
+#ccflags-y += "-Wstack-usage=256"

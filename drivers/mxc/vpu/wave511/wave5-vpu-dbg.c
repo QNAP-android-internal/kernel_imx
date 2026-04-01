@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
 /*
- * Wave5 series multi-standard codec IP - decoder interface
+ * Wave5 series multi-standard codec IP - debug interface
  *
- * Copyright (C) 2025-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #include <linux/types.h>
@@ -33,7 +33,8 @@ static int wave5_vpu_dbg_instance(struct seq_file *s, void *data)
 	if (seq_write(s, str, num))
 		return 0;
 
-	num = scnprintf(str, sizeof(str), "state = %s\n", state_to_str(inst->state));
+	num = scnprintf(str, sizeof(str), "state = %s (%d)\n",
+			state_to_str(inst->state), inst->state);
 	if (seq_write(s, str, num))
 		return 0;
 
@@ -89,14 +90,14 @@ static int wave5_vpu_dbg_instance(struct seq_file *s, void *data)
 	}
 
 	num = scnprintf(str, sizeof(str),
-			"src %d, dst %d, dec %d, proc %d, disp %d, sequence %d, skip %d, err %d\n",
+			"src %d, dst %d, decode %d, process %d, display %d, sequence %d, skip %d, err %d\n",
 			inst->queued_src_buf_num,
 			inst->queued_dst_buf_num,
 			inst->total_dec_cnt,
 			inst->processed_buf_num,
 			inst->displayed_buf_num,
 			inst->sequence,
-			inst->skiped_frame_num,
+			inst->skipped_frame_num,
 			inst->error_frame_num);
 	if (seq_write(s, str, num))
 		return 0;

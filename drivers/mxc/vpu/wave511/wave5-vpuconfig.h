@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - product config definitions
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #ifndef _VPU_CONFIG_H_
@@ -55,6 +55,7 @@
 #define VPU_DEC_TIMEOUT_MS		300
 #define VPU_DEC_TIMEOUT_US		(VPU_DEC_TIMEOUT_MS * USEC_PER_MSEC)
 #define VPU_RETRY_DELAY_US		1000
+#define VPU_RETRY_DELAY_US_MAX		1200
 
 /************************************************************************/
 /* VPU COMMON MEMORY                                                    */

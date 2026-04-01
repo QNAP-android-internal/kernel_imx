@@ -2,13 +2,14 @@
 /*
  * Wave5 series multi-standard codec IP - helper definitions
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #ifndef VPUAPI_H_INCLUDED
 #define VPUAPI_H_INCLUDED
 
 #include <linux/idr.h>
+#include <linux/kfifo.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-mem2mem.h>
 #include <media/v4l2-ctrls.h>
@@ -39,6 +40,8 @@ enum vpu_instance_state {
 	VPU_INST_STATE_STOP = 4,
 	VPU_INST_STATE_ERROR = 5
 };
+
+#define VPU_INST_STATE_ALL	GENMASK(VPU_INST_STATE_ERROR, VPU_INST_STATE_NONE)
 
 /* Maximum available on hardware. */
 #define WAVE5_MAX_FBS 31
@@ -75,6 +78,12 @@ enum wave_std {
 #define HEVC_PROFILE_STILLPICTURE 3
 #define HEVC_PROFILE_MAIN10_STILLPICTURE 2
 
+/* AVC */
+#define AVC_PROFILE_BP 66
+#define AVC_PROFILE_MP 77
+#define AVC_PROFILE_HP 100
+#define AVC_PROFILE_HP10 110
+
 /************************************************************************/
 /* error codes */
 /************************************************************************/
@@ -95,7 +104,7 @@ enum wave_std {
 
 #define BUFFER_MARGIN				4096
 
-#define MAX_FIRMWARE_CALL_RETRY			10
+#define MAX_FIRMWARE_CALL_RETRY			100
 
 /*
  * Parameters of DEC_SET_SEQ_CHANGE_MASK
@@ -109,20 +118,17 @@ enum wave_std {
 #define SEQ_CHANGE_ENABLE_VIDEO_SIGNAL BIT(23)
 #define SEQ_CHANGE_ENABLE_VUI_TIMING_INFO BIT(29)
 
-#define SEQ_CHANGE_ENABLE_ALL_HEVC (SEQ_CHANGE_ENABLE_PROFILE | \
-		SEQ_CHANGE_ENABLE_SIZE | \
-		SEQ_CHANGE_ENABLE_CONF_WIN_OFFSET | \
-		SEQ_CHANGE_ENABLE_BITDEPTH | \
-		SEQ_CHANGE_ENABLE_DPB_COUNT | \
-		SEQ_CHANGE_ENABLE_VIDEO_SIGNAL)
+#define SEQ_CHANGE_ENABLE_ALL		(SEQ_CHANGE_ENABLE_SIZE | \
+					 SEQ_CHANGE_ENABLE_CONF_WIN_OFFSET | \
+					 SEQ_CHANGE_ENABLE_BITDEPTH | \
+					 SEQ_CHANGE_ENABLE_DPB_COUNT | \
+					 SEQ_CHANGE_ENABLE_VIDEO_SIGNAL)
 
-#define SEQ_CHANGE_ENABLE_ALL_AVC (SEQ_CHANGE_ENABLE_SIZE | \
-		SEQ_CHANGE_ENABLE_CONF_WIN_OFFSET | \
-		SEQ_CHANGE_ENABLE_BITDEPTH | \
-		SEQ_CHANGE_ENABLE_DPB_COUNT | \
-		SEQ_CHANGE_ENABLE_ASPECT_RATIO | \
-		SEQ_CHANGE_ENABLE_VIDEO_SIGNAL | \
-		SEQ_CHANGE_ENABLE_VUI_TIMING_INFO)
+#define SEQ_CHANGE_ENABLE_ALL_HEVC	(SEQ_CHANGE_ENABLE_ALL)
+#define SEQ_CHANGE_ENABLE_ALL_AVC	(SEQ_CHANGE_ENABLE_ALL)
+
+#define SEQ_CHANGE_WITHOUT_REALLOCATION (SEQ_CHANGE_ENABLE_VIDEO_SIGNAL | \
+					 SEQ_CHANGE_ENABLE_CONF_WIN_OFFSET)
 
 #define DISPLAY_IDX_FLAG_SEQ_END -1
 #define DISPLAY_IDX_FLAG_NO_FB -3
@@ -133,6 +139,13 @@ enum codec_command {
 	DEC_GET_QUEUE_STATUS,
 	DEC_RESET_FRAMEBUF_INFO,
 	DEC_GET_SEQ_INFO,
+};
+
+enum chroma_format_idc {
+	C_FMT_IDC_YUV400,
+	C_FMT_IDC_YUV420,
+	C_FMT_IDC_YUV422,
+	C_FMT_IDC_YUV444,
 };
 
 enum frame_buffer_format {
@@ -302,8 +315,10 @@ struct dec_initial_info {
 	u32 reorder_delay;
 
 	u32 profile;
+	u32 hevc_vps_extension_flag: 1;
 	u32 luma_bitdepth; /* bit-depth of the luma sample */
 	u32 chroma_bitdepth; /* bit-depth of the chroma sample */
+	enum chroma_format_idc c_fmt_idc;
 	u32 err_reason;
 	u32 warn_info;
 	dma_addr_t rd_ptr; /* read pointer of bitstream buffer */
@@ -433,6 +448,12 @@ struct dec_info {
 	u32 stream_endflag: 1;
 };
 
+struct vpu_irq_status {
+	u32 reason;
+	u32 cmd_done;
+	u32 seq_done;
+};
+
 struct vpu_device {
 	struct device *dev;
 	struct v4l2_device v4l2_dev;
@@ -461,8 +482,9 @@ struct vpu_device {
 	int vpu_poll_interval;
 	int num_clks;
 	struct reset_control *resets;
-
 	struct dentry *debugfs;
+	struct kfifo irq_fifo;
+	spinlock_t irq_lock; /* lock irq fifo access */
 };
 
 struct vpu_instance;
@@ -492,7 +514,6 @@ struct vpu_instance {
 	struct completion irq_done;
 	bool enable;
 	atomic_t refcount;
-	wait_queue_head_t wq_irq;
 
 	struct v4l2_pix_format_mplane src_fmt;
 	struct v4l2_pix_format_mplane dst_fmt;
@@ -512,7 +533,6 @@ struct vpu_instance {
 		struct dec_info dec_info;
 	} *codec_info;
 	unsigned long disp_buf_mask;
-	unsigned long disp_buf_seek;
 	unsigned long avail_dst_bufs;
 	struct frame_buffer frame_buf[WAVE5_MAX_FBS];
 	struct vpu_buf frame_vbuf[WAVE5_MAX_FBS];
@@ -541,15 +561,20 @@ struct vpu_instance {
 	struct vb2_v4l2_buffer *next_frame;
 	bool retry_flag;
 
-	u32 skiped_frame_num;
+	u32 skipped_frame_num;
 	u32 error_frame_num;
 	u32 processed_buf_num;
 	u32 displayed_buf_num;
 	u32 total_dec_cnt;
 	u32 drain_dec_cnt;
 	struct vpu_performance_info performance;
-
 	struct dentry *debugfs;
+};
+
+struct vpu_state_trans_element {
+	unsigned long cur_state_mask;
+	enum vpu_instance_state next_state;
+	void (*set_state_func)(struct vpu_instance *inst);
 };
 
 void wave5_vdi_write_register(struct vpu_device *vpu_dev, u32 addr, u32 data);
@@ -561,6 +586,8 @@ int wave5_vpu_dec_open(struct vpu_instance *inst, struct dec_open_param *open_pa
 int wave5_vpu_dec_close(struct vpu_instance *inst, u32 *fail_res);
 int wave5_vpu_dec_issue_seq_init(struct vpu_instance *inst);
 int wave5_vpu_dec_complete_seq_init(struct vpu_instance *inst, struct dec_initial_info *info);
+int wave5_vpu_dec_allocate_fbc_buffer(struct vpu_instance *inst, int index);
+int wave5_vpu_dec_allocate_aux_buffer(struct vpu_instance *inst, int index);
 void wave5_vpu_dec_fill_linear_frame(struct vpu_instance *inst,
 				     struct frame_buffer *frame, struct vb2_buffer *vb);
 int wave5_vpu_dec_register_frame_buffer_ex(struct vpu_instance *inst, int num_of_decoding_fbs,

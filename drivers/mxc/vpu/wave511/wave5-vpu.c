@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - platform driver
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -49,19 +49,17 @@ int wave5_vpu_wait_interrupt(struct vpu_instance *inst, unsigned int timeout)
 	if (!ret)
 		return -ETIMEDOUT;
 
+	reinit_completion(&inst->irq_done);
+
 	return 0;
 }
 
 void wave5_vpu_enable_instance(struct vpu_instance *inst)
 {
-	struct vpu_device *vpu;
-
 	if (!inst)
 		return;
 
-	vpu = inst->dev;
-	scoped_guard(spinlock, &vpu->inst_lock) {
-		init_waitqueue_head(&inst->wq_irq);
+	scoped_guard(spinlock_irqsave, &inst->dev->inst_lock) {
 		atomic_set(&inst->refcount, 0);
 		inst->enable = true;
 	}
@@ -69,30 +67,35 @@ void wave5_vpu_enable_instance(struct vpu_instance *inst)
 
 void wave5_vpu_disable_instance(struct vpu_instance *inst)
 {
-	struct vpu_device *vpu;
+	int count;
+	int ret;
 
 	if (!inst)
 		return;
 
-	vpu = inst->dev;
-	scoped_guard(spinlock, &vpu->inst_lock)
+	scoped_guard(spinlock_irqsave, &inst->dev->inst_lock)
 		inst->enable = false;
 
-	wait_event(inst->wq_irq, !atomic_read(&inst->refcount));
+	ret = read_poll_timeout(atomic_read, count, !count,
+				VPU_POLL_CHECK_INTERVAL, VPU_BUSY_CHECK_TIMEOUT,
+				false, &inst->refcount);
+	if (ret)
+		dev_err(inst->dev->dev, "disable instance[%d] timeout\n", inst->id);
 }
 
 static struct vpu_instance *wave5_vpu_get_instance(struct vpu_device *dev, u32 mask)
 {
-	struct vpu_instance *inst = NULL;
+	struct vpu_instance *inst;
 
 	if (!mask)
 		return NULL;
 
-	scoped_guard(spinlock, &dev->inst_lock) {
+	scoped_guard(spinlock_irqsave, &dev->inst_lock) {
 		list_for_each_entry(inst, &dev->instances, list) {
 			if (mask & BIT(inst->id)) {
 				if (!inst->enable)
 					return NULL;
+
 				atomic_inc(&inst->refcount);
 				return inst;
 			}
@@ -104,16 +107,97 @@ static struct vpu_instance *wave5_vpu_get_instance(struct vpu_device *dev, u32 m
 
 static void wave5_vpu_put_instance(struct vpu_instance *inst)
 {
-	struct vpu_device *vpu;
-
 	if (!inst)
 		return;
 
-	vpu = inst->dev;
-	scoped_guard(spinlock, &vpu->inst_lock) {
-		if (atomic_dec_and_test(&inst->refcount))
-			wake_up_all(&inst->wq_irq);
+	scoped_guard(spinlock_irqsave, &inst->dev->inst_lock)
+		atomic_dec_if_positive(&inst->refcount);
+}
+
+static irqreturn_t wave5_vpu_irq(int irq, void *dev_id)
+{
+	struct vpu_device *dev = dev_id;
+	struct vpu_irq_status status;
+	struct vpu_instance *inst;
+	int i;
+
+	if (!wave5_vdi_read_register(dev, W5_VPU_VPU_INT_STS))
+		return IRQ_NONE;
+
+	status.reason = wave5_vdi_read_register(dev, W5_VPU_VINT_REASON);
+	status.cmd_done = wave5_vdi_read_register(dev, W5_RET_QUEUE_CMD_DONE_INST);
+	status.seq_done = wave5_vdi_read_register(dev, W5_RET_SEQ_DONE_INSTANCE_INFO);
+
+	wave5_vdi_write_register(dev, W5_VPU_VINT_REASON_CLR, status.reason);
+	wave5_vdi_write_register(dev, W5_VPU_VINT_CLEAR, 0x1);
+	wave5_vpu_clear_interrupt(dev, status.reason);
+
+	dev_dbg(dev->dev, "%s: reason 0x%x, cmd_done 0x%x, seq_done 0x%x\n",
+		__func__, status.reason, status.cmd_done, status.seq_done);
+
+	if (status.reason & BIT(INT_WAVE5_REQ_WORK_BUF)) {
+		if (dev->ctrl)
+			wave5_vpu_ctrl_require_buffer(dev->ctrl, &dev->entity);
+
+		status.reason &= ~BIT(INT_WAVE5_REQ_WORK_BUF);
 	}
+
+	if (status.reason & BIT(INT_WAVE5_INIT_SEQ)) {
+		unsigned long seq_mask = status.seq_done;
+
+		if (dev->product_code == WAVE515_CODE)
+			seq_mask = status.cmd_done;
+
+		for_each_set_bit(i, &seq_mask, MAX_NUM_INSTANCE) {
+			inst = wave5_vpu_get_instance(dev, BIT(i));
+			if (inst) {
+				complete(&inst->irq_done);
+				wave5_vpu_put_instance(inst);
+
+				if (dev->product_code == WAVE515_CODE)
+					status.cmd_done &= ~BIT(i);
+			}
+		}
+
+		status.reason &= ~BIT(INT_WAVE5_INIT_SEQ);
+	}
+
+	if (status.reason) {
+		if (!kfifo_in_spinlocked_noirqsave(&dev->irq_fifo,
+						   &status,
+						   sizeof(status),
+						   &dev->irq_lock))
+			dev_warn(dev->dev, "IRQ fifo full, interrupt may be lost\n");
+
+		return IRQ_WAKE_THREAD;
+	}
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t wave5_vpu_irq_thread(int irq, void *dev_id)
+{
+	struct vpu_device *dev = dev_id;
+	struct vpu_irq_status status;
+	struct vpu_instance *inst;
+	int i;
+
+	while (kfifo_out_spinlocked(&dev->irq_fifo, &status, sizeof(status),
+				    &dev->irq_lock)) {
+		if (status.reason & BIT(INT_WAVE5_DEC_PIC)) {
+			unsigned long cmd_mask = status.cmd_done;
+
+			for_each_set_bit(i, &cmd_mask, MAX_NUM_INSTANCE) {
+				inst = wave5_vpu_get_instance(dev, BIT(i));
+				if (inst) {
+					inst->ops->finish_process(inst);
+					wave5_vpu_put_instance(inst);
+				}
+			}
+		}
+	}
+
+	return IRQ_HANDLED;
 }
 
 static void wave5_vpu_handle_irq(void *dev_id)
@@ -164,37 +248,17 @@ static void wave5_vpu_handle_irq(void *dev_id)
 			inst = wave5_vpu_get_instance(dev, mask & cmd_done);
 			if (inst) {
 				cmd_done &= ~mask;
-				wave5_vdi_write_register(dev, W5_RET_QUEUE_CMD_DONE_INST, cmd_done);
+				wave5_vdi_write_register(dev, W5_RET_QUEUE_CMD_DONE_INST,
+							 cmd_done);
 				inst->ops->finish_process(inst);
 				wave5_vpu_put_instance(inst);
 			}
 		}
 	}
 
-	if (cmd_done || seq_done)
-		dev_dbg(dev->dev, "irq 0x%x, remain seq_done 0x%x, cmd_done 0x%x unhandled\n",
-			irq_reason, seq_done, cmd_done);
-
 	wave5_vdi_write_register(dev, W5_VPU_VINT_REASON_CLR, irq_reason);
 	wave5_vdi_write_register(dev, W5_VPU_VINT_CLEAR, 0x1);
 	wave5_vpu_clear_interrupt(dev, irq_reason);
-}
-
-static irqreturn_t wave5_vpu_irq_thread(int irq, void *dev_id)
-{
-	struct vpu_device *dev = dev_id;
-	int ret;
-
-	ret = pm_runtime_resume_and_get(dev->dev);
-	if (ret)
-		return IRQ_NONE;
-
-	if (wave5_vdi_read_register(dev, W5_VPU_VPU_INT_STS))
-		wave5_vpu_handle_irq(dev);
-
-	pm_runtime_put_sync(dev->dev);
-
-	return IRQ_HANDLED;
 }
 
 static void wave5_vpu_irq_work_fn(struct kthread_work *work)
@@ -234,12 +298,10 @@ static void wave5_vpu_on_boot(struct device *dev)
 {
 	struct vpu_device *vpu_dev = dev_get_drvdata(dev);
 	struct vpu_attr *p_attr = &vpu_dev->attr;
-	unsigned int product_code;
-	unsigned int product_id;
 	u32 revision;
+	unsigned int product_id;
 	int ret;
 
-	product_code = vpu_dev->product_code;
 	vpu_dev->product_code = wave5_vdi_read_register(vpu_dev, W5_VPU_RET_PRODUCT_VERSION);
 	vpu_dev->product = wave5_vpu_get_product_id(vpu_dev);
 
@@ -249,13 +311,12 @@ static void wave5_vpu_on_boot(struct device *dev)
 		return;
 	}
 
-	if (vpu_dev->product_code != product_code)
-		dev_info(dev, "enum product_id: %08x, fw version: %d.%d.%d(r%u)\n",
-			 product_id,
-			 (p_attr->fw_api_version >> 24) & 0xFF,
-			 (p_attr->fw_api_version >> 16) & 0xFF,
-			 (p_attr->fw_api_version >> 0) & 0xFFFF,
-			 revision);
+	dev_dbg(dev, "%s: enum product_id: %08x, fw version: %d.%d.%d(r%u)\n",
+		__func__, product_id,
+		(p_attr->fw_api_version >> 24) & 0xFF,
+		(p_attr->fw_api_version >> 16) & 0xFF,
+		(p_attr->fw_api_version >> 0) & 0xFFFF,
+		revision);
 
 	if (vpu_dev->res->compatible_fw_api_version > p_attr->fw_api_version)
 		dev_err(dev, "compatible fw version is v%d.%d.%d or higher, but only v%d.%d.%d\n",
@@ -319,9 +380,9 @@ static bool wave5_vpu_cq_is_empty(struct vpu_device *vpu_dev)
 {
 	struct vpu_instance *inst;
 
-	scoped_guard(spinlock, &vpu_dev->inst_lock) {
+	scoped_guard(spinlock_irqsave, &vpu_dev->inst_lock) {
 		list_for_each_entry(inst, &vpu_dev->instances, list) {
-			if (!wave5_vpu_dec_is_cq_done(inst))
+			if (atomic_read(&inst->queued_dec_cmd) && !inst->dynamic_source_change)
 				return false;
 		}
 	}
@@ -435,6 +496,15 @@ static int wave5_vpu_probe(struct platform_device *pdev)
 	}
 	dev->num_clks = ret;
 
+	spin_lock_init(&dev->irq_lock);
+	ret = kfifo_alloc(&dev->irq_fifo,
+			  MAX_NUM_INSTANCE * sizeof(struct vpu_irq_status),
+			  GFP_KERNEL);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to allocate IRQ fifo\n");
+		goto err_reset_assert;
+	}
+
 	dev->irq = platform_get_irq(pdev, 0);
 	if (dev->irq < 0) {
 		dev_err(&pdev->dev, "failed to get irq resource, falling back to polling\n");
@@ -444,16 +514,18 @@ static int wave5_vpu_probe(struct platform_device *pdev)
 		if (IS_ERR(dev->worker)) {
 			dev_err(&pdev->dev, "failed to create vpu irq worker\n");
 			ret = PTR_ERR(dev->worker);
-			goto err_reset_assert;
+			goto err_irq_fifo_free;
 		}
 		dev->vpu_poll_interval = vpu_poll_interval;
 		kthread_init_work(&dev->work, wave5_vpu_irq_work_fn);
 	} else {
-		ret = devm_request_threaded_irq(&pdev->dev, dev->irq, NULL,
-						wave5_vpu_irq_thread, IRQF_ONESHOT, "vpu_irq", dev);
+		ret = devm_request_threaded_irq(&pdev->dev, dev->irq,
+						wave5_vpu_irq,
+						wave5_vpu_irq_thread,
+						0, "vpu_irq", dev);
 		if (ret) {
 			dev_err(&pdev->dev, "Register interrupt handler, fail: %d\n", ret);
-			goto err_reset_assert;
+			goto err_irq_fifo_free;
 		}
 	}
 
@@ -461,7 +533,7 @@ static int wave5_vpu_probe(struct platform_device *pdev)
 	ret = wave5_vdi_allocate_dma_memory(&pdev->dev, &dev->temp_vbuf);
 	if (ret) {
 		dev_err(&pdev->dev, "alloc temp of size %zu failed\n", dev->temp_vbuf.size);
-		goto err_reset_assert;
+		goto err_irq_fifo_free;
 	}
 
 	INIT_LIST_HEAD(&dev->instances);
@@ -503,6 +575,8 @@ err_v4l2_unregister:
 	v4l2_device_unregister(&dev->v4l2_dev);
 err_temp_vbuf_free:
 	wave5_vdi_free_dma_memory(&dev->temp_vbuf);
+err_irq_fifo_free:
+	kfifo_free(&dev->irq_fifo);
 err_reset_assert:
 	reset_control_assert(dev->resets);
 
@@ -526,6 +600,7 @@ static void wave5_vpu_remove(struct platform_device *pdev)
 
 	mutex_destroy(&dev->dev_lock);
 	mutex_destroy(&dev->hw_lock);
+	kfifo_free(&dev->irq_fifo);
 	reset_control_assert(dev->resets);
 	wave5_vpu_dec_unregister_device(dev);
 	v4l2_device_unregister(&dev->v4l2_dev);
@@ -601,6 +676,7 @@ static int wave5_vpu_resume(struct device *dev)
 		return ret;
 
 	v4l2_m2m_resume(vpu_dev->v4l2_m2m_dec_dev);
+
 	return 0;
 }
 #endif

@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - decoder interface
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #include <linux/pm_runtime.h>
@@ -23,6 +23,8 @@ const char *state_to_str(enum vpu_instance_state state)
 		return "PIC_RUN";
 	case VPU_INST_STATE_STOP:
 		return "STOP";
+	case VPU_INST_STATE_ERROR:
+		return "ERROR";
 	default:
 		return "UNKNOWN";
 	}
@@ -122,6 +124,10 @@ void wave5_update_output_format_info(struct vpu_instance *inst)
 		inst->cbcr_interleave = false;
 		inst->nv21 = false;
 		inst->output_format = FORMAT_422;
+	} else if (inst->dst_fmt.pixelformat == V4L2_PIX_FMT_GREY) {
+		inst->cbcr_interleave = false;
+		inst->nv21 = false;
+		inst->output_format = FORMAT_400;
 	} else if (inst->dst_fmt.pixelformat == V4L2_PIX_FMT_P010) {
 		inst->cbcr_interleave = true;
 		inst->nv21 = false;
@@ -135,11 +141,6 @@ void wave5_update_output_format_info(struct vpu_instance *inst)
 
 void wave5_cleanup_instance(struct vpu_instance *inst, struct file *filp)
 {
-	int i;
-
-	for (i = 0; i < inst->fbc_buf_count; i++)
-		wave5_vpu_dec_reset_framebuffer(inst, i);
-
 	v4l2_ctrl_handler_free(&inst->v4l2_ctrl_hdl);
 	if (inst->v4l2_fh.vdev) {
 		v4l2_fh_del(&inst->v4l2_fh, filp);
@@ -171,6 +172,7 @@ int wave5_vpu_release_device(struct file *filp,
 			dev_err(inst->dev->dev, "%s close, fail: %d\n", name, ret);
 			return ret;
 		}
+
 		if (!pm_runtime_suspended(inst->dev->dev))
 			pm_runtime_put_sync(inst->dev->dev);
 	}
@@ -336,6 +338,7 @@ static struct vb2_v4l2_buffer *wave5_vpu_get_next_buf(struct v4l2_m2m_queue_ctx 
 	scoped_guard(spinlock_irqsave, &q_ctx->rdy_spinlock) {
 		if (list_empty(&q_ctx->rdy_queue))
 			return NULL;
+
 		list_for_each_entry_safe(buf, tmp, &q_ctx->rdy_queue, list) {
 			if (compare(&buf->vb, target))
 				return &buf->vb;

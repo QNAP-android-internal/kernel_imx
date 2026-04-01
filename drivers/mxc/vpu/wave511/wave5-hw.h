@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - wave5 backend definitions
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #ifndef __WAVE5_FUNCTION_H__
@@ -68,8 +68,10 @@ int wave5_vpu_build_up_dec_param(struct vpu_instance *inst, struct dec_open_para
 
 int wave5_vpu_hw_flush_instance(struct vpu_instance *inst);
 
+u32 wave5_vpu_dec_calc_task_buf_size(struct vpu_instance *inst);
+
 int wave5_vpu_dec_register_framebuffer(struct vpu_instance *inst,
-				       struct frame_buffer *fb_arr, enum tiled_map_type map_type,
+				       struct frame_buffer *fb_arr,
 				       unsigned int count);
 
 int wave5_vpu_dec_register_displaybuffer(struct vpu_instance *inst,

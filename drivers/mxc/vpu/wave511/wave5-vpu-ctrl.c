@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - vpu control device
  *
- * Copyright (C) 2024-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #include <linux/kernel.h>
@@ -18,11 +18,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/iopoll.h>
 #include <linux/genalloc.h>
-#include <linux/thermal.h>
 #include <linux/units.h>
-#include <linux/pm_opp.h>
 #include <linux/freezer.h>
-#include <linux/vmalloc.h>
 
 #include "wave5-vpuconfig.h"
 #include "wave5-regdefine.h"
@@ -121,7 +118,7 @@ struct vpu_ctrl {
 static const struct vpu_ctrl_resource nxp_wave511_ctrl_data = {
 	.fw_name = "cnm/wave511_dec_fw.bin",
 	/* For AVC/HEVC, 4096x2304, 8bit */
-	.sram_size = (72 * 1024),  //0x12000
+	.sram_size = (72 * 1024),
 };
 
 #if WAVE5_ENABLE_SW_UART
@@ -1065,20 +1062,9 @@ static int wave5_vpu_ctrl_runtime_resume(struct device *dev)
 }
 #endif
 
-#ifdef CONFIG_PM_SLEEP
-static int wave5_vpu_ctrl_suspend(struct device *dev)
-{
-	return 0;
-}
-
-static int wave5_vpu_ctrl_resume(struct device *dev)
-{
-	return 0;
-}
-#endif
 static const struct dev_pm_ops wave5_vpu_ctrl_pm_ops = {
 	SET_RUNTIME_PM_OPS(wave5_vpu_ctrl_runtime_suspend, wave5_vpu_ctrl_runtime_resume, NULL)
-	SET_SYSTEM_SLEEP_PM_OPS(wave5_vpu_ctrl_suspend, wave5_vpu_ctrl_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
 };
 
 static const struct of_device_id wave5_ctrl_ids[] = {

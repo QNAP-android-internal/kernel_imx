@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - error values
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 
 #ifndef ERROR_CODE_H_INCLUDED
@@ -202,8 +202,9 @@
 #define AVC_ETCERR_INIT_SEQ_SPS_NOT_FOUND                              0x00005000
 #define AVC_ETCERR_DEC_PIC_VCL_NOT_FOUND                               0x00005001
 #define AVC_ETCERR_NO_VALID_SLICE_IN_AU                                0x00005002
-#define AVC_ETCERR_ASO                                                 0x00005004
-#define AVC_ETCERR_FMO                                                 0x00005005
+#define AVC_SPECERR_ASO                                                0x00005003
+#define AVC_SPECERR_FMO                                                0x00005004
+#define AVC_SPECERR_INTERLACED                                         0x00005006
 #define AVC_ETCERR_INPLACE_V                                           0x0000500F
 
 /************************************************************************/

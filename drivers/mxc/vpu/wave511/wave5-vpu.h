@@ -2,7 +2,7 @@
 /*
  * Wave5 series multi-standard codec IP - basic types
  *
- * Copyright (C) 2021-2026 CHIPS&MEDIA INC
+ * Copyright (C) 2026 CHIPS&MEDIA INC
  */
 #ifndef __VPU_DRV_H__
 #define __VPU_DRV_H__
@@ -74,10 +74,8 @@ void wave5_vpu_wait_activated(struct vpu_device *dev);
 int wave5_vpu_wait_interrupt(struct vpu_instance *inst, unsigned int timeout);
 int  wave5_vpu_dec_register_device(struct vpu_device *dev);
 void wave5_vpu_dec_unregister_device(struct vpu_device *dev);
-
 void wave5_vpu_enable_instance(struct vpu_instance *inst);
 void wave5_vpu_disable_instance(struct vpu_instance *inst);
-
 u32 wave5_vpu_cq_depth(struct vpu_device *vpu_dev);
 
 #endif
