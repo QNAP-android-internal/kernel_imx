@@ -190,6 +190,10 @@
 		};
 	};
 
+	rtc@6f {
+		compatible = "microchip,mcp7940x";
+		reg = <0x6f>;
+	};
 };
 
 &lpi2c3 {
