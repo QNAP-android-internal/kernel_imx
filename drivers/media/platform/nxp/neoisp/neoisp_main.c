@@ -245,7 +245,7 @@ static int neoisp_node_buf_prepare(struct vb2_buffer *vb)
 #define NEOISP_PARAMS_BLOCK_INFO_MEMS(block, type) \
 	NEOISP_PARAMS_BLOCK_INFO(block, type, mem_params)
 
-static const struct v4l2_isp_params_block_type_info neoisp_ext_params_block_types_info[] = {
+static const struct v4l2_isp_params_block_type_info neois_params_block_types_info[] = {
 	NEOISP_PARAMS_BLOCK_INFO_CFG(PIPE_CONF, pipe_conf),
 	NEOISP_PARAMS_BLOCK_INFO_CFG(HEAD_COLOR, head_color),
 	NEOISP_PARAMS_BLOCK_INFO_CFG(HDR_DECOMPRESS0, hdr_decompress0),
@@ -283,17 +283,14 @@ static int neoisp_params_node_buf_prepare(struct vb2_buffer *vb)
 	struct v4l2_isp_params_buffer *params = vb2_plane_vaddr(&vbuf->vb2_buf, 0);
 	int ret;
 
-	if (node->neoisp_format->fourcc == V4L2_META_FMT_NEO_ISP_PARAMS)
-		return neoisp_node_buf_prepare(vb);
-
 	ret = v4l2_isp_params_validate_buffer_size(neoispd->dev, vb,
 						   node->format.fmt.meta.buffersize);
 	if (ret)
 		return ret;
 
 	ret = v4l2_isp_params_validate_buffer(neoispd->dev, vb,
-					      params, neoisp_ext_params_block_types_info,
-					      ARRAY_SIZE(neoisp_ext_params_block_types_info));
+					      params, neois_params_block_types_info,
+					      ARRAY_SIZE(neois_params_block_types_info));
 	if (ret)
 		return ret;
 
@@ -856,13 +853,11 @@ static int neoisp_try_fmt(struct v4l2_format *f, struct neoisp_node_s *node)
 		pixfmt = f->fmt.meta.dataformat;
 
 		if (node_is_output(node) &&
-		    pixfmt != V4L2_META_FMT_NEO_ISP_PARAMS &&
 		    pixfmt != V4L2_META_FMT_NEO_ISP_EXT_PARAMS)
-			f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_PARAMS;
+			f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_EXT_PARAMS;
 		else if (!node_is_output(node) &&
-			 pixfmt != V4L2_META_FMT_NEO_ISP_STATS &&
 			 pixfmt != V4L2_META_FMT_NEO_ISP_EXT_STATS)
-			f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_STATS;
+			f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_EXT_STATS;
 
 		return 0;
 	}
@@ -1415,18 +1410,18 @@ error:
 static void node_set_default_format(struct neoisp_node_s *node)
 {
 	if (node_is_meta(node) && node_is_output(node)) {
-		/* Params node - legacy format */
+		/* Params node - exensible format */
 		struct v4l2_format *f = &node->format;
 
-		f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_PARAMS;
-		f->fmt.meta.buffersize = sizeof(struct neoisp_meta_params_s);
+		f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_EXT_PARAMS;
+		f->fmt.meta.buffersize = v4l2_isp_buffer_size(NEOISP_EXT_PARAMS_MAX_SIZE);
 		f->type = node->buf_type;
 	} else if (node_is_meta(node) && node_is_capture(node)) {
 		/* Stats node - legacy format */
 		struct v4l2_format *f = &node->format;
 
-		f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_STATS;
-		f->fmt.meta.buffersize = sizeof(struct neoisp_meta_stats_s);
+		f->fmt.meta.dataformat = V4L2_META_FMT_NEO_ISP_EXT_STATS;
+		f->fmt.meta.buffersize = v4l2_isp_buffer_size(NEOISP_EXT_STATS_MAX_SIZE);
 		f->type = node->buf_type;
 	} else {
 		struct v4l2_format f = {0};
@@ -1865,13 +1860,13 @@ static const unsigned int neoisp_blocks_list_imx95x[] = {
 	-1, /* end of list */
 };
 
-static const struct neoisp_info_s neoisp_imx952_data = {
-	.capabilities = 0,
+static const struct neoisp_info_s neoisp_imx95_data = {
+	.capabilities = NEO_CAP_ALIGNMENT_MSB,
 	.blocks_list = neoisp_blocks_list_imx95x,
 };
 
-static const struct neoisp_info_s neoisp_imx95_data = {
-	.capabilities = NEO_CAP_ALIGNMENT_MSB,
+static const struct neoisp_info_s neoisp_imx952_data = {
+	.capabilities = 0,
 	.blocks_list = neoisp_blocks_list_imx95x,
 };
 

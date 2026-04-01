@@ -24,7 +24,7 @@
 #include "neoisp.h"
 #include "neoisp_ctx.h"
 
-/**
+/*
  * This is the initial set of parameters setup by driver upon a streamon ioctl for INPUT0 node.
  * It could be updated later by the driver depending on input/output formats setup by userspace
  * and also if fine tuned parameters are provided by the camera stack.
@@ -326,7 +326,7 @@ static const struct neoisp_context_s def_context = {
 	},
 };
 
-static const __u32 neoisp_ext_stats_blocks_v1[] = {
+static const __u32 neoisp_stats_blocks_v1[] = {
 	NEOISP_STATS_BLK_RCTEMP,
 	NEOISP_STATS_BLK_RDRC,
 	NEOISP_STATS_BLK_RAF,
@@ -341,35 +341,7 @@ static const __u32 neoisp_ext_stats_blocks_v1[] = {
 };
 
 union neoisp_params_block_u {
-	struct neoisp_pipe_conf_cfg_s pipe_conf;
-	struct neoisp_head_color_cfg_s head_color;
-	struct neoisp_hdr_decompress0_cfg_s hdr_decompress0;
-	struct neoisp_hdr_decompress1_cfg_s hdr_decompress1;
-	struct neoisp_obwb_cfg_s obwb;
-	struct neoisp_hdr_merge_cfg_s hdr_merge;
-	struct neoisp_rgbir_cfg_s rgbir;
-	struct neoisp_stat_cfg_s stat;
-	struct neoisp_ir_compress_cfg_s ir_compress;
-	struct neoisp_bnr_cfg_s bnr;
-	struct neoisp_vignetting_ctrl_cfg_s vignetting_ctrl;
-	struct neoisp_ctemp_cfg_s ctemp;
-	struct neoisp_demosaic_cfg_s demosaic;
-	struct neoisp_rgb2yuv_cfg_s rgb2yuv;
-	struct neoisp_dr_comp_cfg_s drc;
-	struct neoisp_nr_cfg_s nrc;
-	struct neoisp_af_cfg_s afc;
-	struct neoisp_ee_cfg_s eec;
-	struct neoisp_df_cfg_s dfc;
-	struct neoisp_convmed_cfg_s convmed;
-	struct neoisp_cas_cfg_s cas;
-	struct neoisp_gcm_cfg_s gcm;
-	struct neoisp_vignetting_table_mem_params_s vignetting_table;
-	struct neoisp_drc_global_tonemap_mem_params_s drc_global_tonemap;
-	struct neoisp_drc_local_tonemap_mem_params_s drc_local_tonemap;
-};
-
-union neoisp_ext_params_block_u {
-	struct v4l2_isp_params_block_header header;
+	struct v4l2_isp_block_header header;
 	struct neoisp_pipe_conf_cfg_es pipe_conf;
 	struct neoisp_head_color_cfg_es head_color;
 	struct neoisp_hdr_decompress0_cfg_es hdr_decompress0;
@@ -398,7 +370,7 @@ union neoisp_ext_params_block_u {
 };
 
 union neoisp_stats_block_u {
-	struct v4l2_isp_stats_block_header header;
+	struct v4l2_isp_block_header header;
 	struct neoisp_ctemp_reg_stats_es rctemp;
 	struct neoisp_drc_reg_stats_es rdrc;
 	struct neoisp_af_reg_stats_es raf;
@@ -450,175 +422,216 @@ static inline void ctx_blk_write(enum isp_block_map_e map, u32 *ptr, u32 *dest)
 	memcpy(dest + woffset, ptr, count);
 }
 
-static void neoisp_params_handler_pipe_conf(struct neoisp_dev_s *neoispd,
-					    union neoisp_params_block_u *blk)
-{
-	struct neoisp_context_s *ctx = neoispd->context;
-	struct neoisp_pipe_conf_s *pc = &ctx->hw.pipe_conf;
-	u32 tmp = pc->img_conf;
+/*------------------------------------------------------------------------------
+ * Extensible parameters format handling
+ */
 
+static void
+neoisp_params_handler_pipe_conf(struct neoisp_context_s *ctx,
+				union neoisp_params_block_u *block)
+{
+	struct neoisp_pipe_conf_s *pc = &ctx->hw.pipe_conf;
+	struct neoisp_pipe_conf_cfg_s *cfg;
+	u32 tmp;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->pipe_conf.cfg;
+	tmp = pc->img_conf;
 	tmp &= ~(NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN0 |
 		 NEO_PIPE_CONF_IMG_CONF_CAM0_LPALIGN0 |
 		 NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN1 |
 		 NEO_PIPE_CONF_IMG_CONF_CAM0_LPALIGN1);
 	tmp |=
-		NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN0_SET(blk->pipe_conf.img_conf_inalign0) |
-		NEO_PIPE_CONF_IMG_CONF_CAM0_LPALIGN0_SET(blk->pipe_conf.img_conf_lpalign0) |
-		NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN1_SET(blk->pipe_conf.img_conf_inalign1) |
-		NEO_PIPE_CONF_IMG_CONF_CAM0_LPALIGN1_SET(blk->pipe_conf.img_conf_lpalign1);
+		NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN0_SET(cfg->img_conf_inalign0) |
+		NEO_PIPE_CONF_IMG_CONF_CAM0_LPALIGN0_SET(cfg->img_conf_lpalign0) |
+		NEO_PIPE_CONF_IMG_CONF_CAM0_INALIGN1_SET(cfg->img_conf_inalign1) |
+		NEO_PIPE_CONF_IMG_CONF_CAM0_LPALIGN1_SET(cfg->img_conf_lpalign1);
 	pc->img_conf = tmp;
 }
 
-static void neoisp_params_handler_head_color(struct neoisp_dev_s *neoispd,
-					     union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_head_color(struct neoisp_context_s *ctx,
+				 union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hc_s *hc = &ctx->hw.hc;
+	struct neoisp_head_color_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->head_color.cfg;
 	hc->ctrl =
-		NEO_HC_CTRL_CAM0_HOFFSET_SET(blk->head_color.ctrl_hoffset) |
-		NEO_HC_CTRL_CAM0_VOFFSET_SET(blk->head_color.ctrl_voffset);
+		NEO_HC_CTRL_CAM0_HOFFSET_SET(cfg->ctrl_hoffset) |
+		NEO_HC_CTRL_CAM0_VOFFSET_SET(cfg->ctrl_voffset);
 }
 
-static void neoisp_params_handler_hdr_decompress0(struct neoisp_dev_s *neoispd,
-						  union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_hdr_decompress0(struct neoisp_context_s *ctx,
+				      union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hdr_decompress0_s *hd0 = &ctx->hw.hdr_decompress0;
+	struct neoisp_hdr_decompress0_cfg_s *cfg;
 
-	hd0->ctrl =
-		NEO_CTRL_CAM0_ENABLE_SET(blk->hdr_decompress0.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		hd0->ctrl &= ~NEO_HDR_DECOMPRESS0_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		hd0->ctrl |= NEO_HDR_DECOMPRESS0_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->hdr_decompress0.cfg;
 	hd0->knee_point1 =
 		NEO_HDR_DECOMPRESS0_KNEE_POINT1_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_point1);
+		(cfg->knee_point1);
 	hd0->knee_point2 =
 		NEO_HDR_DECOMPRESS0_KNEE_POINT2_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_point2);
+		(cfg->knee_point2);
 	hd0->knee_point3 =
 		NEO_HDR_DECOMPRESS0_KNEE_POINT3_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_point3);
+		(cfg->knee_point3);
 	hd0->knee_point4 =
 		NEO_HDR_DECOMPRESS0_KNEE_POINT4_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_point4);
+		(cfg->knee_point4);
 	hd0->knee_offset0 =
 		NEO_HDR_DECOMPRESS0_KNEE_OFFSET0_CAM0_OFFSET_SET
-		(blk->hdr_decompress0.knee_offset0);
+		(cfg->knee_offset0);
 	hd0->knee_offset1 =
 		NEO_HDR_DECOMPRESS0_KNEE_OFFSET1_CAM0_OFFSET_SET
-		(blk->hdr_decompress0.knee_offset1);
+		(cfg->knee_offset1);
 	hd0->knee_offset2 =
 		NEO_HDR_DECOMPRESS0_KNEE_OFFSET2_CAM0_OFFSET_SET
-		(blk->hdr_decompress0.knee_offset2);
+		(cfg->knee_offset2);
 	hd0->knee_offset3 =
 		NEO_HDR_DECOMPRESS0_KNEE_OFFSET3_CAM0_OFFSET_SET
-		(blk->hdr_decompress0.knee_offset3);
+		(cfg->knee_offset3);
 	hd0->knee_offset4 =
 		NEO_HDR_DECOMPRESS0_KNEE_OFFSET4_CAM0_OFFSET_SET
-		(blk->hdr_decompress0.knee_offset4);
+		(cfg->knee_offset4);
 	hd0->knee_ratio01 =
 		NEO_HDR_DECOMPRESS0_KNEE_RATIO01_CAM0_RATIO0_SET
-		(blk->hdr_decompress0.knee_ratio0);
+		(cfg->knee_ratio0);
 	hd0->knee_ratio01 |=
 		NEO_HDR_DECOMPRESS0_KNEE_RATIO01_CAM0_RATIO1_SET
-		(blk->hdr_decompress0.knee_ratio1);
+		(cfg->knee_ratio1);
 	hd0->knee_ratio23 =
 		NEO_HDR_DECOMPRESS0_KNEE_RATIO23_CAM0_RATIO2_SET
-		(blk->hdr_decompress0.knee_ratio2);
+		(cfg->knee_ratio2);
 	hd0->knee_ratio23 |=
 		NEO_HDR_DECOMPRESS0_KNEE_RATIO23_CAM0_RATIO3_SET
-		(blk->hdr_decompress0.knee_ratio3);
+		(cfg->knee_ratio3);
 	hd0->knee_ratio4 =
 		NEO_HDR_DECOMPRESS0_KNEE_RATIO4_CAM0_RATIO4_SET
-		(blk->hdr_decompress0.knee_ratio4);
+		(cfg->knee_ratio4);
 	hd0->knee_npoint0 =
 		NEO_HDR_DECOMPRESS0_KNEE_NPOINT0_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_npoint0);
+		(cfg->knee_npoint0);
 	hd0->knee_npoint1 =
 		NEO_HDR_DECOMPRESS0_KNEE_NPOINT1_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_npoint1);
+		(cfg->knee_npoint1);
 	hd0->knee_npoint2 =
 		NEO_HDR_DECOMPRESS0_KNEE_NPOINT2_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_npoint2);
+		(cfg->knee_npoint2);
 	hd0->knee_npoint3 =
 		NEO_HDR_DECOMPRESS0_KNEE_NPOINT3_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_npoint3);
+		(cfg->knee_npoint3);
 	hd0->knee_npoint4 =
 		NEO_HDR_DECOMPRESS0_KNEE_NPOINT4_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress0.knee_npoint4);
+		(cfg->knee_npoint4);
 }
 
-static void neoisp_params_handler_hdr_decompress1(struct neoisp_dev_s *neoispd,
-						  union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_hdr_decompress1(struct neoisp_context_s *ctx,
+				      union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hdr_decompress1_s *hd1 = &ctx->hw.hdr_decompress1;
+	struct neoisp_hdr_decompress1_cfg_s *cfg;
 
-	hd1->ctrl =
-		NEO_CTRL_CAM0_ENABLE_SET(blk->hdr_decompress1.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		hd1->ctrl &= ~NEO_HDR_DECOMPRESS1_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		hd1->ctrl |= NEO_HDR_DECOMPRESS1_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->hdr_decompress1.cfg;
 	hd1->knee_point1 =
 		NEO_HDR_DECOMPRESS1_KNEE_POINT1_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_point1);
+		(cfg->knee_point1);
 	hd1->knee_point2 =
 		NEO_HDR_DECOMPRESS1_KNEE_POINT2_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_point2);
+		(cfg->knee_point2);
 	hd1->knee_point3 =
 		NEO_HDR_DECOMPRESS1_KNEE_POINT3_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_point3);
+		(cfg->knee_point3);
 	hd1->knee_point4 =
 		NEO_HDR_DECOMPRESS1_KNEE_POINT4_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_point4);
+		(cfg->knee_point4);
 	hd1->knee_offset0 =
 		NEO_HDR_DECOMPRESS1_KNEE_OFFSET0_CAM0_OFFSET_SET
-		(blk->hdr_decompress1.knee_offset0);
+		(cfg->knee_offset0);
 	hd1->knee_offset1 =
 		NEO_HDR_DECOMPRESS1_KNEE_OFFSET1_CAM0_OFFSET_SET
-		(blk->hdr_decompress1.knee_offset1);
+		(cfg->knee_offset1);
 	hd1->knee_offset2 =
 		NEO_HDR_DECOMPRESS1_KNEE_OFFSET2_CAM0_OFFSET_SET
-		(blk->hdr_decompress1.knee_offset2);
+		(cfg->knee_offset2);
 	hd1->knee_offset3 =
 		NEO_HDR_DECOMPRESS1_KNEE_OFFSET3_CAM0_OFFSET_SET
-		(blk->hdr_decompress1.knee_offset3);
+		(cfg->knee_offset3);
 	hd1->knee_offset4 =
 		NEO_HDR_DECOMPRESS1_KNEE_OFFSET4_CAM0_OFFSET_SET
-		(blk->hdr_decompress1.knee_offset4);
+		(cfg->knee_offset4);
 	hd1->knee_ratio01 =
 		NEO_HDR_DECOMPRESS1_KNEE_RATIO01_CAM0_RATIO0_SET
-		(blk->hdr_decompress1.knee_ratio0);
+		(cfg->knee_ratio0);
 	hd1->knee_ratio01 |=
 		NEO_HDR_DECOMPRESS1_KNEE_RATIO01_CAM0_RATIO1_SET
-		(blk->hdr_decompress1.knee_ratio1);
+		(cfg->knee_ratio1);
 	hd1->knee_ratio23 =
 		NEO_HDR_DECOMPRESS1_KNEE_RATIO23_CAM0_RATIO2_SET
-		(blk->hdr_decompress1.knee_ratio2);
+		(cfg->knee_ratio2);
 	hd1->knee_ratio23 |=
 		NEO_HDR_DECOMPRESS1_KNEE_RATIO23_CAM0_RATIO3_SET
-		(blk->hdr_decompress1.knee_ratio3);
+		(cfg->knee_ratio3);
 	hd1->knee_ratio4 =
 		NEO_HDR_DECOMPRESS1_KNEE_RATIO4_CAM0_RATIO4_SET
-		(blk->hdr_decompress1.knee_ratio4);
+		(cfg->knee_ratio4);
 	hd1->knee_npoint0 =
 		NEO_HDR_DECOMPRESS1_KNEE_NPOINT0_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_npoint0);
+		(cfg->knee_npoint0);
 	hd1->knee_npoint1 =
 		NEO_HDR_DECOMPRESS1_KNEE_NPOINT1_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_npoint1);
+		(cfg->knee_npoint1);
 	hd1->knee_npoint2 =
 		NEO_HDR_DECOMPRESS1_KNEE_NPOINT2_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_npoint2);
+		(cfg->knee_npoint2);
 	hd1->knee_npoint3 =
 		NEO_HDR_DECOMPRESS1_KNEE_NPOINT3_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_npoint3);
+		(cfg->knee_npoint3);
 	hd1->knee_npoint4 =
 		NEO_HDR_DECOMPRESS1_KNEE_NPOINT4_CAM0_KNEEPOINT_SET
-		(blk->hdr_decompress1.knee_npoint4);
+		(cfg->knee_npoint4);
 }
 
-static void __neoisp_params_handler_obwb(struct neoisp_dev_s *neoispd,
-					 union neoisp_params_block_u *blk, u8 id)
+static void
+__neoisp_params_handler_obwb(struct neoisp_context_s *ctx,
+			     union neoisp_params_block_u *block,
+			     u8 id)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_obwb_s *obwb;
+	struct neoisp_obwb_cfg_s *cfg;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
 
 	switch (id) {
 	case 0:
@@ -631,116 +644,144 @@ static void __neoisp_params_handler_obwb(struct neoisp_dev_s *neoispd,
 		obwb = &ctx->hw.obwb2;
 		break;
 	default:
-		dev_err(neoispd->dev, "Unexpected OBWB instance %u\n", id);
 		return;
 	}
 
+	cfg = &block->obwb.cfg;
 	obwb->ctrl =
-		NEO_OB_WB0_CTRL_CAM0_OBPP_SET(blk->obwb.ctrl_obpp);
+		NEO_OB_WB0_CTRL_CAM0_OBPP_SET(cfg->ctrl_obpp);
 	obwb->r_ctrl =
-		NEO_OB_WB0_R_CTRL_CAM0_OFFSET_SET(blk->obwb.r_ctrl_offset) |
-		NEO_OB_WB0_R_CTRL_CAM0_GAIN_SET(blk->obwb.r_ctrl_gain);
+		NEO_OB_WB0_R_CTRL_CAM0_OFFSET_SET(cfg->r_ctrl_offset) |
+		NEO_OB_WB0_R_CTRL_CAM0_GAIN_SET(cfg->r_ctrl_gain);
 	obwb->gr_ctrl =
-		NEO_OB_WB0_GR_CTRL_CAM0_OFFSET_SET(blk->obwb.gr_ctrl_offset) |
-		NEO_OB_WB0_GR_CTRL_CAM0_GAIN_SET(blk->obwb.gr_ctrl_gain);
+		NEO_OB_WB0_GR_CTRL_CAM0_OFFSET_SET(cfg->gr_ctrl_offset) |
+		NEO_OB_WB0_GR_CTRL_CAM0_GAIN_SET(cfg->gr_ctrl_gain);
 	obwb->gb_ctrl =
-		NEO_OB_WB0_GB_CTRL_CAM0_OFFSET_SET(blk->obwb.gb_ctrl_offset) |
-		NEO_OB_WB0_GB_CTRL_CAM0_GAIN_SET(blk->obwb.gb_ctrl_gain);
+		NEO_OB_WB0_GB_CTRL_CAM0_OFFSET_SET(cfg->gb_ctrl_offset) |
+		NEO_OB_WB0_GB_CTRL_CAM0_GAIN_SET(cfg->gb_ctrl_gain);
 	obwb->b_ctrl =
-		NEO_OB_WB0_B_CTRL_CAM0_OFFSET_SET(blk->obwb.b_ctrl_offset) |
-		NEO_OB_WB0_B_CTRL_CAM0_GAIN_SET(blk->obwb.b_ctrl_gain);
+		NEO_OB_WB0_B_CTRL_CAM0_OFFSET_SET(cfg->b_ctrl_offset) |
+		NEO_OB_WB0_B_CTRL_CAM0_GAIN_SET(cfg->b_ctrl_gain);
 }
 
-static void neoisp_params_handler_obwb0(struct neoisp_dev_s *neoispd,
-					union neoisp_params_block_u *blk)
+static void neoisp_params_handler_obwb0(struct neoisp_context_s *ctx,
+					union neoisp_params_block_u *block)
 {
-	__neoisp_params_handler_obwb(neoispd, blk, 0);
+	__neoisp_params_handler_obwb(ctx, block, 0);
 }
 
-static void neoisp_params_handler_obwb1(struct neoisp_dev_s *neoispd,
-					union neoisp_params_block_u *blk)
+static void neoisp_params_handler_obwb1(struct neoisp_context_s *ctx,
+					union neoisp_params_block_u *block)
 {
-	__neoisp_params_handler_obwb(neoispd, blk, 1);
+	__neoisp_params_handler_obwb(ctx, block, 1);
 }
 
-static void neoisp_params_handler_obwb2(struct neoisp_dev_s *neoispd,
-					union neoisp_params_block_u *blk)
+static void neoisp_params_handler_obwb2(struct neoisp_context_s *ctx,
+					union neoisp_params_block_u *block)
 {
-	__neoisp_params_handler_obwb(neoispd, blk, 2);
+	__neoisp_params_handler_obwb(ctx, block, 2);
 }
 
-static void neoisp_params_handler_hdr_merge(struct neoisp_dev_s *neoispd,
-					    union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_hdr_merge(struct neoisp_context_s *ctx,
+				union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_hdr_merge_s *hmg = &ctx->hw.hdr_merge;
+	struct neoisp_hdr_merge_cfg_s *cfg;
+	u32 tmp;
 
-	hmg->ctrl =
-		NEO_HDR_MERGE_CTRL_CAM0_OBPP_SET(blk->hdr_merge.ctrl_obpp) |
-		NEO_HDR_MERGE_CTRL_CAM0_MOTION_FIX_EN_SET(blk->hdr_merge.ctrl_motion_fix_en) |
-		NEO_HDR_MERGE_CTRL_CAM0_BLEND_3X3_SET(blk->hdr_merge.ctrl_blend_3x3) |
-		NEO_HDR_MERGE_CTRL_CAM0_GAIN0BPP_SET(blk->hdr_merge.ctrl_gain0bpp) |
-		NEO_HDR_MERGE_CTRL_CAM0_GAIN1BPP_SET(blk->hdr_merge.ctrl_gain1bpp) |
-		NEO_HDR_MERGE_CTRL_CAM0_ENABLE_SET(blk->hdr_merge.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		hmg->ctrl &= ~NEO_HDR_MERGE_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		hmg->ctrl |= NEO_HDR_MERGE_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->hdr_merge.cfg;
+	tmp = hmg->ctrl &
+		~(NEO_HDR_MERGE_CTRL_CAM0_OBPP_MASK |
+		  NEO_HDR_MERGE_CTRL_CAM0_SAFETY_ON |
+		  NEO_HDR_MERGE_CTRL_CAM0_BLEND_3X3 |
+		  NEO_HDR_MERGE_CTRL_CAM0_GAIN0BPP_MASK |
+		  NEO_HDR_MERGE_CTRL_CAM0_GAIN1BPP_MASK);
+	tmp |= NEO_HDR_MERGE_CTRL_CAM0_OBPP_SET(cfg->ctrl_obpp) |
+		NEO_HDR_MERGE_CTRL_CAM0_MOTION_FIX_EN_SET(cfg->ctrl_motion_fix_en) |
+		NEO_HDR_MERGE_CTRL_CAM0_BLEND_3X3_SET(cfg->ctrl_blend_3x3) |
+		NEO_HDR_MERGE_CTRL_CAM0_GAIN0BPP_SET(cfg->ctrl_gain0bpp) |
+		NEO_HDR_MERGE_CTRL_CAM0_GAIN1BPP_SET(cfg->ctrl_gain1bpp);
+	hmg->ctrl = tmp;
+
 	hmg->gain_offset =
-		NEO_HDR_MERGE_GAIN_OFFSET_CAM0_OFFSET0_SET(blk->hdr_merge.gain_offset_offset0) |
-		NEO_HDR_MERGE_GAIN_OFFSET_CAM0_OFFSET1_SET(blk->hdr_merge.gain_offset_offset1);
+		NEO_HDR_MERGE_GAIN_OFFSET_CAM0_OFFSET0_SET(cfg->gain_offset_offset0) |
+		NEO_HDR_MERGE_GAIN_OFFSET_CAM0_OFFSET1_SET(cfg->gain_offset_offset1);
 	hmg->gain_scale =
-		NEO_HDR_MERGE_GAIN_SCALE_CAM0_SCALE0_SET(blk->hdr_merge.gain_scale_scale0) |
-		NEO_HDR_MERGE_GAIN_SCALE_CAM0_SCALE1_SET(blk->hdr_merge.gain_scale_scale1);
+		NEO_HDR_MERGE_GAIN_SCALE_CAM0_SCALE0_SET(cfg->gain_scale_scale0) |
+		NEO_HDR_MERGE_GAIN_SCALE_CAM0_SCALE1_SET(cfg->gain_scale_scale1);
 	hmg->gain_shift =
-		NEO_HDR_MERGE_GAIN_SHIFT_CAM0_SHIFT0_SET(blk->hdr_merge.gain_shift_shift0) |
-		NEO_HDR_MERGE_GAIN_SHIFT_CAM0_SHIFT1_SET(blk->hdr_merge.gain_shift_shift1);
+		NEO_HDR_MERGE_GAIN_SHIFT_CAM0_SHIFT0_SET(cfg->gain_shift_shift0) |
+		NEO_HDR_MERGE_GAIN_SHIFT_CAM0_SHIFT1_SET(cfg->gain_shift_shift1);
 	hmg->luma_th =
-		NEO_HDR_MERGE_LUMA_TH_CAM0_TH0_SET(blk->hdr_merge.luma_th_th0);
+		NEO_HDR_MERGE_LUMA_TH_CAM0_TH0_SET(cfg->luma_th_th0);
 	hmg->luma_scale =
-		NEO_HDR_MERGE_LUMA_SCALE_CAM0_SCALE_SET(blk->hdr_merge.luma_scale_scale) |
-		NEO_HDR_MERGE_LUMA_SCALE_CAM0_SHIFT_SET(blk->hdr_merge.luma_scale_shift) |
-		NEO_HDR_MERGE_LUMA_SCALE_CAM0_THSHIFT_SET(blk->hdr_merge.luma_scale_thshift);
+		NEO_HDR_MERGE_LUMA_SCALE_CAM0_SCALE_SET(cfg->luma_scale_scale) |
+		NEO_HDR_MERGE_LUMA_SCALE_CAM0_SHIFT_SET(cfg->luma_scale_shift) |
+		NEO_HDR_MERGE_LUMA_SCALE_CAM0_THSHIFT_SET(cfg->luma_scale_thshift);
 	hmg->downscale =
-		NEO_HDR_MERGE_DOWNSCALE_CAM0_IMGSCALE0_SET(blk->hdr_merge.downscale_imgscale0) |
-		NEO_HDR_MERGE_DOWNSCALE_CAM0_IMGSCALE1_SET(blk->hdr_merge.downscale_imgscale1);
+		NEO_HDR_MERGE_DOWNSCALE_CAM0_IMGSCALE0_SET(cfg->downscale_imgscale0) |
+		NEO_HDR_MERGE_DOWNSCALE_CAM0_IMGSCALE1_SET(cfg->downscale_imgscale1);
 	hmg->upscale =
-		NEO_HDR_MERGE_UPSCALE_CAM0_IMGSCALE0_SET(blk->hdr_merge.upscale_imgscale0) |
-		NEO_HDR_MERGE_UPSCALE_CAM0_IMGSCALE1_SET(blk->hdr_merge.upscale_imgscale1);
+		NEO_HDR_MERGE_UPSCALE_CAM0_IMGSCALE0_SET(cfg->upscale_imgscale0) |
+		NEO_HDR_MERGE_UPSCALE_CAM0_IMGSCALE1_SET(cfg->upscale_imgscale1);
 	hmg->post_scale =
-		NEO_HDR_MERGE_POST_SCALE_CAM0_SCALE_SET(blk->hdr_merge.post_scale_scale);
+		NEO_HDR_MERGE_POST_SCALE_CAM0_SCALE_SET(cfg->post_scale_scale);
 }
 
-static void neoisp_params_handler_rgbir(struct neoisp_dev_s *neoispd,
-					union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_rgbir(struct neoisp_context_s *ctx,
+			    union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_rgbir_s *rgbir = &ctx->hw.rgbir;
+	struct neoisp_rgbir_cfg_s *cfg;
 	struct neoisp_stat_hist_cfg_s *hist;
 
-	rgbir->ctrl =
-		NEO_RGBIR_CTRL_CAM0_ENABLE_SET(blk->rgbir.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		rgbir->ctrl &= ~NEO_RGBIR_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		rgbir->ctrl |= NEO_RGBIR_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->rgbir.cfg;
 	rgbir->ccm0 =
-		NEO_RGBIR_CCM0_CAM0_CCM_SET(blk->rgbir.ccm0_ccm);
+		NEO_RGBIR_CCM0_CAM0_CCM_SET(cfg->ccm0_ccm);
 	rgbir->ccm1 =
-		NEO_RGBIR_CCM1_CAM0_CCM_SET(blk->rgbir.ccm1_ccm);
+		NEO_RGBIR_CCM1_CAM0_CCM_SET(cfg->ccm1_ccm);
 	rgbir->ccm2 =
-		NEO_RGBIR_CCM2_CAM0_CCM_SET(blk->rgbir.ccm2_ccm);
+		NEO_RGBIR_CCM2_CAM0_CCM_SET(cfg->ccm2_ccm);
 	rgbir->ccm0_th =
-		NEO_RGBIR_CCM0_TH_CAM0_THRESHOLD_SET(blk->rgbir.ccm0_th_threshold);
+		NEO_RGBIR_CCM0_TH_CAM0_THRESHOLD_SET(cfg->ccm0_th_threshold);
 	rgbir->ccm1_th =
-		NEO_RGBIR_CCM1_TH_CAM0_THRESHOLD_SET(blk->rgbir.ccm1_th_threshold);
+		NEO_RGBIR_CCM1_TH_CAM0_THRESHOLD_SET(cfg->ccm1_th_threshold);
 	rgbir->ccm2_th =
-		NEO_RGBIR_CCM2_TH_CAM0_THRESHOLD_SET(blk->rgbir.ccm2_th_threshold);
+		NEO_RGBIR_CCM2_TH_CAM0_THRESHOLD_SET(cfg->ccm2_th_threshold);
 	rgbir->roi0_pos =
-		NEO_RGBIR_ROI0_POS_CAM0_XPOS_SET(blk->rgbir.roi[0].xpos) |
-		NEO_RGBIR_ROI0_POS_CAM0_YPOS_SET(blk->rgbir.roi[0].ypos);
+		NEO_RGBIR_ROI0_POS_CAM0_XPOS_SET(cfg->roi[0].xpos) |
+		NEO_RGBIR_ROI0_POS_CAM0_YPOS_SET(cfg->roi[0].ypos);
 	rgbir->roi0_size =
-		NEO_RGBIR_ROI0_SIZE_CAM0_WIDTH_SET(blk->rgbir.roi[0].width) |
-		NEO_RGBIR_ROI0_SIZE_CAM0_HEIGHT_SET(blk->rgbir.roi[0].height);
+		NEO_RGBIR_ROI0_SIZE_CAM0_WIDTH_SET(cfg->roi[0].width) |
+		NEO_RGBIR_ROI0_SIZE_CAM0_HEIGHT_SET(cfg->roi[0].height);
 	rgbir->roi1_pos =
-		NEO_RGBIR_ROI1_POS_CAM0_XPOS_SET(blk->rgbir.roi[1].xpos) |
-		NEO_RGBIR_ROI1_POS_CAM0_YPOS_SET(blk->rgbir.roi[1].ypos);
+		NEO_RGBIR_ROI1_POS_CAM0_XPOS_SET(cfg->roi[1].xpos) |
+		NEO_RGBIR_ROI1_POS_CAM0_YPOS_SET(cfg->roi[1].ypos);
 	rgbir->roi1_size =
-		NEO_RGBIR_ROI1_SIZE_CAM0_WIDTH_SET(blk->rgbir.roi[1].width) |
-		NEO_RGBIR_ROI1_SIZE_CAM0_HEIGHT_SET(blk->rgbir.roi[1].height);
-	hist = &blk->rgbir.hists[0];
+		NEO_RGBIR_ROI1_SIZE_CAM0_WIDTH_SET(cfg->roi[1].width) |
+		NEO_RGBIR_ROI1_SIZE_CAM0_HEIGHT_SET(cfg->roi[1].height);
+
+	hist = &cfg->hists[0];
 	rgbir->hist0_ctrl =
 		NEO_RGBIR_HIST0_CTRL_CAM0_LIN_INPUT1_LOG_SET(hist->hist_ctrl_lin_input1_log) |
 		NEO_RGBIR_HIST0_CTRL_CAM0_DIR_INPUT1_DIF_SET(hist->hist_ctrl_dir_input1_dif) |
@@ -749,7 +790,8 @@ static void neoisp_params_handler_rgbir(struct neoisp_dev_s *neoispd,
 		NEO_RGBIR_HIST0_CTRL_CAM0_OFFSET_SET(hist->hist_ctrl_offset);
 	rgbir->hist0_scale =
 		NEO_RGBIR_HIST0_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
-	hist = &blk->rgbir.hists[1];
+
+	hist = &cfg->hists[1];
 	rgbir->hist1_ctrl =
 		NEO_RGBIR_HIST1_CTRL_CAM0_LIN_INPUT1_LOG_SET(hist->hist_ctrl_lin_input1_log) |
 		NEO_RGBIR_HIST1_CTRL_CAM0_DIR_INPUT1_DIF_SET(hist->hist_ctrl_dir_input1_dif) |
@@ -760,26 +802,33 @@ static void neoisp_params_handler_rgbir(struct neoisp_dev_s *neoispd,
 		NEO_RGBIR_HIST1_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
 }
 
-static void neoisp_params_handler_stat(struct neoisp_dev_s *neoispd,
-				       union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_stat(struct neoisp_context_s *ctx,
+			   union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_stat_s *stat = &ctx->hw.stat;
+	struct neoisp_stat_cfg_s *cfg;
 	struct neoisp_stat_hist_cfg_s *hist;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->stat.cfg;
 	stat->roi0_pos =
-		NEO_STAT_ROI0_POS_CAM0_XPOS_SET(blk->stat.roi0.xpos) |
-		NEO_STAT_ROI0_POS_CAM0_YPOS_SET(blk->stat.roi0.ypos);
+		NEO_STAT_ROI0_POS_CAM0_XPOS_SET(cfg->roi0.xpos) |
+		NEO_STAT_ROI0_POS_CAM0_YPOS_SET(cfg->roi0.ypos);
 	stat->roi0_size =
-		NEO_STAT_ROI0_SIZE_CAM0_WIDTH_SET(blk->stat.roi0.width) |
-		NEO_STAT_ROI0_SIZE_CAM0_HEIGHT_SET(blk->stat.roi0.height);
+		NEO_STAT_ROI0_SIZE_CAM0_WIDTH_SET(cfg->roi0.width) |
+		NEO_STAT_ROI0_SIZE_CAM0_HEIGHT_SET(cfg->roi0.height);
 	stat->roi1_pos =
-		NEO_STAT_ROI1_POS_CAM0_XPOS_SET(blk->stat.roi1.xpos) |
-		NEO_STAT_ROI1_POS_CAM0_YPOS_SET(blk->stat.roi1.ypos);
+		NEO_STAT_ROI1_POS_CAM0_XPOS_SET(cfg->roi1.xpos) |
+		NEO_STAT_ROI1_POS_CAM0_YPOS_SET(cfg->roi1.ypos);
 	stat->roi1_size =
-		NEO_STAT_ROI1_SIZE_CAM0_WIDTH_SET(blk->stat.roi1.width) |
-		NEO_STAT_ROI1_SIZE_CAM0_HEIGHT_SET(blk->stat.roi1.height);
-	hist = &blk->stat.hists[0];
+		NEO_STAT_ROI1_SIZE_CAM0_WIDTH_SET(cfg->roi1.width) |
+		NEO_STAT_ROI1_SIZE_CAM0_HEIGHT_SET(cfg->roi1.height);
+
+	hist = &cfg->hists[0];
 	stat->hist0_ctrl =
 		NEO_STAT_HIST0_CTRL_CAM0_LIN_INPUT1_LOG_SET(hist->hist_ctrl_lin_input1_log) |
 		NEO_STAT_HIST0_CTRL_CAM0_DIR_INPUT1_DIF_SET(hist->hist_ctrl_dir_input1_dif) |
@@ -788,7 +837,8 @@ static void neoisp_params_handler_stat(struct neoisp_dev_s *neoispd,
 		NEO_STAT_HIST0_CTRL_CAM0_OFFSET_SET(hist->hist_ctrl_offset);
 	stat->hist0_scale =
 		NEO_STAT_HIST0_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
-	hist = &blk->stat.hists[1];
+
+	hist = &cfg->hists[1];
 	stat->hist1_ctrl =
 		NEO_STAT_HIST1_CTRL_CAM0_LIN_INPUT1_LOG_SET(hist->hist_ctrl_lin_input1_log) |
 		NEO_STAT_HIST1_CTRL_CAM0_DIR_INPUT1_DIF_SET(hist->hist_ctrl_dir_input1_dif) |
@@ -797,7 +847,8 @@ static void neoisp_params_handler_stat(struct neoisp_dev_s *neoispd,
 		NEO_STAT_HIST1_CTRL_CAM0_OFFSET_SET(hist->hist_ctrl_offset);
 	stat->hist1_scale =
 		NEO_STAT_HIST1_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
-	hist = &blk->stat.hists[2];
+
+	hist = &cfg->hists[2];
 	stat->hist2_ctrl =
 		NEO_STAT_HIST2_CTRL_CAM0_LIN_INPUT1_LOG_SET(hist->hist_ctrl_lin_input1_log) |
 		NEO_STAT_HIST2_CTRL_CAM0_DIR_INPUT1_DIF_SET(hist->hist_ctrl_dir_input1_dif) |
@@ -806,7 +857,8 @@ static void neoisp_params_handler_stat(struct neoisp_dev_s *neoispd,
 		NEO_STAT_HIST2_CTRL_CAM0_OFFSET_SET(hist->hist_ctrl_offset);
 	stat->hist2_scale =
 		NEO_STAT_HIST2_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
-	hist = &blk->stat.hists[3];
+
+	hist = &cfg->hists[3];
 	stat->hist3_ctrl =
 		NEO_STAT_HIST2_CTRL_CAM0_LIN_INPUT1_LOG_SET(hist->hist_ctrl_lin_input1_log) |
 		NEO_STAT_HIST2_CTRL_CAM0_DIR_INPUT1_DIF_SET(hist->hist_ctrl_dir_input1_dif) |
@@ -817,923 +869,918 @@ static void neoisp_params_handler_stat(struct neoisp_dev_s *neoispd,
 		NEO_STAT_HIST3_SCALE_CAM0_SCALE_SET(hist->hist_scale_scale);
 }
 
-static void neoisp_params_handler_ir_compress(struct neoisp_dev_s *neoispd,
-					      union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_ir_compress(struct neoisp_context_s *ctx,
+				  union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_ir_compress_s *ircomp = &ctx->hw.ir_compress;
+	struct neoisp_ir_compress_cfg_s *cfg;
+	u32 tmp;
 
-	ircomp->ctrl =
-		NEO_IR_COMPRESS_CTRL_CAM0_OBPP_SET(blk->ir_compress.ctrl_obpp) |
-		NEO_IR_COMPRESS_CTRL_CAM0_ENABLE_SET(blk->ir_compress.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		ircomp->ctrl &= ~NEO_IR_COMPRESS_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		ircomp->ctrl |= NEO_IR_COMPRESS_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->ir_compress.cfg;
+	tmp = ircomp->ctrl &
+		~NEO_IR_COMPRESS_CTRL_CAM0_OBPP;
+	tmp |= NEO_IR_COMPRESS_CTRL_CAM0_OBPP_SET(cfg->ctrl_obpp);
+	ircomp->ctrl = tmp;
+
 	ircomp->knee_point1 =
 		NEO_IR_COMPRESS_KNEE_POINT1_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_point1_kneepoint);
+		(cfg->knee_point1_kneepoint);
 	ircomp->knee_point2 =
 		NEO_IR_COMPRESS_KNEE_POINT2_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_point2_kneepoint);
+		(cfg->knee_point2_kneepoint);
 	ircomp->knee_point3 =
 		NEO_IR_COMPRESS_KNEE_POINT3_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_point3_kneepoint);
+		(cfg->knee_point3_kneepoint);
 	ircomp->knee_point4 =
 		NEO_IR_COMPRESS_KNEE_POINT4_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_point4_kneepoint);
+		(cfg->knee_point4_kneepoint);
 	ircomp->knee_offset0 =
 		NEO_IR_COMPRESS_KNEE_OFFSET0_CAM0_OFFSET_SET
-		(blk->ir_compress.knee_offset0_offset);
+		(cfg->knee_offset0_offset);
 	ircomp->knee_offset1 =
 		NEO_IR_COMPRESS_KNEE_OFFSET1_CAM0_OFFSET_SET
-		(blk->ir_compress.knee_offset1_offset);
+		(cfg->knee_offset1_offset);
 	ircomp->knee_offset2 =
 		NEO_IR_COMPRESS_KNEE_OFFSET2_CAM0_OFFSET_SET
-		(blk->ir_compress.knee_offset2_offset);
+		(cfg->knee_offset2_offset);
 	ircomp->knee_offset3 =
 		NEO_IR_COMPRESS_KNEE_OFFSET3_CAM0_OFFSET_SET
-		(blk->ir_compress.knee_offset3_offset);
+		(cfg->knee_offset3_offset);
 	ircomp->knee_offset4 =
 		NEO_IR_COMPRESS_KNEE_OFFSET4_CAM0_OFFSET_SET
-		(blk->ir_compress.knee_offset4_offset);
+		(cfg->knee_offset4_offset);
 	ircomp->knee_ratio01 =
 		NEO_IR_COMPRESS_KNEE_RATIO01_CAM0_RATIO0_SET
-		(blk->ir_compress.knee_ratio01_ratio0);
+		(cfg->knee_ratio01_ratio0);
 	ircomp->knee_ratio01 |=
 		NEO_IR_COMPRESS_KNEE_RATIO01_CAM0_RATIO1_SET
-		(blk->ir_compress.knee_ratio01_ratio1);
+		(cfg->knee_ratio01_ratio1);
 	ircomp->knee_ratio23 =
 		NEO_IR_COMPRESS_KNEE_RATIO23_CAM0_RATIO2_SET
-		(blk->ir_compress.knee_ratio23_ratio2);
+		(cfg->knee_ratio23_ratio2);
 	ircomp->knee_ratio23 |=
 		NEO_IR_COMPRESS_KNEE_RATIO23_CAM0_RATIO3_SET
-		(blk->ir_compress.knee_ratio23_ratio3);
+		(cfg->knee_ratio23_ratio3);
 	ircomp->knee_ratio4 =
 		NEO_IR_COMPRESS_KNEE_RATIO4_CAM0_RATIO4_SET
-		(blk->ir_compress.knee_ratio4_ratio4);
+		(cfg->knee_ratio4_ratio4);
 	ircomp->knee_npoint0 =
 		NEO_IR_COMPRESS_KNEE_NPOINT0_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_npoint0_kneepoint);
+		(cfg->knee_npoint0_kneepoint);
 	ircomp->knee_npoint1 =
 		NEO_IR_COMPRESS_KNEE_NPOINT1_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_npoint1_kneepoint);
+		(cfg->knee_npoint1_kneepoint);
 	ircomp->knee_npoint2 =
 		NEO_IR_COMPRESS_KNEE_NPOINT2_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_npoint2_kneepoint);
+		(cfg->knee_npoint2_kneepoint);
 	ircomp->knee_npoint3 =
 		NEO_IR_COMPRESS_KNEE_NPOINT3_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_npoint3_kneepoint);
+		(cfg->knee_npoint3_kneepoint);
 	ircomp->knee_npoint4 =
 		NEO_IR_COMPRESS_KNEE_NPOINT4_CAM0_KNEEPOINT_SET
-		(blk->ir_compress.knee_npoint4_kneepoint);
+		(cfg->knee_npoint4_kneepoint);
 }
 
-static void neoisp_params_handler_ctemp(struct neoisp_dev_s *neoispd,
-					union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_ctemp(struct neoisp_context_s *ctx,
+			    union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_ctemp_s *ctemp = &ctx->hw.ctemp;
+	struct neoisp_ctemp_cfg_s *cfg;
 	struct neoisp_ctemp_roi_desc_s *croi;
+	u32 tmp;
 
-	ctemp->ctrl =
-		NEO_COLOR_TEMP_CTRL_CAM0_IBPP_SET(blk->ctemp.ctrl_ibpp) |
-		NEO_COLOR_TEMP_CTRL_CAM0_CSCON_SET(blk->ctemp.ctrl_cscon) |
-		NEO_COLOR_TEMP_CTRL_CAM0_ENABLE_SET(blk->ctemp.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		ctemp->ctrl &= ~NEO_COLOR_TEMP_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		ctemp->ctrl |= NEO_COLOR_TEMP_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->ctemp.cfg;
+	tmp = ctemp->ctrl &
+		~(NEO_COLOR_TEMP_CTRL_CAM0_IBPP_MASK |
+		  NEO_COLOR_TEMP_CTRL_CAM0_CSCON);
+	tmp |=
+		NEO_COLOR_TEMP_CTRL_CAM0_IBPP_SET(cfg->ctrl_ibpp) |
+		NEO_COLOR_TEMP_CTRL_CAM0_CSCON_SET(cfg->ctrl_cscon);
+	ctemp->ctrl = tmp;
+
 	ctemp->roi_pos =
-		NEO_COLOR_TEMP_ROI_POS_CAM0_XPOS_SET(blk->ctemp.roi.xpos) |
-		NEO_COLOR_TEMP_ROI_POS_CAM0_YPOS_SET(blk->ctemp.roi.ypos);
+		NEO_COLOR_TEMP_ROI_POS_CAM0_XPOS_SET(cfg->roi.xpos) |
+		NEO_COLOR_TEMP_ROI_POS_CAM0_YPOS_SET(cfg->roi.ypos);
 	ctemp->roi_size =
-		NEO_COLOR_TEMP_ROI_SIZE_CAM0_WIDTH_SET(blk->ctemp.roi.width) |
-		NEO_COLOR_TEMP_ROI_SIZE_CAM0_HEIGHT_SET(blk->ctemp.roi.height);
+		NEO_COLOR_TEMP_ROI_SIZE_CAM0_WIDTH_SET(cfg->roi.width) |
+		NEO_COLOR_TEMP_ROI_SIZE_CAM0_HEIGHT_SET(cfg->roi.height);
 	ctemp->redgain =
-		NEO_COLOR_TEMP_REDGAIN_CAM0_MIN_SET(blk->ctemp.redgain_min) |
-		NEO_COLOR_TEMP_REDGAIN_CAM0_MAX_SET(blk->ctemp.redgain_max);
+		NEO_COLOR_TEMP_REDGAIN_CAM0_MIN_SET(cfg->redgain_min) |
+		NEO_COLOR_TEMP_REDGAIN_CAM0_MAX_SET(cfg->redgain_max);
 	ctemp->bluegain =
-		NEO_COLOR_TEMP_BLUEGAIN_CAM0_MIN_SET(blk->ctemp.bluegain_min) |
-		NEO_COLOR_TEMP_BLUEGAIN_CAM0_MAX_SET(blk->ctemp.bluegain_max);
+		NEO_COLOR_TEMP_BLUEGAIN_CAM0_MIN_SET(cfg->bluegain_min) |
+		NEO_COLOR_TEMP_BLUEGAIN_CAM0_MAX_SET(cfg->bluegain_max);
 	ctemp->point1 =
-		NEO_COLOR_TEMP_POINT1_CAM0_BLUE_SET(blk->ctemp.point1_blue) |
-		NEO_COLOR_TEMP_POINT1_CAM0_RED_SET(blk->ctemp.point1_red);
+		NEO_COLOR_TEMP_POINT1_CAM0_BLUE_SET(cfg->point1_blue) |
+		NEO_COLOR_TEMP_POINT1_CAM0_RED_SET(cfg->point1_red);
 	ctemp->point2 =
-		NEO_COLOR_TEMP_POINT2_CAM0_BLUE_SET(blk->ctemp.point2_blue) |
-		NEO_COLOR_TEMP_POINT2_CAM0_RED_SET(blk->ctemp.point2_red);
+		NEO_COLOR_TEMP_POINT2_CAM0_BLUE_SET(cfg->point2_blue) |
+		NEO_COLOR_TEMP_POINT2_CAM0_RED_SET(cfg->point2_red);
 	ctemp->hoffset =
-		NEO_COLOR_TEMP_HOFFSET_CAM0_RIGHT_SET(blk->ctemp.hoffset_right) |
-		NEO_COLOR_TEMP_HOFFSET_CAM0_LEFT_SET(blk->ctemp.hoffset_left);
+		NEO_COLOR_TEMP_HOFFSET_CAM0_RIGHT_SET(cfg->hoffset_right) |
+		NEO_COLOR_TEMP_HOFFSET_CAM0_LEFT_SET(cfg->hoffset_left);
 	ctemp->voffset =
-		NEO_COLOR_TEMP_VOFFSET_CAM0_UP_SET(blk->ctemp.voffset_up) |
-		NEO_COLOR_TEMP_VOFFSET_CAM0_DOWN_SET(blk->ctemp.voffset_down);
+		NEO_COLOR_TEMP_VOFFSET_CAM0_UP_SET(cfg->voffset_up) |
+		NEO_COLOR_TEMP_VOFFSET_CAM0_DOWN_SET(cfg->voffset_down);
 	ctemp->point1_slope =
-		NEO_COLOR_TEMP_POINT1_SLOPE_CAM0_SLOPE_L_SET(blk->ctemp.point1_slope_slope_l) |
-		NEO_COLOR_TEMP_POINT1_SLOPE_CAM0_SLOPE_R_SET(blk->ctemp.point1_slope_slope_r);
+		NEO_COLOR_TEMP_POINT1_SLOPE_CAM0_SLOPE_L_SET(cfg->point1_slope_slope_l) |
+		NEO_COLOR_TEMP_POINT1_SLOPE_CAM0_SLOPE_R_SET(cfg->point1_slope_slope_r);
 	ctemp->point2_slope =
-		NEO_COLOR_TEMP_POINT2_SLOPE_CAM0_SLOPE_L_SET(blk->ctemp.point2_slope_slope_l) |
-		NEO_COLOR_TEMP_POINT2_SLOPE_CAM0_SLOPE_R_SET(blk->ctemp.point2_slope_slope_r);
+		NEO_COLOR_TEMP_POINT2_SLOPE_CAM0_SLOPE_L_SET(cfg->point2_slope_slope_l) |
+		NEO_COLOR_TEMP_POINT2_SLOPE_CAM0_SLOPE_R_SET(cfg->point2_slope_slope_r);
 	ctemp->luma_th =
-		NEO_COLOR_TEMP_LUMA_TH_CAM0_THL_SET(blk->ctemp.luma_th_thl) |
-		NEO_COLOR_TEMP_LUMA_TH_CAM0_THH_SET(blk->ctemp.luma_th_thh);
+		NEO_COLOR_TEMP_LUMA_TH_CAM0_THL_SET(cfg->luma_th_thl) |
+		NEO_COLOR_TEMP_LUMA_TH_CAM0_THH_SET(cfg->luma_th_thh);
 	ctemp->csc_mat0 =
-		NEO_COLOR_TEMP_CSC_MAT0_CAM0_R0C0_SET(blk->ctemp.csc_matrix[0][0]) |
-		NEO_COLOR_TEMP_CSC_MAT0_CAM0_R0C1_SET(blk->ctemp.csc_matrix[0][1]);
+		NEO_COLOR_TEMP_CSC_MAT0_CAM0_R0C0_SET(cfg->csc_matrix[0][0]) |
+		NEO_COLOR_TEMP_CSC_MAT0_CAM0_R0C1_SET(cfg->csc_matrix[0][1]);
 	ctemp->csc_mat1 =
-		NEO_COLOR_TEMP_CSC_MAT1_CAM0_R0C2_SET(blk->ctemp.csc_matrix[0][2]) |
-		NEO_COLOR_TEMP_CSC_MAT1_CAM0_R1C0_SET(blk->ctemp.csc_matrix[1][0]);
+		NEO_COLOR_TEMP_CSC_MAT1_CAM0_R0C2_SET(cfg->csc_matrix[0][2]) |
+		NEO_COLOR_TEMP_CSC_MAT1_CAM0_R1C0_SET(cfg->csc_matrix[1][0]);
 	ctemp->csc_mat2 =
-		NEO_COLOR_TEMP_CSC_MAT2_CAM0_R1C1_SET(blk->ctemp.csc_matrix[1][1]) |
-		NEO_COLOR_TEMP_CSC_MAT2_CAM0_R1C2_SET(blk->ctemp.csc_matrix[1][2]);
+		NEO_COLOR_TEMP_CSC_MAT2_CAM0_R1C1_SET(cfg->csc_matrix[1][1]) |
+		NEO_COLOR_TEMP_CSC_MAT2_CAM0_R1C2_SET(cfg->csc_matrix[1][2]);
 	ctemp->csc_mat3 =
-		NEO_COLOR_TEMP_CSC_MAT3_CAM0_R2C0_SET(blk->ctemp.csc_matrix[2][0]) |
-		NEO_COLOR_TEMP_CSC_MAT3_CAM0_R2C1_SET(blk->ctemp.csc_matrix[2][1]);
+		NEO_COLOR_TEMP_CSC_MAT3_CAM0_R2C0_SET(cfg->csc_matrix[2][0]) |
+		NEO_COLOR_TEMP_CSC_MAT3_CAM0_R2C1_SET(cfg->csc_matrix[2][1]);
 	ctemp->csc_mat4 =
-		NEO_COLOR_TEMP_CSC_MAT4_CAM0_R2C2_SET(blk->ctemp.csc_matrix[2][2]);
+		NEO_COLOR_TEMP_CSC_MAT4_CAM0_R2C2_SET(cfg->csc_matrix[2][2]);
 	ctemp->r_gr_offset =
-		NEO_COLOR_TEMP_R_GR_OFFSET_CAM0_OFFSET0_SET(blk->ctemp.offsets[0]) |
-		NEO_COLOR_TEMP_R_GR_OFFSET_CAM0_OFFSET1_SET(blk->ctemp.offsets[1]);
+		NEO_COLOR_TEMP_R_GR_OFFSET_CAM0_OFFSET0_SET(cfg->offsets[0]) |
+		NEO_COLOR_TEMP_R_GR_OFFSET_CAM0_OFFSET1_SET(cfg->offsets[1]);
 	ctemp->gb_b_offset =
-		NEO_COLOR_TEMP_GB_B_OFFSET_CAM0_OFFSET0_SET(blk->ctemp.offsets[2]) |
-		NEO_COLOR_TEMP_GB_B_OFFSET_CAM0_OFFSET1_SET(blk->ctemp.offsets[3]);
+		NEO_COLOR_TEMP_GB_B_OFFSET_CAM0_OFFSET0_SET(cfg->offsets[2]) |
+		NEO_COLOR_TEMP_GB_B_OFFSET_CAM0_OFFSET1_SET(cfg->offsets[3]);
 	ctemp->stat_blk_size0 =
-		NEO_COLOR_TEMP_STAT_BLK_SIZE0_XSIZE_SET(blk->ctemp.stat_blk_size0_xsize) |
-		NEO_COLOR_TEMP_STAT_BLK_SIZE0_YSIZE_SET(blk->ctemp.stat_blk_size0_ysize);
-	croi = &blk->ctemp.color_rois[0];
+		NEO_COLOR_TEMP_STAT_BLK_SIZE0_XSIZE_SET(cfg->stat_blk_size0_xsize) |
+		NEO_COLOR_TEMP_STAT_BLK_SIZE0_YSIZE_SET(cfg->stat_blk_size0_ysize);
+
+	croi = &cfg->color_rois[0];
 	ctemp->croi0_pos =
 		NEO_COLOR_TEMP_CROI0_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI0_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI0_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI0_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[1];
+
+	croi = &cfg->color_rois[1];
 	ctemp->croi1_pos =
 		NEO_COLOR_TEMP_CROI1_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI1_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI1_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI1_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[2];
+
+	croi = &cfg->color_rois[2];
 	ctemp->croi2_pos =
 		NEO_COLOR_TEMP_CROI2_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI2_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI2_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI2_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[3];
+
+	croi = &cfg->color_rois[3];
 	ctemp->croi3_pos =
 		NEO_COLOR_TEMP_CROI3_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI3_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI3_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI3_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[4];
+
+	croi = &cfg->color_rois[4];
 	ctemp->croi4_pos =
 		NEO_COLOR_TEMP_CROI4_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI4_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI4_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI4_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[5];
+
+	croi = &cfg->color_rois[5];
 	ctemp->croi5_pos =
 		NEO_COLOR_TEMP_CROI5_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI5_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI5_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI5_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[6];
+
+	croi = &cfg->color_rois[6];
 	ctemp->croi6_pos =
 		NEO_COLOR_TEMP_CROI6_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI6_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI6_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI6_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[7];
+
+	croi = &cfg->color_rois[7];
 	ctemp->croi7_pos =
 		NEO_COLOR_TEMP_CROI7_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI7_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI7_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI7_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[8];
+
+	croi = &cfg->color_rois[8];
 	ctemp->croi8_pos =
 		NEO_COLOR_TEMP_CROI8_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI8_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI8_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI8_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
-	croi = &blk->ctemp.color_rois[9];
+
+	croi = &cfg->color_rois[9];
 	ctemp->croi9_pos =
 		NEO_COLOR_TEMP_CROI9_POS_CAM0_ROVERG_LOW_SET(croi->pos_roverg_low) |
 		NEO_COLOR_TEMP_CROI9_POS_CAM0_ROVERG_HIGH_SET(croi->pos_roverg_high) |
 		NEO_COLOR_TEMP_CROI9_POS_CAM0_BOVERG_LOW_SET(croi->pos_boverg_low) |
 		NEO_COLOR_TEMP_CROI9_POS_CAM0_BOVERG_HIGH_SET(croi->pos_boverg_high);
+
 	ctemp->gr_avg_in =
-		NEO_COLOR_TEMP_GR_AVG_IN_CAM0_GR_AGV_SET(blk->ctemp.gr_avg_in_gr_agv);
+		NEO_COLOR_TEMP_GR_AVG_IN_CAM0_GR_AGV_SET(cfg->gr_avg_in_gr_agv);
 	ctemp->gb_avg_in =
-		NEO_COLOR_TEMP_GB_AVG_IN_CAM0_GB_AGV_SET(blk->ctemp.gb_avg_in_gb_agv);
+		NEO_COLOR_TEMP_GB_AVG_IN_CAM0_GB_AGV_SET(cfg->gb_avg_in_gb_agv);
 }
 
-static void neoisp_params_handler_bnr(struct neoisp_dev_s *neoispd,
-				      union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_bnr(struct neoisp_context_s *ctx,
+			  union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_bnr_s *bnr = &ctx->hw.bnr;
+	struct neoisp_bnr_cfg_s *cfg;
+	u32 tmp;
 
-	bnr->ctrl =
-		NEO_BNR_CTRL_CAM0_OBPP_SET(blk->bnr.ctrl_obpp) |
-		NEO_BNR_CTRL_CAM0_DEBUG_SET(blk->bnr.ctrl_debug) |
-		NEO_BNR_CTRL_CAM0_NHOOD_SET(blk->bnr.ctrl_nhood) |
-		NEO_BNR_CTRL_CAM0_ENABLE_SET(blk->bnr.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		bnr->ctrl &= ~NEO_BNR_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		bnr->ctrl |= NEO_BNR_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->bnr.cfg;
+	tmp = bnr->ctrl &
+		~(NEO_BNR_CTRL_CAM0_OBPP_MASK |
+		  NEO_BNR_CTRL_CAM0_DEBUG_MASK |
+		  NEO_BNR_CTRL_CAM0_NHOOD);
+	tmp |=
+		NEO_BNR_CTRL_CAM0_OBPP_SET(cfg->ctrl_obpp) |
+		NEO_BNR_CTRL_CAM0_DEBUG_SET(cfg->ctrl_debug) |
+		NEO_BNR_CTRL_CAM0_NHOOD_SET(cfg->ctrl_nhood);
+	bnr->ctrl = tmp;
+
 	bnr->ypeak =
-		NEO_BNR_YPEAK_CAM0_PEAK_LOW_SET(blk->bnr.ypeak_peak_low) |
-		NEO_BNR_YPEAK_CAM0_PEAK_SEL_SET(blk->bnr.ypeak_peak_sel) |
-		NEO_BNR_YPEAK_CAM0_PEAK_HIGH_SET(blk->bnr.ypeak_peak_high) |
-		NEO_BNR_YPEAK_CAM0_PEAK_OUTSEL_SET(blk->bnr.ypeak_peak_outsel);
+		NEO_BNR_YPEAK_CAM0_PEAK_LOW_SET(cfg->ypeak_peak_low) |
+		NEO_BNR_YPEAK_CAM0_PEAK_SEL_SET(cfg->ypeak_peak_sel) |
+		NEO_BNR_YPEAK_CAM0_PEAK_HIGH_SET(cfg->ypeak_peak_high) |
+		NEO_BNR_YPEAK_CAM0_PEAK_OUTSEL_SET(cfg->ypeak_peak_outsel);
 	bnr->yedge_th0 =
-		NEO_BNR_YEDGE_TH0_CAM0_EDGE_TH0_SET(blk->bnr.yedge_th0_edge_th0);
+		NEO_BNR_YEDGE_TH0_CAM0_EDGE_TH0_SET(cfg->yedge_th0_edge_th0);
 	bnr->yedge_scale =
-		NEO_BNR_YEDGE_SCALE_CAM0_SCALE_SET(blk->bnr.yedge_scale_scale) |
-		NEO_BNR_YEDGE_SCALE_CAM0_SHIFT_SET(blk->bnr.yedge_scale_shift);
+		NEO_BNR_YEDGE_SCALE_CAM0_SCALE_SET(cfg->yedge_scale_scale) |
+		NEO_BNR_YEDGE_SCALE_CAM0_SHIFT_SET(cfg->yedge_scale_shift);
 	bnr->yedges_th0 =
-		NEO_BNR_YEDGES_TH0_CAM0_EDGE_TH0_SET(blk->bnr.yedges_th0_edge_th0);
+		NEO_BNR_YEDGES_TH0_CAM0_EDGE_TH0_SET(cfg->yedges_th0_edge_th0);
 	bnr->yedges_scale =
-		NEO_BNR_YEDGES_SCALE_CAM0_SCALE_SET(blk->bnr.yedges_scale_scale) |
-		NEO_BNR_YEDGES_SCALE_CAM0_SHIFT_SET(blk->bnr.yedges_scale_shift);
+		NEO_BNR_YEDGES_SCALE_CAM0_SCALE_SET(cfg->yedges_scale_scale) |
+		NEO_BNR_YEDGES_SCALE_CAM0_SHIFT_SET(cfg->yedges_scale_shift);
 	bnr->yedgea_th0 =
-		NEO_BNR_YEDGEA_TH0_CAM0_EDGE_TH0_SET(blk->bnr.yedgea_th0_edge_th0);
+		NEO_BNR_YEDGEA_TH0_CAM0_EDGE_TH0_SET(cfg->yedgea_th0_edge_th0);
 	bnr->yedgea_scale =
-		NEO_BNR_YEDGEA_SCALE_CAM0_SCALE_SET(blk->bnr.yedgea_scale_scale) |
-		NEO_BNR_YEDGEA_SCALE_CAM0_SHIFT_SET(blk->bnr.yedgea_scale_shift);
+		NEO_BNR_YEDGEA_SCALE_CAM0_SCALE_SET(cfg->yedgea_scale_scale) |
+		NEO_BNR_YEDGEA_SCALE_CAM0_SHIFT_SET(cfg->yedgea_scale_shift);
 	bnr->yluma_x_th0 =
-		NEO_BNR_YLUMA_X_TH0_CAM0_TH_SET(blk->bnr.yluma_x_th0_th);
+		NEO_BNR_YLUMA_X_TH0_CAM0_TH_SET(cfg->yluma_x_th0_th);
 	bnr->yluma_y_th =
-		NEO_BNR_YLUMA_Y_TH_CAM0_LUMA_Y_TH0_SET(blk->bnr.yluma_y_th_luma_y_th0) |
-		NEO_BNR_YLUMA_Y_TH_CAM0_LUMA_Y_TH1_SET(blk->bnr.yluma_y_th_luma_y_th1);
+		NEO_BNR_YLUMA_Y_TH_CAM0_LUMA_Y_TH0_SET(cfg->yluma_y_th_luma_y_th0) |
+		NEO_BNR_YLUMA_Y_TH_CAM0_LUMA_Y_TH1_SET(cfg->yluma_y_th_luma_y_th1);
 	bnr->yluma_scale =
-		NEO_BNR_YLUMA_SCALE_CAM0_SCALE_SET(blk->bnr.yluma_scale_scale) |
-		NEO_BNR_YLUMA_SCALE_CAM0_SHIFT_SET(blk->bnr.yluma_scale_shift);
+		NEO_BNR_YLUMA_SCALE_CAM0_SCALE_SET(cfg->yluma_scale_scale) |
+		NEO_BNR_YLUMA_SCALE_CAM0_SHIFT_SET(cfg->yluma_scale_shift);
 	bnr->yalpha_gain =
-		NEO_BNR_YALPHA_GAIN_CAM0_GAIN_SET(blk->bnr.yalpha_gain_gain) |
-		NEO_BNR_YALPHA_GAIN_CAM0_OFFSET_SET(blk->bnr.yalpha_gain_offset);
+		NEO_BNR_YALPHA_GAIN_CAM0_GAIN_SET(cfg->yalpha_gain_gain) |
+		NEO_BNR_YALPHA_GAIN_CAM0_OFFSET_SET(cfg->yalpha_gain_offset);
 	bnr->cpeak =
-		NEO_BNR_CPEAK_CAM0_PEAK_LOW_SET(blk->bnr.cpeak_peak_low) |
-		NEO_BNR_CPEAK_CAM0_PEAK_SEL_SET(blk->bnr.cpeak_peak_sel) |
-		NEO_BNR_CPEAK_CAM0_PEAK_HIGH_SET(blk->bnr.cpeak_peak_high) |
-		NEO_BNR_CPEAK_CAM0_PEAK_OUTSEL_SET(blk->bnr.cpeak_peak_outsel);
+		NEO_BNR_CPEAK_CAM0_PEAK_LOW_SET(cfg->cpeak_peak_low) |
+		NEO_BNR_CPEAK_CAM0_PEAK_SEL_SET(cfg->cpeak_peak_sel) |
+		NEO_BNR_CPEAK_CAM0_PEAK_HIGH_SET(cfg->cpeak_peak_high) |
+		NEO_BNR_CPEAK_CAM0_PEAK_OUTSEL_SET(cfg->cpeak_peak_outsel);
 	bnr->cedge_th0 =
-		NEO_BNR_CEDGE_TH0_CAM0_EDGE_TH0_SET(blk->bnr.cedge_th0_edge_th0);
+		NEO_BNR_CEDGE_TH0_CAM0_EDGE_TH0_SET(cfg->cedge_th0_edge_th0);
 	bnr->cedge_scale =
-		NEO_BNR_CEDGE_SCALE_CAM0_SCALE_SET(blk->bnr.cedge_scale_scale) |
-		NEO_BNR_CEDGE_SCALE_CAM0_SHIFT_SET(blk->bnr.cedge_scale_shift);
+		NEO_BNR_CEDGE_SCALE_CAM0_SCALE_SET(cfg->cedge_scale_scale) |
+		NEO_BNR_CEDGE_SCALE_CAM0_SHIFT_SET(cfg->cedge_scale_shift);
 	bnr->cedges_th0 =
-		NEO_BNR_CEDGES_TH0_CAM0_EDGE_TH0_SET(blk->bnr.cedges_th0_edge_th0);
+		NEO_BNR_CEDGES_TH0_CAM0_EDGE_TH0_SET(cfg->cedges_th0_edge_th0);
 	bnr->cedges_scale =
-		NEO_BNR_CEDGES_SCALE_CAM0_SCALE_SET(blk->bnr.cedges_scale_scale) |
-		NEO_BNR_CEDGES_SCALE_CAM0_SHIFT_SET(blk->bnr.cedges_scale_shift);
+		NEO_BNR_CEDGES_SCALE_CAM0_SCALE_SET(cfg->cedges_scale_scale) |
+		NEO_BNR_CEDGES_SCALE_CAM0_SHIFT_SET(cfg->cedges_scale_shift);
 	bnr->cedgea_th0 =
-		NEO_BNR_CEDGEA_TH0_CAM0_EDGE_TH0_SET(blk->bnr.cedgea_th0_edge_th0);
+		NEO_BNR_CEDGEA_TH0_CAM0_EDGE_TH0_SET(cfg->cedgea_th0_edge_th0);
 	bnr->cedgea_scale =
-		NEO_BNR_CEDGEA_SCALE_CAM0_SCALE_SET(blk->bnr.cedgea_scale_scale) |
-		NEO_BNR_CEDGEA_SCALE_CAM0_SHIFT_SET(blk->bnr.cedgea_scale_shift);
+		NEO_BNR_CEDGEA_SCALE_CAM0_SCALE_SET(cfg->cedgea_scale_scale) |
+		NEO_BNR_CEDGEA_SCALE_CAM0_SHIFT_SET(cfg->cedgea_scale_shift);
 	bnr->cluma_x_th0 =
-		NEO_BNR_CLUMA_X_TH0_CAM0_TH_SET(blk->bnr.cluma_x_th0_th);
+		NEO_BNR_CLUMA_X_TH0_CAM0_TH_SET(cfg->cluma_x_th0_th);
 	bnr->cluma_y_th =
-		NEO_BNR_CLUMA_Y_TH_CAM0_LUMA_Y_TH0_SET(blk->bnr.cluma_y_th_luma_y_th0) |
-		NEO_BNR_CLUMA_Y_TH_CAM0_LUMA_Y_TH1_SET(blk->bnr.cluma_y_th_luma_y_th1);
+		NEO_BNR_CLUMA_Y_TH_CAM0_LUMA_Y_TH0_SET(cfg->cluma_y_th_luma_y_th0) |
+		NEO_BNR_CLUMA_Y_TH_CAM0_LUMA_Y_TH1_SET(cfg->cluma_y_th_luma_y_th1);
 	bnr->cluma_scale =
-		NEO_BNR_CLUMA_SCALE_CAM0_SCALE_SET(blk->bnr.cluma_scale_scale) |
-		NEO_BNR_CLUMA_SCALE_CAM0_SHIFT_SET(blk->bnr.cluma_scale_shift);
+		NEO_BNR_CLUMA_SCALE_CAM0_SCALE_SET(cfg->cluma_scale_scale) |
+		NEO_BNR_CLUMA_SCALE_CAM0_SHIFT_SET(cfg->cluma_scale_shift);
 	bnr->calpha_gain =
-		NEO_BNR_CALPHA_GAIN_CAM0_GAIN_SET(blk->bnr.calpha_gain_gain) |
-		NEO_BNR_CALPHA_GAIN_CAM0_OFFSET_SET(blk->bnr.calpha_gain_offset);
+		NEO_BNR_CALPHA_GAIN_CAM0_GAIN_SET(cfg->calpha_gain_gain) |
+		NEO_BNR_CALPHA_GAIN_CAM0_OFFSET_SET(cfg->calpha_gain_offset);
 	bnr->stretch =
-		NEO_BNR_STRETCH_CAM0_GAIN_SET(blk->bnr.stretch_gain);
+		NEO_BNR_STRETCH_CAM0_GAIN_SET(cfg->stretch_gain);
 }
 
-static void neoisp_params_handler_vignetting_ctrl(struct neoisp_dev_s *neoispd,
-						  union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_vignetting_ctrl(struct neoisp_context_s *ctx,
+				      union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_vignetting_ctrl_s *vignetting = &ctx->hw.vignetting_ctrl;
+	struct neoisp_vignetting_ctrl_cfg_s *cfg;
 
-	vignetting->ctrl =
-		NEO_VIGNETTING_CTRL_CAM0_ENABLE_SET(blk->vignetting_ctrl.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		vignetting->ctrl &= ~NEO_VIGNETTING_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		vignetting->ctrl |= NEO_VIGNETTING_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->vignetting_ctrl.cfg;
 	vignetting->blk_conf =
-		NEO_VIGNETTING_BLK_CONF_CAM0_COLS_SET(blk->vignetting_ctrl.blk_conf_cols) |
-		NEO_VIGNETTING_BLK_CONF_CAM0_ROWS_SET(blk->vignetting_ctrl.blk_conf_rows);
+		NEO_VIGNETTING_BLK_CONF_CAM0_COLS_SET(cfg->blk_conf_cols) |
+		NEO_VIGNETTING_BLK_CONF_CAM0_ROWS_SET(cfg->blk_conf_rows);
 	vignetting->blk_size =
-		NEO_VIGNETTING_BLK_SIZE_CAM0_XSIZE_SET(blk->vignetting_ctrl.blk_size_xsize) |
-		NEO_VIGNETTING_BLK_SIZE_CAM0_YSIZE_SET(blk->vignetting_ctrl.blk_size_ysize);
+		NEO_VIGNETTING_BLK_SIZE_CAM0_XSIZE_SET(cfg->blk_size_xsize) |
+		NEO_VIGNETTING_BLK_SIZE_CAM0_YSIZE_SET(cfg->blk_size_ysize);
 	vignetting->blk_stepy =
-		NEO_VIGNETTING_BLK_STEPY_CAM0_STEP_SET(blk->vignetting_ctrl.blk_stepy_step);
+		NEO_VIGNETTING_BLK_STEPY_CAM0_STEP_SET(cfg->blk_stepy_step);
 	vignetting->blk_stepx =
-		NEO_VIGNETTING_BLK_STEPX_CAM0_STEP_SET(blk->vignetting_ctrl.blk_stepx_step);
+		NEO_VIGNETTING_BLK_STEPX_CAM0_STEP_SET(cfg->blk_stepx_step);
 }
 
-static void neoisp_params_handler_demosaic(struct neoisp_dev_s *neoispd,
-					   union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_demosaic(struct neoisp_context_s *ctx,
+			       union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_demosaic_s *demosaic = &ctx->hw.demosaic;
+	struct neoisp_demosaic_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->demosaic.cfg;
 	demosaic->ctrl =
-		NEO_DEMOSAIC_CTRL_CAM0_FMT_SET(blk->demosaic.ctrl_fmt);
+		NEO_DEMOSAIC_CTRL_CAM0_FMT_SET(cfg->ctrl_fmt);
 	demosaic->activity_ctl =
-		NEO_DEMOSAIC_ACTIVITY_CTL_CAM0_ALPHA_SET(blk->demosaic.activity_ctl_alpha) |
-		NEO_DEMOSAIC_ACTIVITY_CTL_CAM0_ACT_RATIO_SET(blk->demosaic.activity_ctl_act_ratio);
+		NEO_DEMOSAIC_ACTIVITY_CTL_CAM0_ALPHA_SET(cfg->activity_ctl_alpha) |
+		NEO_DEMOSAIC_ACTIVITY_CTL_CAM0_ACT_RATIO_SET(cfg->activity_ctl_act_ratio);
 	demosaic->dynamics_ctl0 =
 		NEO_DEMOSAIC_DYNAMICS_CTL0_CAM0_STRENGTHG_SET
-		(blk->demosaic.dynamics_ctl0_strengthg);
+		(cfg->dynamics_ctl0_strengthg);
 	demosaic->dynamics_ctl0 |=
 		NEO_DEMOSAIC_DYNAMICS_CTL0_CAM0_STRENGTHC_SET
-		(blk->demosaic.dynamics_ctl0_strengthc);
+		(cfg->dynamics_ctl0_strengthc);
 	demosaic->dynamics_ctl2 =
 		NEO_DEMOSAIC_DYNAMICS_CTL2_CAM0_MAX_IMPACT_SET
-		(blk->demosaic.dynamics_ctl2_max_impact);
+		(cfg->dynamics_ctl2_max_impact);
 }
 
-static void neoisp_params_handler_rgb2yuv(struct neoisp_dev_s *neoispd,
-					  union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_rgb2yuv(struct neoisp_context_s *ctx,
+			      union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_rgb2yuv_s *rgb2yuv = &ctx->hw.rgb2yuv;
+	struct neoisp_rgb2yuv_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->rgb2yuv.cfg;
 	rgb2yuv->gain_ctrl =
-		NEO_RGB_TO_YUV_GAIN_CTRL_CAM0_RGAIN_SET(blk->rgb2yuv.gain_ctrl_rgain) |
-		NEO_RGB_TO_YUV_GAIN_CTRL_CAM0_BGAIN_SET(blk->rgb2yuv.gain_ctrl_bgain);
+		NEO_RGB_TO_YUV_GAIN_CTRL_CAM0_RGAIN_SET(cfg->gain_ctrl_rgain) |
+		NEO_RGB_TO_YUV_GAIN_CTRL_CAM0_BGAIN_SET(cfg->gain_ctrl_bgain);
 	rgb2yuv->mat0 =
-		NEO_RGB_TO_YUV_MAT0_CAM0_R0C0_SET(blk->rgb2yuv.mat_rxcy[0][0]) |
-		NEO_RGB_TO_YUV_MAT0_CAM0_R0C1_SET(blk->rgb2yuv.mat_rxcy[0][1]);
+		NEO_RGB_TO_YUV_MAT0_CAM0_R0C0_SET(cfg->mat_rxcy[0][0]) |
+		NEO_RGB_TO_YUV_MAT0_CAM0_R0C1_SET(cfg->mat_rxcy[0][1]);
 	rgb2yuv->mat1 =
-		NEO_RGB_TO_YUV_MAT1_CAM0_R0C2_SET(blk->rgb2yuv.mat_rxcy[0][2]);
+		NEO_RGB_TO_YUV_MAT1_CAM0_R0C2_SET(cfg->mat_rxcy[0][2]);
 	rgb2yuv->mat2 =
-		NEO_RGB_TO_YUV_MAT2_CAM0_R1C0_SET(blk->rgb2yuv.mat_rxcy[1][0]) |
-		NEO_RGB_TO_YUV_MAT2_CAM0_R1C1_SET(blk->rgb2yuv.mat_rxcy[1][1]);
+		NEO_RGB_TO_YUV_MAT2_CAM0_R1C0_SET(cfg->mat_rxcy[1][0]) |
+		NEO_RGB_TO_YUV_MAT2_CAM0_R1C1_SET(cfg->mat_rxcy[1][1]);
 	rgb2yuv->mat3 =
-		NEO_RGB_TO_YUV_MAT3_CAM0_R1C2_SET(blk->rgb2yuv.mat_rxcy[1][2]);
+		NEO_RGB_TO_YUV_MAT3_CAM0_R1C2_SET(cfg->mat_rxcy[1][2]);
 	rgb2yuv->mat4 =
-		NEO_RGB_TO_YUV_MAT4_CAM0_R2C0_SET(blk->rgb2yuv.mat_rxcy[2][0]) |
-		NEO_RGB_TO_YUV_MAT4_CAM0_R2C1_SET(blk->rgb2yuv.mat_rxcy[2][1]);
+		NEO_RGB_TO_YUV_MAT4_CAM0_R2C0_SET(cfg->mat_rxcy[2][0]) |
+		NEO_RGB_TO_YUV_MAT4_CAM0_R2C1_SET(cfg->mat_rxcy[2][1]);
 	rgb2yuv->mat5 =
-		NEO_RGB_TO_YUV_MAT5_CAM0_R2C2_SET(blk->rgb2yuv.mat_rxcy[2][2]);
+		NEO_RGB_TO_YUV_MAT5_CAM0_R2C2_SET(cfg->mat_rxcy[2][2]);
 	rgb2yuv->offset0 =
-		NEO_RGB_TO_YUV_OFFSET0_CAM0_OFFSET_SET(blk->rgb2yuv.csc_offsets[0]);
+		NEO_RGB_TO_YUV_OFFSET0_CAM0_OFFSET_SET(cfg->csc_offsets[0]);
 	rgb2yuv->offset1 =
-		NEO_RGB_TO_YUV_OFFSET1_CAM0_OFFSET_SET(blk->rgb2yuv.csc_offsets[1]);
+		NEO_RGB_TO_YUV_OFFSET1_CAM0_OFFSET_SET(cfg->csc_offsets[1]);
 	rgb2yuv->offset2 =
-		NEO_RGB_TO_YUV_OFFSET2_CAM0_OFFSET_SET(blk->rgb2yuv.csc_offsets[2]);
+		NEO_RGB_TO_YUV_OFFSET2_CAM0_OFFSET_SET(cfg->csc_offsets[2]);
 }
 
-static void neoisp_params_handler_dr_comp(struct neoisp_dev_s *neoispd,
-					  union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_dr_comp(struct neoisp_context_s *ctx,
+			      union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_dr_comp_s *drc = &ctx->hw.drc;
+	struct neoisp_dr_comp_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->dr_comp.cfg;
 	drc->roi0_pos =
-		NEO_DRC_ROI0_POS_CAM0_XPOS_SET(blk->drc.roi0.xpos) |
-		NEO_DRC_ROI0_POS_CAM0_YPOS_SET(blk->drc.roi0.ypos);
+		NEO_DRC_ROI0_POS_CAM0_XPOS_SET(cfg->roi0.xpos) |
+		NEO_DRC_ROI0_POS_CAM0_YPOS_SET(cfg->roi0.ypos);
 	drc->roi0_size =
-		NEO_DRC_ROI0_SIZE_CAM0_WIDTH_SET(blk->drc.roi0.width) |
-		NEO_DRC_ROI0_SIZE_CAM0_HEIGHT_SET(blk->drc.roi0.height);
+		NEO_DRC_ROI0_SIZE_CAM0_WIDTH_SET(cfg->roi0.width) |
+		NEO_DRC_ROI0_SIZE_CAM0_HEIGHT_SET(cfg->roi0.height);
 	drc->roi1_pos =
-		NEO_DRC_ROI1_POS_CAM0_XPOS_SET(blk->drc.roi1.xpos) |
-		NEO_DRC_ROI1_POS_CAM0_YPOS_SET(blk->drc.roi1.ypos);
+		NEO_DRC_ROI1_POS_CAM0_XPOS_SET(cfg->roi1.xpos) |
+		NEO_DRC_ROI1_POS_CAM0_YPOS_SET(cfg->roi1.ypos);
 	drc->roi1_size =
-		NEO_DRC_ROI1_SIZE_CAM0_WIDTH_SET(blk->drc.roi1.width) |
-		NEO_DRC_ROI1_SIZE_CAM0_HEIGHT_SET(blk->drc.roi1.height);
+		NEO_DRC_ROI1_SIZE_CAM0_WIDTH_SET(cfg->roi1.width) |
+		NEO_DRC_ROI1_SIZE_CAM0_HEIGHT_SET(cfg->roi1.height);
 	drc->groi_sum_shift =
-		NEO_DRC_GROI_SUM_SHIFT_CAM0_SHIFT0_SET(blk->drc.groi_sum_shift_shift0) |
-		NEO_DRC_GROI_SUM_SHIFT_CAM0_SHIFT1_SET(blk->drc.groi_sum_shift_shift1);
+		NEO_DRC_GROI_SUM_SHIFT_CAM0_SHIFT0_SET(cfg->groi_sum_shift_shift0) |
+		NEO_DRC_GROI_SUM_SHIFT_CAM0_SHIFT1_SET(cfg->groi_sum_shift_shift1);
 	drc->gbl_gain =
-		NEO_DRC_GBL_GAIN_CAM0_GAIN_SET(blk->drc.gbl_gain_gain);
+		NEO_DRC_GBL_GAIN_CAM0_GAIN_SET(cfg->gbl_gain_gain);
 	drc->lcl_blk_size =
-		NEO_DRC_LCL_BLK_SIZE_CAM0_XSIZE_SET(blk->drc.lcl_blk_size_xsize) |
-		NEO_DRC_LCL_BLK_SIZE_CAM0_YSIZE_SET(blk->drc.lcl_blk_size_ysize);
+		NEO_DRC_LCL_BLK_SIZE_CAM0_XSIZE_SET(cfg->lcl_blk_size_xsize) |
+		NEO_DRC_LCL_BLK_SIZE_CAM0_YSIZE_SET(cfg->lcl_blk_size_ysize);
 	drc->lcl_stretch =
-		NEO_DRC_LCL_STRETCH_CAM0_STRETCH_SET(blk->drc.lcl_stretch_stretch) |
-		NEO_DRC_LCL_STRETCH_CAM0_OFFSET_SET(blk->drc.lcl_stretch_offset);
+		NEO_DRC_LCL_STRETCH_CAM0_STRETCH_SET(cfg->lcl_stretch_stretch) |
+		NEO_DRC_LCL_STRETCH_CAM0_OFFSET_SET(cfg->lcl_stretch_offset);
 	drc->lcl_blk_stepy =
-		NEO_DRC_LCL_BLK_STEPY_CAM0_STEP_SET(blk->drc.lcl_blk_stepy_step);
+		NEO_DRC_LCL_BLK_STEPY_CAM0_STEP_SET(cfg->lcl_blk_stepy_step);
 	drc->lcl_blk_stepx =
-		NEO_DRC_LCL_BLK_STEPX_CAM0_STEP_SET(blk->drc.lcl_blk_stepx_step);
+		NEO_DRC_LCL_BLK_STEPX_CAM0_STEP_SET(cfg->lcl_blk_stepx_step);
 	drc->lcl_sum_shift =
-		NEO_DRC_LCL_SUM_SHIFT_CAM0_SHIFT_SET(blk->drc.lcl_sum_shift_shift);
+		NEO_DRC_LCL_SUM_SHIFT_CAM0_SHIFT_SET(cfg->lcl_sum_shift_shift);
 	drc->alpha =
-		NEO_DRC_ALPHA_CAM0_ALPHA_SET(blk->drc.alpha_alpha);
+		NEO_DRC_ALPHA_CAM0_ALPHA_SET(cfg->alpha_alpha);
 }
 
-static void neoisp_params_handler_nr(struct neoisp_dev_s *neoispd,
-				     union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_nr(struct neoisp_context_s *ctx,
+			 union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_nr_s *nr = &ctx->hw.nr;
+	struct neoisp_nr_cfg_s *cfg;
+	u32 tmp;
 
-	nr->ctrl =
-		NEO_NR_CTRL_CAM0_DEBUG_SET(blk->nrc.ctrl_debug) |
-		NEO_NR_CTRL_CAM0_ENABLE_SET(blk->nrc.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		nr->ctrl &= ~NEO_NR_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		nr->ctrl |= NEO_NR_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->nr.cfg;
+	tmp = nr->ctrl &
+		~NEO_NR_CTRL_CAM0_DEBUG_MASK;
+	tmp |= NEO_NR_CTRL_CAM0_DEBUG_SET(cfg->ctrl_debug);
+	nr->ctrl = tmp;
+
 	nr->blend_scale =
-		NEO_NR_BLEND_SCALE_CAM0_SCALE_SET(blk->nrc.blend_scale_scale) |
-		NEO_NR_BLEND_SCALE_CAM0_SHIFT_SET(blk->nrc.blend_scale_shift) |
-		NEO_NR_BLEND_SCALE_CAM0_GAIN_SET(blk->nrc.blend_scale_gain);
+		NEO_NR_BLEND_SCALE_CAM0_SCALE_SET(cfg->blend_scale_scale) |
+		NEO_NR_BLEND_SCALE_CAM0_SHIFT_SET(cfg->blend_scale_shift) |
+		NEO_NR_BLEND_SCALE_CAM0_GAIN_SET(cfg->blend_scale_gain);
 	nr->blend_th0 =
-		NEO_NR_BLEND_TH0_CAM0_TH_SET(blk->nrc.blend_th0_th);
+		NEO_NR_BLEND_TH0_CAM0_TH_SET(cfg->blend_th0_th);
 }
 
-static void neoisp_params_handler_df(struct neoisp_dev_s *neoispd,
-				     union neoisp_params_block_u *blk)
+static void neoisp_params_handler_df(struct neoisp_context_s *ctx,
+				     union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_df_s *df = &ctx->hw.df;
+	struct neoisp_df_cfg_s *cfg;
+	u32 tmp;
 
-	df->ctrl =
-		NEO_DF_CTRL_CAM0_DEBUG_SET(blk->dfc.ctrl_debug) |
-		NEO_DF_CTRL_CAM0_ENABLE_SET(blk->dfc.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		df->ctrl &= ~NEO_DF_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		df->ctrl |= NEO_DF_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->df.cfg;
+	tmp = df->ctrl &
+		~NEO_DF_CTRL_CAM0_DEBUG_MASK;
+	tmp |= NEO_DF_CTRL_CAM0_DEBUG_SET(cfg->ctrl_debug);
+	df->ctrl = tmp;
+
 	df->th_scale =
-		NEO_DF_TH_SCALE_CAM0_SCALE_SET(blk->dfc.th_scale_scale);
+		NEO_DF_TH_SCALE_CAM0_SCALE_SET(cfg->th_scale_scale);
 	df->blend_shift =
-		NEO_DF_BLEND_SHIFT_CAM0_SHIFT_SET(blk->dfc.blend_shift_shift);
+		NEO_DF_BLEND_SHIFT_CAM0_SHIFT_SET(cfg->blend_shift_shift);
 	df->blend_th0 =
-		NEO_DF_BLEND_TH0_CAM0_TH_SET(blk->dfc.blend_th0_th);
+		NEO_DF_BLEND_TH0_CAM0_TH_SET(cfg->blend_th0_th);
 }
 
-static void neoisp_params_handler_ee(struct neoisp_dev_s *neoispd,
-				     union neoisp_params_block_u *blk)
+static void neoisp_params_handler_ee(struct neoisp_context_s *ctx,
+				     union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_ee_s *ee = &ctx->hw.ee;
+	struct neoisp_ee_cfg_s *cfg;
+	u32 tmp;
 
-	ee->ctrl =
-		NEO_EE_CTRL_CAM0_DEBUG_SET(blk->eec.ctrl_debug) |
-		NEO_EE_CTRL_CAM0_ENABLE_SET(blk->eec.ctrl_enable);
+	if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_DISABLE)
+		ee->ctrl &= ~NEO_EE_CTRL_CAM0_ENABLE;
+	else if (block->header.flags & V4L2_ISP_PARAMS_FL_BLOCK_ENABLE)
+		ee->ctrl |= NEO_EE_CTRL_CAM0_ENABLE;
+
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing else to do */
+		return;
+
+	cfg = &block->ee.cfg;
+	tmp = ee->ctrl &
+		~NEO_EE_CTRL_CAM0_DEBUG_MASK;
+	tmp |= NEO_EE_CTRL_CAM0_DEBUG_SET(cfg->ctrl_debug);
+	ee->ctrl = tmp;
+
 	ee->coring =
-		NEO_EE_CORING_CAM0_CORING_SET(blk->eec.coring_coring);
+		NEO_EE_CORING_CAM0_CORING_SET(cfg->coring_coring);
 	ee->clip =
-		NEO_EE_CLIP_CAM0_CLIP_SET(blk->eec.clip_clip);
+		NEO_EE_CLIP_CAM0_CLIP_SET(cfg->clip_clip);
 	ee->maskgain =
-		NEO_EE_MASKGAIN_CAM0_GAIN_SET(blk->eec.maskgain_gain);
+		NEO_EE_MASKGAIN_CAM0_GAIN_SET(cfg->maskgain_gain);
 }
 
-static void neoisp_params_handler_convmed(struct neoisp_dev_s *neoispd,
-					  union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_convmed(struct neoisp_context_s *ctx,
+			      union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_convmed_s *convmed = &ctx->hw.convmed;
+	struct neoisp_convmed_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->convmed.cfg;
 	convmed->ctrl =
-		NEO_CCONVMED_CTRL_CAM0_FLT_SET(blk->convmed.ctrl_flt);
+		NEO_CCONVMED_CTRL_CAM0_FLT_SET(cfg->ctrl_flt);
 }
 
-static void neoisp_params_handler_cas(struct neoisp_dev_s *neoispd,
-				      union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_cas(struct neoisp_context_s *ctx,
+			  union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_cas_s *cas = &ctx->hw.cas;
+	struct neoisp_cas_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->cas.cfg;
 	cas->gain =
-		NEO_CAS_GAIN_CAM0_SCALE_SET(blk->cas.gain_scale) |
-		NEO_CAS_GAIN_CAM0_SHIFT_SET(blk->cas.gain_shift);
+		NEO_CAS_GAIN_CAM0_SCALE_SET(cfg->gain_scale) |
+		NEO_CAS_GAIN_CAM0_SHIFT_SET(cfg->gain_shift);
 	cas->corr =
-		NEO_CAS_CORR_CAM0_CORR_SET(blk->cas.corr_corr);
+		NEO_CAS_CORR_CAM0_CORR_SET(cfg->corr_corr);
 	cas->offset =
-		NEO_CAS_OFFSET_CAM0_OFFSET_SET(blk->cas.offset_offset);
+		NEO_CAS_OFFSET_CAM0_OFFSET_SET(cfg->offset_offset);
 }
 
-static void neoisp_params_handler_gcm(struct neoisp_dev_s *neoispd,
-				      union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_gcm(struct neoisp_context_s *ctx,
+			  union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_gcm_s *gcm = &ctx->hw.gcm;
+	struct neoisp_gcm_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->gcm.cfg;
 	gcm->imat0 =
-		NEO_GCM_IMAT0_CAM0_R0C0_SET(blk->gcm.imat_rxcy[0][0]) |
-		NEO_GCM_IMAT0_CAM0_R0C1_SET(blk->gcm.imat_rxcy[0][1]);
+		NEO_GCM_IMAT0_CAM0_R0C0_SET(cfg->imat_rxcy[0][0]) |
+		NEO_GCM_IMAT0_CAM0_R0C1_SET(cfg->imat_rxcy[0][1]);
 	gcm->imat1 =
-		NEO_GCM_IMAT1_CAM0_R0C2_SET(blk->gcm.imat_rxcy[0][2]);
+		NEO_GCM_IMAT1_CAM0_R0C2_SET(cfg->imat_rxcy[0][2]);
 	gcm->imat2 =
-		NEO_GCM_IMAT2_CAM0_R1C0_SET(blk->gcm.imat_rxcy[1][0]) |
-		NEO_GCM_IMAT2_CAM0_R1C1_SET(blk->gcm.imat_rxcy[1][1]);
+		NEO_GCM_IMAT2_CAM0_R1C0_SET(cfg->imat_rxcy[1][0]) |
+		NEO_GCM_IMAT2_CAM0_R1C1_SET(cfg->imat_rxcy[1][1]);
 	gcm->imat3 =
-		NEO_GCM_IMAT3_CAM0_R1C2_SET(blk->gcm.imat_rxcy[1][2]);
+		NEO_GCM_IMAT3_CAM0_R1C2_SET(cfg->imat_rxcy[1][2]);
 	gcm->imat4 =
-		NEO_GCM_IMAT4_CAM0_R2C0_SET(blk->gcm.imat_rxcy[2][0]) |
-		NEO_GCM_IMAT4_CAM0_R2C1_SET(blk->gcm.imat_rxcy[2][1]);
+		NEO_GCM_IMAT4_CAM0_R2C0_SET(cfg->imat_rxcy[2][0]) |
+		NEO_GCM_IMAT4_CAM0_R2C1_SET(cfg->imat_rxcy[2][1]);
 	gcm->imat5 =
-		NEO_GCM_IMAT5_CAM0_R2C2_SET(blk->gcm.imat_rxcy[2][2]);
+		NEO_GCM_IMAT5_CAM0_R2C2_SET(cfg->imat_rxcy[2][2]);
 	gcm->ioffset0 =
-		NEO_GCM_IOFFSET0_CAM0_OFFSET0_SET(blk->gcm.ioffsets[0]);
+		NEO_GCM_IOFFSET0_CAM0_OFFSET0_SET(cfg->ioffsets[0]);
 	gcm->ioffset1 =
-		NEO_GCM_IOFFSET1_CAM0_OFFSET1_SET(blk->gcm.ioffsets[1]);
+		NEO_GCM_IOFFSET1_CAM0_OFFSET1_SET(cfg->ioffsets[1]);
 	gcm->ioffset2 =
-		NEO_GCM_IOFFSET2_CAM0_OFFSET2_SET(blk->gcm.ioffsets[2]);
+		NEO_GCM_IOFFSET2_CAM0_OFFSET2_SET(cfg->ioffsets[2]);
 	gcm->omat0 =
-		NEO_GCM_OMAT0_CAM0_R0C0_SET(blk->gcm.omat_rxcy[0][0]) |
-		NEO_GCM_OMAT0_CAM0_R0C1_SET(blk->gcm.omat_rxcy[0][1]);
+		NEO_GCM_OMAT0_CAM0_R0C0_SET(cfg->omat_rxcy[0][0]) |
+		NEO_GCM_OMAT0_CAM0_R0C1_SET(cfg->omat_rxcy[0][1]);
 	gcm->omat1 =
-		NEO_GCM_OMAT1_CAM0_R0C2_SET(blk->gcm.omat_rxcy[0][2]);
+		NEO_GCM_OMAT1_CAM0_R0C2_SET(cfg->omat_rxcy[0][2]);
 	gcm->omat2 =
-		NEO_GCM_OMAT2_CAM0_R1C0_SET(blk->gcm.omat_rxcy[1][0]) |
-		NEO_GCM_OMAT2_CAM0_R1C1_SET(blk->gcm.omat_rxcy[1][1]);
+		NEO_GCM_OMAT2_CAM0_R1C0_SET(cfg->omat_rxcy[1][0]) |
+		NEO_GCM_OMAT2_CAM0_R1C1_SET(cfg->omat_rxcy[1][1]);
 	gcm->omat3 =
-		NEO_GCM_OMAT3_CAM0_R1C2_SET(blk->gcm.omat_rxcy[1][2]);
+		NEO_GCM_OMAT3_CAM0_R1C2_SET(cfg->omat_rxcy[1][2]);
 	gcm->omat4 =
-		NEO_GCM_OMAT4_CAM0_R2C0_SET(blk->gcm.omat_rxcy[2][0]) |
-		NEO_GCM_OMAT4_CAM0_R2C1_SET(blk->gcm.omat_rxcy[2][1]);
+		NEO_GCM_OMAT4_CAM0_R2C0_SET(cfg->omat_rxcy[2][0]) |
+		NEO_GCM_OMAT4_CAM0_R2C1_SET(cfg->omat_rxcy[2][1]);
 	gcm->omat5 =
-		NEO_GCM_OMAT5_CAM0_R2C2_SET(blk->gcm.omat_rxcy[2][2]);
+		NEO_GCM_OMAT5_CAM0_R2C2_SET(cfg->omat_rxcy[2][2]);
 	gcm->ooffset0 =
-		NEO_GCM_OOFFSET0_CAM0_OFFSET0_SET(blk->gcm.ooffsets[0]);
+		NEO_GCM_OOFFSET0_CAM0_OFFSET0_SET(cfg->ooffsets[0]);
 	gcm->ooffset1 =
-		NEO_GCM_OOFFSET1_CAM0_OFFSET1_SET(blk->gcm.ooffsets[1]);
+		NEO_GCM_OOFFSET1_CAM0_OFFSET1_SET(cfg->ooffsets[1]);
 	gcm->ooffset2 =
-		NEO_GCM_OOFFSET2_CAM0_OFFSET2_SET(blk->gcm.ooffsets[2]);
+		NEO_GCM_OOFFSET2_CAM0_OFFSET2_SET(cfg->ooffsets[2]);
 	gcm->gamma0 =
-		NEO_GCM_GAMMA0_CAM0_GAMMA0_SET(blk->gcm.gamma0_gamma0) |
-		NEO_GCM_GAMMA0_CAM0_OFFSET0_SET(blk->gcm.gamma0_offset0);
+		NEO_GCM_GAMMA0_CAM0_GAMMA0_SET(cfg->gamma0_gamma0) |
+		NEO_GCM_GAMMA0_CAM0_OFFSET0_SET(cfg->gamma0_offset0);
 	gcm->gamma1 =
-		NEO_GCM_GAMMA1_CAM0_GAMMA1_SET(blk->gcm.gamma1_gamma1) |
-		NEO_GCM_GAMMA1_CAM0_OFFSET1_SET(blk->gcm.gamma1_offset1);
+		NEO_GCM_GAMMA1_CAM0_GAMMA1_SET(cfg->gamma1_gamma1) |
+		NEO_GCM_GAMMA1_CAM0_OFFSET1_SET(cfg->gamma1_offset1);
 	gcm->gamma2 =
-		NEO_GCM_GAMMA2_CAM0_GAMMA2_SET(blk->gcm.gamma2_gamma2) |
-		NEO_GCM_GAMMA2_CAM0_OFFSET2_SET(blk->gcm.gamma2_offset2);
+		NEO_GCM_GAMMA2_CAM0_GAMMA2_SET(cfg->gamma2_gamma2) |
+		NEO_GCM_GAMMA2_CAM0_OFFSET2_SET(cfg->gamma2_offset2);
 	gcm->blklvl0_ctrl =
-		NEO_GCM_BLKLVL0_CTRL_CAM0_OFFSET0_SET(blk->gcm.blklvl0_ctrl_offset0) |
-		NEO_GCM_BLKLVL0_CTRL_CAM0_GAIN0_SET(blk->gcm.blklvl0_ctrl_gain0);
+		NEO_GCM_BLKLVL0_CTRL_CAM0_OFFSET0_SET(cfg->blklvl0_ctrl_offset0) |
+		NEO_GCM_BLKLVL0_CTRL_CAM0_GAIN0_SET(cfg->blklvl0_ctrl_gain0);
 	gcm->blklvl1_ctrl =
-		NEO_GCM_BLKLVL1_CTRL_CAM0_OFFSET1_SET(blk->gcm.blklvl1_ctrl_offset1) |
-		NEO_GCM_BLKLVL1_CTRL_CAM0_GAIN1_SET(blk->gcm.blklvl1_ctrl_gain1);
+		NEO_GCM_BLKLVL1_CTRL_CAM0_OFFSET1_SET(cfg->blklvl1_ctrl_offset1) |
+		NEO_GCM_BLKLVL1_CTRL_CAM0_GAIN1_SET(cfg->blklvl1_ctrl_gain1);
 	gcm->blklvl2_ctrl =
-		NEO_GCM_BLKLVL2_CTRL_CAM0_OFFSET2_SET(blk->gcm.blklvl2_ctrl_offset2) |
-		NEO_GCM_BLKLVL2_CTRL_CAM0_GAIN2_SET(blk->gcm.blklvl2_ctrl_gain2);
+		NEO_GCM_BLKLVL2_CTRL_CAM0_OFFSET2_SET(cfg->blklvl2_ctrl_offset2) |
+		NEO_GCM_BLKLVL2_CTRL_CAM0_GAIN2_SET(cfg->blklvl2_ctrl_gain2);
 	gcm->lowth_ctrl01 =
-		NEO_GCM_LOWTH_CTRL01_CAM0_THRESHOLD0_SET(blk->gcm.lowth_ctrl01_threshold0) |
-		NEO_GCM_LOWTH_CTRL01_CAM0_THRESHOLD1_SET(blk->gcm.lowth_ctrl01_threshold1);
+		NEO_GCM_LOWTH_CTRL01_CAM0_THRESHOLD0_SET(cfg->lowth_ctrl01_threshold0) |
+		NEO_GCM_LOWTH_CTRL01_CAM0_THRESHOLD1_SET(cfg->lowth_ctrl01_threshold1);
 	gcm->lowth_ctrl2 =
-		NEO_GCM_LOWTH_CTRL2_CAM0_THRESHOLD2_SET(blk->gcm.lowth_ctrl2_threshold2);
+		NEO_GCM_LOWTH_CTRL2_CAM0_THRESHOLD2_SET(cfg->lowth_ctrl2_threshold2);
 	gcm->mat_confg =
-		NEO_GCM_MAT_CONFG_CAM0_SIGN_CONFG_SET(blk->gcm.mat_confg_sign_confg);
+		NEO_GCM_MAT_CONFG_CAM0_SIGN_CONFG_SET(cfg->mat_confg_sign_confg);
 }
 
-static void neoisp_params_handler_af(struct neoisp_dev_s *neoispd,
-				     union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_af(struct neoisp_context_s *ctx,
+			 union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
 	struct neoisp_autofocus_s *af = &ctx->hw.autofocus;
+	struct neoisp_af_cfg_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->af.cfg;
 	af->roi0_pos =
-		NEO_AUTOFOCUS_ROI0_POS_CAM0_XPOS_SET(blk->afc.af_roi[0].xpos) |
-		NEO_AUTOFOCUS_ROI0_POS_CAM0_YPOS_SET(blk->afc.af_roi[0].ypos);
+		NEO_AUTOFOCUS_ROI0_POS_CAM0_XPOS_SET(cfg->af_roi[0].xpos) |
+		NEO_AUTOFOCUS_ROI0_POS_CAM0_YPOS_SET(cfg->af_roi[0].ypos);
 	af->roi0_size =
-		NEO_AUTOFOCUS_ROI0_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[0].width) |
-		NEO_AUTOFOCUS_ROI0_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[0].height);
+		NEO_AUTOFOCUS_ROI0_SIZE_CAM0_WIDTH_SET(cfg->af_roi[0].width) |
+		NEO_AUTOFOCUS_ROI0_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[0].height);
 	af->roi1_pos =
-		NEO_AUTOFOCUS_ROI1_POS_CAM0_XPOS_SET(blk->afc.af_roi[1].xpos) |
-		NEO_AUTOFOCUS_ROI1_POS_CAM0_YPOS_SET(blk->afc.af_roi[1].ypos);
+		NEO_AUTOFOCUS_ROI1_POS_CAM0_XPOS_SET(cfg->af_roi[1].xpos) |
+		NEO_AUTOFOCUS_ROI1_POS_CAM0_YPOS_SET(cfg->af_roi[1].ypos);
 	af->roi1_size =
-		NEO_AUTOFOCUS_ROI1_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[1].width) |
-		NEO_AUTOFOCUS_ROI1_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[1].height);
+		NEO_AUTOFOCUS_ROI1_SIZE_CAM0_WIDTH_SET(cfg->af_roi[1].width) |
+		NEO_AUTOFOCUS_ROI1_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[1].height);
 	af->roi2_pos =
-		NEO_AUTOFOCUS_ROI2_POS_CAM0_XPOS_SET(blk->afc.af_roi[2].xpos) |
-		NEO_AUTOFOCUS_ROI2_POS_CAM0_YPOS_SET(blk->afc.af_roi[2].ypos);
+		NEO_AUTOFOCUS_ROI2_POS_CAM0_XPOS_SET(cfg->af_roi[2].xpos) |
+		NEO_AUTOFOCUS_ROI2_POS_CAM0_YPOS_SET(cfg->af_roi[2].ypos);
 	af->roi2_size =
-		NEO_AUTOFOCUS_ROI2_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[2].width) |
-		NEO_AUTOFOCUS_ROI2_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[2].height);
+		NEO_AUTOFOCUS_ROI2_SIZE_CAM0_WIDTH_SET(cfg->af_roi[2].width) |
+		NEO_AUTOFOCUS_ROI2_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[2].height);
 	af->roi3_pos =
-		NEO_AUTOFOCUS_ROI3_POS_CAM0_XPOS_SET(blk->afc.af_roi[3].xpos) |
-		NEO_AUTOFOCUS_ROI3_POS_CAM0_YPOS_SET(blk->afc.af_roi[3].ypos);
+		NEO_AUTOFOCUS_ROI3_POS_CAM0_XPOS_SET(cfg->af_roi[3].xpos) |
+		NEO_AUTOFOCUS_ROI3_POS_CAM0_YPOS_SET(cfg->af_roi[3].ypos);
 	af->roi3_size =
-		NEO_AUTOFOCUS_ROI3_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[3].width) |
-		NEO_AUTOFOCUS_ROI3_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[3].height);
+		NEO_AUTOFOCUS_ROI3_SIZE_CAM0_WIDTH_SET(cfg->af_roi[3].width) |
+		NEO_AUTOFOCUS_ROI3_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[3].height);
 	af->roi4_pos =
-		NEO_AUTOFOCUS_ROI4_POS_CAM0_XPOS_SET(blk->afc.af_roi[4].xpos) |
-		NEO_AUTOFOCUS_ROI4_POS_CAM0_YPOS_SET(blk->afc.af_roi[4].ypos);
+		NEO_AUTOFOCUS_ROI4_POS_CAM0_XPOS_SET(cfg->af_roi[4].xpos) |
+		NEO_AUTOFOCUS_ROI4_POS_CAM0_YPOS_SET(cfg->af_roi[4].ypos);
 	af->roi4_size =
-		NEO_AUTOFOCUS_ROI4_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[4].width) |
-		NEO_AUTOFOCUS_ROI4_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[4].height);
+		NEO_AUTOFOCUS_ROI4_SIZE_CAM0_WIDTH_SET(cfg->af_roi[4].width) |
+		NEO_AUTOFOCUS_ROI4_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[4].height);
 	af->roi5_pos =
-		NEO_AUTOFOCUS_ROI5_POS_CAM0_XPOS_SET(blk->afc.af_roi[5].xpos) |
-		NEO_AUTOFOCUS_ROI5_POS_CAM0_YPOS_SET(blk->afc.af_roi[5].ypos);
+		NEO_AUTOFOCUS_ROI5_POS_CAM0_XPOS_SET(cfg->af_roi[5].xpos) |
+		NEO_AUTOFOCUS_ROI5_POS_CAM0_YPOS_SET(cfg->af_roi[5].ypos);
 	af->roi5_size =
-		NEO_AUTOFOCUS_ROI5_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[5].width) |
-		NEO_AUTOFOCUS_ROI5_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[5].height);
+		NEO_AUTOFOCUS_ROI5_SIZE_CAM0_WIDTH_SET(cfg->af_roi[5].width) |
+		NEO_AUTOFOCUS_ROI5_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[5].height);
 	af->roi6_pos =
-		NEO_AUTOFOCUS_ROI6_POS_CAM0_XPOS_SET(blk->afc.af_roi[6].xpos) |
-		NEO_AUTOFOCUS_ROI6_POS_CAM0_YPOS_SET(blk->afc.af_roi[6].ypos);
+		NEO_AUTOFOCUS_ROI6_POS_CAM0_XPOS_SET(cfg->af_roi[6].xpos) |
+		NEO_AUTOFOCUS_ROI6_POS_CAM0_YPOS_SET(cfg->af_roi[6].ypos);
 	af->roi6_size =
-		NEO_AUTOFOCUS_ROI6_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[6].width) |
-		NEO_AUTOFOCUS_ROI6_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[6].height);
+		NEO_AUTOFOCUS_ROI6_SIZE_CAM0_WIDTH_SET(cfg->af_roi[6].width) |
+		NEO_AUTOFOCUS_ROI6_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[6].height);
 	af->roi7_pos =
-		NEO_AUTOFOCUS_ROI7_POS_CAM0_XPOS_SET(blk->afc.af_roi[7].xpos) |
-		NEO_AUTOFOCUS_ROI7_POS_CAM0_YPOS_SET(blk->afc.af_roi[7].ypos);
+		NEO_AUTOFOCUS_ROI7_POS_CAM0_XPOS_SET(cfg->af_roi[7].xpos) |
+		NEO_AUTOFOCUS_ROI7_POS_CAM0_YPOS_SET(cfg->af_roi[7].ypos);
 	af->roi7_size =
-		NEO_AUTOFOCUS_ROI7_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[7].width) |
-		NEO_AUTOFOCUS_ROI7_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[7].height);
+		NEO_AUTOFOCUS_ROI7_SIZE_CAM0_WIDTH_SET(cfg->af_roi[7].width) |
+		NEO_AUTOFOCUS_ROI7_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[7].height);
 	af->roi8_pos =
-		NEO_AUTOFOCUS_ROI8_POS_CAM0_XPOS_SET(blk->afc.af_roi[8].xpos) |
-		NEO_AUTOFOCUS_ROI8_POS_CAM0_YPOS_SET(blk->afc.af_roi[8].ypos);
+		NEO_AUTOFOCUS_ROI8_POS_CAM0_XPOS_SET(cfg->af_roi[8].xpos) |
+		NEO_AUTOFOCUS_ROI8_POS_CAM0_YPOS_SET(cfg->af_roi[8].ypos);
 	af->roi8_size =
-		NEO_AUTOFOCUS_ROI8_SIZE_CAM0_WIDTH_SET(blk->afc.af_roi[8].width) |
-		NEO_AUTOFOCUS_ROI8_SIZE_CAM0_HEIGHT_SET(blk->afc.af_roi[8].height);
+		NEO_AUTOFOCUS_ROI8_SIZE_CAM0_WIDTH_SET(cfg->af_roi[8].width) |
+		NEO_AUTOFOCUS_ROI8_SIZE_CAM0_HEIGHT_SET(cfg->af_roi[8].height);
 	af->fil0_coeffs0 =
-		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF0_SET(blk->afc.fil0_coeffs[0]) |
-		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF1_SET(blk->afc.fil0_coeffs[1]) |
-		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF2_SET(blk->afc.fil0_coeffs[2]) |
-		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF3_SET(blk->afc.fil0_coeffs[3]);
+		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF0_SET(cfg->fil0_coeffs[0]) |
+		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF1_SET(cfg->fil0_coeffs[1]) |
+		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF2_SET(cfg->fil0_coeffs[2]) |
+		NEO_AUTOFOCUS_FIL0_COEFFS0_CAM0_COEFF3_SET(cfg->fil0_coeffs[3]);
 	af->fil0_coeffs1 =
-		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF4_SET(blk->afc.fil0_coeffs[4]) |
-		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF5_SET(blk->afc.fil0_coeffs[5]) |
-		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF6_SET(blk->afc.fil0_coeffs[6]) |
-		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF7_SET(blk->afc.fil0_coeffs[7]);
+		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF4_SET(cfg->fil0_coeffs[4]) |
+		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF5_SET(cfg->fil0_coeffs[5]) |
+		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF6_SET(cfg->fil0_coeffs[6]) |
+		NEO_AUTOFOCUS_FIL0_COEFFS1_CAM0_COEFF7_SET(cfg->fil0_coeffs[7]);
 	af->fil0_coeffs2 =
-		NEO_AUTOFOCUS_FIL0_COEFFS2_CAM0_COEFF8_SET(blk->afc.fil0_coeffs[8]);
+		NEO_AUTOFOCUS_FIL0_COEFFS2_CAM0_COEFF8_SET(cfg->fil0_coeffs[8]);
 	af->fil0_shift =
-		NEO_AUTOFOCUS_FIL0_SHIFT_CAM0_SHIFT_SET(blk->afc.fil0_shift_shift);
+		NEO_AUTOFOCUS_FIL0_SHIFT_CAM0_SHIFT_SET(cfg->fil0_shift_shift);
 	af->fil1_coeffs0 =
-		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF0_SET(blk->afc.fil1_coeffs[0]) |
-		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF1_SET(blk->afc.fil1_coeffs[1]) |
-		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF2_SET(blk->afc.fil1_coeffs[2]) |
-		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF3_SET(blk->afc.fil1_coeffs[3]);
+		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF0_SET(cfg->fil1_coeffs[0]) |
+		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF1_SET(cfg->fil1_coeffs[1]) |
+		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF2_SET(cfg->fil1_coeffs[2]) |
+		NEO_AUTOFOCUS_FIL1_COEFFS0_CAM0_COEFF3_SET(cfg->fil1_coeffs[3]);
 	af->fil1_coeffs1 =
-		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF4_SET(blk->afc.fil1_coeffs[4]) |
-		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF5_SET(blk->afc.fil1_coeffs[5]) |
-		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF6_SET(blk->afc.fil1_coeffs[6]) |
-		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF7_SET(blk->afc.fil1_coeffs[7]);
+		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF4_SET(cfg->fil1_coeffs[4]) |
+		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF5_SET(cfg->fil1_coeffs[5]) |
+		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF6_SET(cfg->fil1_coeffs[6]) |
+		NEO_AUTOFOCUS_FIL1_COEFFS1_CAM0_COEFF7_SET(cfg->fil1_coeffs[7]);
 	af->fil1_coeffs2 =
-		NEO_AUTOFOCUS_FIL1_COEFFS2_CAM0_COEFF8_SET(blk->afc.fil1_coeffs[8]);
+		NEO_AUTOFOCUS_FIL1_COEFFS2_CAM0_COEFF8_SET(cfg->fil1_coeffs[8]);
 	af->fil1_shift =
-		NEO_AUTOFOCUS_FIL1_SHIFT_CAM0_SHIFT_SET(blk->afc.fil1_shift_shift);
+		NEO_AUTOFOCUS_FIL1_SHIFT_CAM0_SHIFT_SET(cfg->fil1_shift_shift);
 }
 
-static void neoisp_params_handler_vignetting_table(struct neoisp_dev_s *neoispd,
-						   union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_vignetting_table(struct neoisp_context_s *ctx,
+				       union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_vignetting_table_mem_params_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->vignetting_table.cfg;
 	memcpy((u8 *)(uintptr_t)&ctx->vig,
-	       (u8 *)(uintptr_t)blk->vignetting_table.vignetting_table,
+	       (u8 *)(uintptr_t)cfg->vignetting_table,
 	       sizeof(struct neoisp_vignetting_table_mem_params_s));
 }
 
-static void neoisp_params_handler_drc_global_tonemap(struct neoisp_dev_s *neoispd,
-						     union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_drc_global_tonemap(struct neoisp_context_s *ctx,
+					 union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_drc_global_tonemap_mem_params_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->drc_global_tonemap.cfg;
 	memcpy((u8 *)(uintptr_t)&ctx->gtm,
-	       (u8 *)(uintptr_t)blk->drc_global_tonemap.drc_global_tonemap,
+	       (u8 *)(uintptr_t)cfg->drc_global_tonemap,
 	       sizeof(struct neoisp_drc_global_tonemap_mem_params_s));
 }
 
-static void neoisp_params_handler_drc_local_tonemap(struct neoisp_dev_s *neoispd,
-						    union neoisp_params_block_u *blk)
+static void
+neoisp_params_handler_drc_local_tonemap(struct neoisp_context_s *ctx,
+					union neoisp_params_block_u *block)
 {
-	struct neoisp_context_s *ctx = neoispd->context;
+	struct neoisp_drc_local_tonemap_mem_params_s *cfg;
 
+	if (block->header.size == sizeof(struct v4l2_isp_block_header))
+		/* nothing to do */
+		return;
+
+	cfg = &block->drc_local_tonemap.cfg;
 	memcpy((u8 *)(uintptr_t)&ctx->ltm,
-	       (u8 *)(uintptr_t)blk->drc_local_tonemap.drc_local_tonemap,
+	       (u8 *)(uintptr_t)cfg->drc_local_tonemap,
 	       sizeof(struct neoisp_drc_local_tonemap_mem_params_s));
 }
 
-/*
- * Extended params block handlers
- *
- * Handlers are created with below macros. Extended parameters handlers goal is
- * to  prepare all the block parameters' fields, then forward to the second
- * level handler (used from legacy API too) that performs the copy into hw
- * context memory region. The extended parameters handlers check block size and
- * header flag from the struct c:type:`v4l2_isp_params_block_header`. Flags are
- * not handled the same on all macros, depending on ISP blocks. Reason is that
- * some ISP blocks do have a ctrl_enable bit, then associated contexts do have
- * ctrl_enable field, while some other ISP blocks don't.
- *
- * When ctrl_enable bit is present:
- *  - if :c:type:`v4l2_isp_params_block_header` flag is set to either ENABLE
- * or DISABLE, then the block's parameter `ctrl_enable` field is configured the
- * same.
- *  - if :c:type:`v4l2_isp_params_block_header` flag is not set at all, then
- * the `ctrl_enable` value from the hw context is copied to the block's
- * parameters `ctrl_enable` field. This is because 2nd level handler uses all
- * the parameters block fields and overwrite the whole hw context. Thus we
- * ensure that `ctrl_enable` in hw context is overwritten with same value.
- *  - According to v4l2-isp documentation, a block data could be omitted if
- * DISABLE flag is set. In such case, the `ctrl_enable` field value from the hw
- * context is forced to DISABLE.
- *
- * When `ctrl_enable` bit is not present in an ISP block, all the block fields
- * are shared to the 2nd level handler, to be copied into hw context, except
- * when the :c:type:`v4l2_isp_params_block_header` flag is DISABLED and the
- * block is empty. In such case, the block is simply ignored.
- */
-#define NEOISP_EXT_PARAMS_HANDLER(block, type) \
-	static void neoisp_ext_params_handler_ ## block \
-		(struct neoisp_dev_s *neoispd, \
-		 union neoisp_ext_params_block_u *ext_blk) \
-	{ \
-		struct neoisp_ ## block ## _ ## type ## _es *ext_params = &ext_blk->block; \
-		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE && \
-		    ext_params->header.size == sizeof(struct v4l2_isp_params_block_header)) \
-			/* Only header w/ DISABLE flag, then bypass context update */ \
-			return; \
-		union neoisp_params_block_u *cfg = \
-			(union neoisp_params_block_u *)&ext_params->cfg; \
-		neoisp_params_handler_ ## block(neoispd, cfg); \
-	}
-
-#define NEOISP_EXT_PARAMS_HANDLER_MULT(block, inst) \
-	static void neoisp_ext_params_handler_ ## block ## inst \
-		(struct neoisp_dev_s *neoispd, \
-		 union neoisp_ext_params_block_u *ext_blk) \
-	{ \
-		struct neoisp_ ## block ## _cfg_es *ext_params = &ext_blk->block; \
-		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE && \
-		    ext_params->header.size == sizeof(struct v4l2_isp_params_block_header)) \
-			/* Only header w/ DISABLE flag, then bypass context update */ \
-			return; \
-		union neoisp_params_block_u *cfg = \
-			(union neoisp_params_block_u *)&ext_params->cfg; \
-		__neoisp_params_handler_ ## block(neoispd, cfg, inst); \
-	}
-
-#define NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(block) \
-	static void neoisp_ext_params_handler_ ## block \
-		(struct neoisp_dev_s *neoispd, \
-		 union neoisp_ext_params_block_u *ext_blk) \
-	{ \
-		struct neoisp_ ## block ## _cfg_es *ext_params = &ext_blk->block; \
-		union neoisp_params_block_u *cfg; \
-		struct neoisp_context_s *ctx = neoispd->context; \
-		struct neoisp_ ## block ## _s *blk = &ctx->hw.block; \
-		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE && \
-		    ext_params->header.size == sizeof(struct v4l2_isp_params_block_header)) { \
-			/* Only header w/ DISABLE flag, then disable in context */ \
-			blk->ctrl = 0; \
-			return; \
-		} \
-		if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_DISABLE) \
-			ext_params->cfg.ctrl_enable = 0; \
-		else if (ext_params->header.flags == V4L2_ISP_PARAMS_FL_BLOCK_ENABLE) \
-			ext_params->cfg.ctrl_enable = 1; \
-		else \
-			ext_params->cfg.ctrl_enable = blk->ctrl; \
-		cfg = (union neoisp_params_block_u *)&ext_params->cfg; \
-		neoisp_params_handler_ ## block(neoispd, cfg); \
-	}
-
-#define NEOISP_EXT_PARAMS_HANDLER_CFG(block) \
-	NEOISP_EXT_PARAMS_HANDLER(block, cfg)
-
-NEOISP_EXT_PARAMS_HANDLER_CFG(pipe_conf)
-NEOISP_EXT_PARAMS_HANDLER_CFG(head_color)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(hdr_decompress0)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(hdr_decompress1)
-NEOISP_EXT_PARAMS_HANDLER_MULT(obwb, 0)
-NEOISP_EXT_PARAMS_HANDLER_MULT(obwb, 1)
-NEOISP_EXT_PARAMS_HANDLER_MULT(obwb, 2)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(hdr_merge)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(rgbir)
-NEOISP_EXT_PARAMS_HANDLER_CFG(stat)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(ir_compress)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(bnr)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(vignetting_ctrl)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(ctemp)
-NEOISP_EXT_PARAMS_HANDLER_CFG(demosaic)
-NEOISP_EXT_PARAMS_HANDLER_CFG(rgb2yuv)
-NEOISP_EXT_PARAMS_HANDLER_CFG(dr_comp)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(nr)
-NEOISP_EXT_PARAMS_HANDLER_CFG(af)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(ee)
-NEOISP_EXT_PARAMS_HANDLER_CTRL_ENABLE(df)
-NEOISP_EXT_PARAMS_HANDLER_CFG(convmed)
-NEOISP_EXT_PARAMS_HANDLER_CFG(cas)
-NEOISP_EXT_PARAMS_HANDLER_CFG(gcm)
-NEOISP_EXT_PARAMS_HANDLER(vignetting_table, mem_params)
-NEOISP_EXT_PARAMS_HANDLER(drc_global_tonemap, mem_params)
-NEOISP_EXT_PARAMS_HANDLER(drc_local_tonemap, mem_params)
-
 static const struct neoisp_block_handler_s {
-	size_t size;
-	void (*handler)(struct neoisp_dev_s *neoispd, union neoisp_params_block_u *blk);
-	void (*ext_handler)(struct neoisp_dev_s *neoispd, union neoisp_ext_params_block_u *ext_blk);
+	void (*handler)(struct neoisp_context_s *ctx, union neoisp_params_block_u *ext_blk);
 } neoisp_block_handlers[] = {
 	[NEOISP_PARAM_BLK_PIPE_CONF] = {
-		.size = sizeof(struct neoisp_pipe_conf_cfg_s),
 		.handler = &neoisp_params_handler_pipe_conf,
-		.ext_handler = &neoisp_ext_params_handler_pipe_conf,
 	},
 	[NEOISP_PARAM_BLK_HEAD_COLOR] = {
-		.size = sizeof(struct neoisp_head_color_cfg_s),
 		.handler = &neoisp_params_handler_head_color,
-		.ext_handler = &neoisp_ext_params_handler_head_color,
 	},
 	[NEOISP_PARAM_BLK_HDR_DECOMPRESS0] = {
-		.size = sizeof(struct neoisp_hdr_decompress0_cfg_s),
 		.handler = &neoisp_params_handler_hdr_decompress0,
-		.ext_handler = &neoisp_ext_params_handler_hdr_decompress0,
 	},
 	[NEOISP_PARAM_BLK_HDR_DECOMPRESS1] = {
-		.size = sizeof(struct neoisp_hdr_decompress1_cfg_s),
 		.handler = &neoisp_params_handler_hdr_decompress1,
-		.ext_handler = &neoisp_ext_params_handler_hdr_decompress1,
 	},
 	[NEOISP_PARAM_BLK_OBWB0] = {
-		.size = sizeof(struct neoisp_obwb_cfg_s),
 		.handler = &neoisp_params_handler_obwb0,
-		.ext_handler = &neoisp_ext_params_handler_obwb0,
 	},
 	[NEOISP_PARAM_BLK_OBWB1] = {
-		.size = sizeof(struct neoisp_obwb_cfg_s),
 		.handler = &neoisp_params_handler_obwb1,
-		.ext_handler = &neoisp_ext_params_handler_obwb1,
 	},
 	[NEOISP_PARAM_BLK_OBWB2] = {
-		.size = sizeof(struct neoisp_obwb_cfg_s),
 		.handler = &neoisp_params_handler_obwb2,
-		.ext_handler = &neoisp_ext_params_handler_obwb2,
 	},
 	[NEOISP_PARAM_BLK_HDR_MERGE] = {
-		.size = sizeof(struct neoisp_hdr_merge_cfg_s),
 		.handler = &neoisp_params_handler_hdr_merge,
-		.ext_handler = &neoisp_ext_params_handler_hdr_merge,
 	},
 	[NEOISP_PARAM_BLK_RGBIR] = {
-		.size = sizeof(struct neoisp_rgbir_cfg_s),
 		.handler = &neoisp_params_handler_rgbir,
-		.ext_handler = &neoisp_ext_params_handler_rgbir,
 	},
 	[NEOISP_PARAM_BLK_STAT] = {
-		.size = sizeof(struct neoisp_stat_cfg_s),
 		.handler = &neoisp_params_handler_stat,
-		.ext_handler = &neoisp_ext_params_handler_stat,
 	},
 	[NEOISP_PARAM_BLK_IR_COMPRESS] = {
-		.size = sizeof(struct neoisp_ir_compress_cfg_s),
 		.handler = &neoisp_params_handler_ir_compress,
-		.ext_handler = &neoisp_ext_params_handler_ir_compress,
 	},
 	[NEOISP_PARAM_BLK_BNR] = {
-		.size = sizeof(struct neoisp_bnr_cfg_s),
 		.handler = &neoisp_params_handler_bnr,
-		.ext_handler = &neoisp_ext_params_handler_bnr,
 	},
 	[NEOISP_PARAM_BLK_VIGNETTING_CTRL] = {
-		.size = sizeof(struct neoisp_vignetting_ctrl_cfg_s),
 		.handler = &neoisp_params_handler_vignetting_ctrl,
-		.ext_handler = &neoisp_ext_params_handler_vignetting_ctrl,
 	},
 	[NEOISP_PARAM_BLK_CTEMP] = {
-		.size = sizeof(struct neoisp_ctemp_cfg_s),
 		.handler = &neoisp_params_handler_ctemp,
-		.ext_handler = &neoisp_ext_params_handler_ctemp,
 	},
 	[NEOISP_PARAM_BLK_DEMOSAIC] = {
-		.size = sizeof(struct neoisp_demosaic_cfg_s),
 		.handler = &neoisp_params_handler_demosaic,
-		.ext_handler = &neoisp_ext_params_handler_demosaic,
 	},
 	[NEOISP_PARAM_BLK_RGB2YUV] = {
-		.size = sizeof(struct neoisp_rgb2yuv_cfg_s),
 		.handler = &neoisp_params_handler_rgb2yuv,
-		.ext_handler = &neoisp_ext_params_handler_rgb2yuv,
 	},
 	[NEOISP_PARAM_BLK_DR_COMP] = {
-		.size = sizeof(struct neoisp_dr_comp_cfg_s),
 		.handler = &neoisp_params_handler_dr_comp,
-		.ext_handler = &neoisp_ext_params_handler_dr_comp,
 	},
 	[NEOISP_PARAM_BLK_NR] = {
-		.size = sizeof(struct neoisp_nr_cfg_s),
 		.handler = &neoisp_params_handler_nr,
-		.ext_handler = &neoisp_ext_params_handler_nr,
 	},
 	[NEOISP_PARAM_BLK_AF] = {
-		.size = sizeof(struct neoisp_af_cfg_s),
 		.handler = &neoisp_params_handler_af,
-		.ext_handler = &neoisp_ext_params_handler_af,
 	},
 	[NEOISP_PARAM_BLK_EE] = {
-		.size = sizeof(struct neoisp_ee_cfg_s),
 		.handler = &neoisp_params_handler_ee,
-		.ext_handler = &neoisp_ext_params_handler_ee,
 	},
 	[NEOISP_PARAM_BLK_DF] = {
-		.size = sizeof(struct neoisp_df_cfg_s),
 		.handler = &neoisp_params_handler_df,
-		.ext_handler = &neoisp_ext_params_handler_df,
 	},
 	[NEOISP_PARAM_BLK_CONVMED] = {
-		.size = sizeof(struct neoisp_convmed_cfg_s),
 		.handler = &neoisp_params_handler_convmed,
-		.ext_handler = &neoisp_ext_params_handler_convmed,
 	},
 	[NEOISP_PARAM_BLK_CAS] = {
-		.size = sizeof(struct neoisp_cas_cfg_s),
 		.handler = &neoisp_params_handler_cas,
-		.ext_handler = &neoisp_ext_params_handler_cas,
 	},
 	[NEOISP_PARAM_BLK_GCM] = {
-		.size = sizeof(struct neoisp_gcm_cfg_s),
 		.handler = &neoisp_params_handler_gcm,
-		.ext_handler = &neoisp_ext_params_handler_gcm,
 	},
 	[NEOISP_PARAM_BLK_VIGNETTING_TABLE] = {
-		.size = sizeof(struct neoisp_vignetting_table_mem_params_s),
 		.handler = &neoisp_params_handler_vignetting_table,
-		.ext_handler = &neoisp_ext_params_handler_vignetting_table,
 	},
 	[NEOISP_PARAM_BLK_DRC_GLOBAL_TONEMAP] = {
-		.size = sizeof(struct neoisp_drc_global_tonemap_mem_params_s),
 		.handler = &neoisp_params_handler_drc_global_tonemap,
-		.ext_handler = &neoisp_ext_params_handler_drc_global_tonemap,
 	},
 	[NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP] = {
-		.size = sizeof(struct neoisp_drc_local_tonemap_mem_params_s),
 		.handler = &neoisp_params_handler_drc_local_tonemap,
-		.ext_handler = &neoisp_ext_params_handler_drc_local_tonemap,
 	},
 };
 
@@ -2414,191 +2461,33 @@ void neoisp_ctx_update_pipe_conf(struct neoisp_dev_s *neoispd)
 void neoisp_ctx_update_w_user_params(struct neoisp_dev_s *neoispd)
 {
 	struct neoisp_buffer_s *buf = neoispd->queued_job.buf[NEOISP_PARAMS_NODE];
-	struct neoisp_node_s *node = &neoispd->node[NEOISP_PARAMS_NODE];
+	const struct neoisp_block_handler_s *block_handler;
+	struct v4l2_isp_buffer *params;
+	size_t block_offset = 0, max_offset;
 
 	if (IS_ERR_OR_NULL(buf))
 		return;
 
-	/* Check parameters buffer format */
-	switch (node->neoisp_format->fourcc) {
-	case V4L2_META_FMT_NEO_ISP_PARAMS: {
-		/* Legacy params API */
-		struct neoisp_meta_params_s *lparams =
-			(struct neoisp_meta_params_s *)get_vaddr(buf);
-		const struct neoisp_block_handler_s *block_handler;
-		union neoisp_params_block_u *block;
+	params = (struct v4l2_isp_buffer *)get_vaddr(buf);
 
-		/* Update selected blocks wrt feature config flag */
-		if (lparams->features_cfg.pipe_conf_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_PIPE_CONF];
-			block = (union neoisp_params_block_u *)&lparams->regs.pipe_conf;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.head_color_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HEAD_COLOR];
-			block = (union neoisp_params_block_u *)&lparams->regs.head_color;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.hdr_decompress_input0_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_DECOMPRESS0];
-			block = (union neoisp_params_block_u *)&lparams->regs.decompress_input0;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.hdr_decompress_input1_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_DECOMPRESS1];
-			block = (union neoisp_params_block_u *)&lparams->regs.decompress_input1;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.obwb0_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB0];
-			block = (union neoisp_params_block_u *)&lparams->regs.obwb[0];
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.obwb1_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB1];
-			block = (union neoisp_params_block_u *)&lparams->regs.obwb[1];
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.obwb2_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_OBWB2];
-			block = (union neoisp_params_block_u *)&lparams->regs.obwb[2];
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.hdr_merge_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_HDR_MERGE];
-			block = (union neoisp_params_block_u *)&lparams->regs.hdr_merge;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.rgbir_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_RGBIR];
-			block = (union neoisp_params_block_u *)&lparams->regs.rgbir;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.stat_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_STAT];
-			block = (union neoisp_params_block_u *)&lparams->regs.stat;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.ir_compress_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_IR_COMPRESS];
-			block = (union neoisp_params_block_u *)&lparams->regs.ir_compress;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.bnr_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_BNR];
-			block = (union neoisp_params_block_u *)&lparams->regs.bnr;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.vignetting_ctrl_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_VIGNETTING_CTRL];
-			block = (union neoisp_params_block_u *)&lparams->regs.vignetting_ctrl;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.ctemp_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CTEMP];
-			block = (union neoisp_params_block_u *)&lparams->regs.ctemp;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.demosaic_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DEMOSAIC];
-			block = (union neoisp_params_block_u *)&lparams->regs.demosaic;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.rgb2yuv_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_RGB2YUV];
-			block = (union neoisp_params_block_u *)&lparams->regs.rgb2yuv;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.dr_comp_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DR_COMP];
-			block = (union neoisp_params_block_u *)&lparams->regs.drc;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.nr_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_NR];
-			block = (union neoisp_params_block_u *)&lparams->regs.nr;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.af_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_AF];
-			block = (union neoisp_params_block_u *)&lparams->regs.af;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.ee_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_EE];
-			block = (union neoisp_params_block_u *)&lparams->regs.ee;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.df_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DF];
-			block = (union neoisp_params_block_u *)&lparams->regs.df;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.convmed_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CONVMED];
-			block = (union neoisp_params_block_u *)&lparams->regs.convmed;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.cas_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_CAS];
-			block = (union neoisp_params_block_u *)&lparams->regs.cas;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.gcm_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_GCM];
-			block = (union neoisp_params_block_u *)&lparams->regs.gcm;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.vignetting_table_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_VIGNETTING_TABLE];
-			block = (union neoisp_params_block_u *)&lparams->mems.vt;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.drc_global_tonemap_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DRC_GLOBAL_TONEMAP];
-			block = (union neoisp_params_block_u *)&lparams->mems.gtm;
-			block_handler->handler(neoispd, block);
-		}
-		if (lparams->features_cfg.drc_local_tonemap_cfg) {
-			block_handler = &neoisp_block_handlers[NEOISP_PARAM_BLK_DRC_LOCAL_TONEMAP];
-			block = (union neoisp_params_block_u *)&lparams->mems.ltm;
-			block_handler->handler(neoispd, block);
-		}
+	if (params->data_size == 0)
+		/* No relevant parameters in this buffer */
+		return;
 
-		break;
-	}
-	case V4L2_META_FMT_NEO_ISP_EXT_PARAMS: {
-		/* Extended params API */
-		const struct neoisp_block_handler_s *block_handler;
-		struct v4l2_isp_params_buffer *ext_params =
-			(struct v4l2_isp_params_buffer *)get_vaddr(buf);
-		size_t block_offset = 0, max_offset;
+	max_offset = params->data_size;
 
-		if (ext_params->data_size == 0)
-			/* No relevant parameters in this buffer */
-			break;
+	/*
+	 * Walk the list of parameter blocks and process them. No
+	 * validation is done here, as the content of the parameters
+	 * buffer is already checked when the buffer is queued.
+	 */
+	while (block_offset < max_offset) {
+		union neoisp_params_block_u *block = (union neoisp_params_block_u *)
+			&params->data[block_offset];
+		block_offset += block->header.size;
 
-		max_offset = ext_params->data_size;
-
-		/*
-		 * Walk the list of parameter blocks and process them. No
-		 * validation is done here, as the content of the parameters
-		 * buffer is already checked when the buffer is queued.
-		 */
-		while (block_offset < max_offset) {
-			union neoisp_ext_params_block_u *block = (union neoisp_ext_params_block_u *)
-				&ext_params->data[block_offset];
-			block_offset += block->header.size;
-
-			block_handler = &neoisp_block_handlers[block->header.type];
-			block_handler->ext_handler(neoispd, block);
-		}
-		break;
-	}
-	default:
-		dev_err(neoispd->dev, "Error: unknown params fmt (%#x)\n",
-			node->neoisp_format->fourcc);
-		break;
+		block_handler = &neoisp_block_handlers[block->header.type];
+		block_handler->handler(neoispd->context, block);
 	}
 }
 
@@ -2627,7 +2516,7 @@ void neoisp_ctx_upload_context(struct neoisp_dev_s *neoispd)
 }
 
 static void neoisp_ctx_get_stats_blk(struct neoisp_dev_s *neoispd, u32 btype, u8 *src,
-				     struct v4l2_isp_stats_buffer *ext_stats, u32 *offset)
+				     struct v4l2_isp_buffer *ext_stats, u32 *offset)
 {
 	union neoisp_stats_block_u *blk = (union neoisp_stats_block_u *)&ext_stats->data[*offset];
 	u32 size = 0, loff, lsz;
@@ -2707,7 +2596,7 @@ static void neoisp_ctx_get_stats_blk(struct neoisp_dev_s *neoispd, u32 btype, u8
 		return;
 	}
 	blk->header.type = btype;
-	blk->header.size = ALIGN(size + sizeof(struct v4l2_isp_stats_block_header), 8);
+	blk->header.size = ALIGN(size + sizeof(struct v4l2_isp_block_header), 8);
 	blk->header.flags = 0;
 	*offset += blk->header.size;
 }
@@ -2716,7 +2605,8 @@ void neoisp_ctx_get_stats(struct neoisp_dev_s *neoispd, struct neoisp_buffer_s *
 {
 	struct neoisp_node_s *node = &neoispd->node[NEOISP_STATS_NODE];
 	u8 *src = (u8 *)(uintptr_t)neoispd->mmio_tcm;
-	u32 offset, size, *blk_list, count;
+	struct v4l2_isp_buffer *stats;
+	u32 offset, *blk_list, count;
 
 	/* Check if stats node link is enabled */
 	if (!neoisp_node_link_is_enabled(node))
@@ -2727,68 +2617,14 @@ void neoisp_ctx_get_stats(struct neoisp_dev_s *neoispd, struct neoisp_buffer_s *
 		return;
 	}
 
-	switch (node->neoisp_format->fourcc) {
-	case V4L2_META_FMT_NEO_ISP_STATS: {
-		struct neoisp_meta_stats_s *lstats = (struct neoisp_meta_stats_s *)get_vaddr(buf);
+	stats = (struct v4l2_isp_buffer *)get_vaddr(buf);
 
-		/* Get stats from registers */
-		memcpy_fromio((u32 *)(uintptr_t)&lstats->regs,
-			      neoispd->mmio + NEO_ALIAS_ALIAS_REG0,
-			      sizeof(struct neoisp_reg_stats_s));
+	offset = 0;
+	blk_list = (u32 *)neoisp_stats_blocks_v1;
+	count = ARRAY_SIZE(neoisp_stats_blocks_v1);
+	for (int i = 0; i < count; i++)
+		neoisp_ctx_get_stats_blk(neoispd, blk_list[i], src, stats, &offset);
 
-		/* Get ctemp stats from memory */
-		get_offsize(NEO_CTEMP_R_SUM_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_r_sum, &src[offset], size);
-
-		get_offsize(NEO_CTEMP_G_SUM_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_g_sum, &src[offset], size);
-
-		get_offsize(NEO_CTEMP_B_SUM_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_b_sum, &src[offset], size);
-
-		get_offsize(NEO_CTEMP_PIX_CNT_MAP, &offset, &size);
-		memcpy(&lstats->mems.ctemp.ctemp_pix_cnt, &src[offset], size);
-
-		/* Get rgbir stats from memory */
-		get_offsize(NEO_RGBIR_HIST_MAP, &offset, &size);
-		memcpy(&lstats->mems.rgbir.rgbir_hist, &src[offset], size);
-
-		/* Get histograms stats from memory */
-		get_offsize(NEO_HIST_STAT_MAP, &offset, &size);
-		memcpy(&lstats->mems.hist.hist_stat, &src[offset], size);
-
-		/* Get drc local sum stats from memory */
-		get_offsize(NEO_DRC_LOCAL_SUM_MAP, &offset, &size);
-		memcpy(&lstats->mems.drc.drc_local_sum, &src[offset], size);
-
-		/* Get drc hist roi0 stats from memory */
-		get_offsize(NEO_DRC_GLOBAL_HIST_ROI0_MAP, &offset, &size);
-		memcpy(&lstats->mems.drc.drc_global_hist_roi0, &src[offset], size);
-
-		/* Get drc hist roi1 stats from memory */
-		get_offsize(NEO_DRC_GLOBAL_HIST_ROI1_MAP, &offset, &size);
-		memcpy(&lstats->mems.drc.drc_global_hist_roi1, &src[offset], size);
-		break;
-	}
-
-	case V4L2_META_FMT_NEO_ISP_EXT_STATS: {
-		struct v4l2_isp_stats_buffer *ext_stats =
-			(struct v4l2_isp_stats_buffer *)get_vaddr(buf);
-
-		ext_stats->version = V4L2_ISP_VERSION_V1;
-		offset = 0;
-		blk_list = (u32 *)neoisp_ext_stats_blocks_v1;
-		count = ARRAY_SIZE(neoisp_ext_stats_blocks_v1);
-		for (int i = 0; i < count; i++)
-			neoisp_ctx_get_stats_blk(neoispd, blk_list[i], src, ext_stats, &offset);
-
-		ext_stats->data_size = offset;
-		break;
-	}
-	default:
-		dev_err(neoispd->dev, "Error: unknown stats fmt (%#x)\n",
-			node->neoisp_format->fourcc);
-		break;
-	}
+	stats->version = V4L2_ISP_VERSION_V1;
+	stats->data_size = offset;
 }
-

@@ -474,14 +474,7 @@ static const struct neoisp_fmt_s formats_vout[] = {
 
 static const struct neoisp_fmt_s formats_mout[] = {
 	{
-		.fourcc = V4L2_META_FMT_NEO_ISP_PARAMS, /* NXP neoisp 3A parameters */
-		.align = 32,
-		.bit_depth = 8,
-		.num_planes = 1,
-		.type = NEOISP_FMT_META_OUTPUT
-	},
-	{
-		.fourcc = V4L2_META_FMT_NEO_ISP_EXT_PARAMS, /* NXP neoisp extended 3A parameters */
+		.fourcc = V4L2_META_FMT_NEO_ISP_EXT_PARAMS, /* NXP Neoisp Extensible Parameters */
 		.align = 32,
 		.bit_depth = 8,
 		.num_planes = 1,
@@ -491,14 +484,7 @@ static const struct neoisp_fmt_s formats_mout[] = {
 
 static const struct neoisp_fmt_s formats_mcap[] = {
 	{
-		.fourcc = V4L2_META_FMT_NEO_ISP_STATS, /* NXP neoisp 3A Statistics */
-		.align = 32,
-		.bit_depth = 8,
-		.num_planes = 1,
-		.type = NEOISP_FMT_META_CAPTURE
-	},
-	{
-		.fourcc = V4L2_META_FMT_NEO_ISP_EXT_STATS, /* NXP neoisp extended 3A Statistics */
+		.fourcc = V4L2_META_FMT_NEO_ISP_EXT_STATS, /* NXP Neoisp Extensible Statistics */
 		.align = 32,
 		.bit_depth = 8,
 		.num_planes = 1,
