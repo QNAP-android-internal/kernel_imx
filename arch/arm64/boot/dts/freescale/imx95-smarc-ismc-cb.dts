@@ -117,6 +117,20 @@
 		enable-active-low;
 	};
 
+	sound-alc5672 {
+		compatible = "fsl,imx-audio-alc5672";
+		model = "alc5672-audio";
+		audio-cpu = <&sai3>;
+		audio-codec = <&codec>;
+		audio-routing =
+			"Headphone Jack", "HPOL",
+			"Headphone Jack", "HPOR",
+			"Mic Jack", "MICBIAS1",
+			"IN1P", "Mic Jack";
+
+		status = "okay";
+	};
+
 	reg_si5332_stby: regulator-si5332-stby {
 		compatible = "regulator-fixed";
 		regulator-name = "si5332-stby";
@@ -160,6 +174,21 @@
 			reg = <0>;
 			linux,default-trigger = "none";
 		};
+	};
+};
+
+&lpi2c5 {
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_lpi2c5>;
+	status = "okay";
+
+	codec: alc5672@1c {
+		status = "okay";
+		compatible = "realtek,alc5672";
+		reg = <0x1c>;
+		clocks = <&scmi_clk IMX95_CLK_SAI3>;
+		clock-names = "mclk";
 	};
 };
 
@@ -216,6 +245,12 @@
 	assigned-clock-rates = <3932160000>,
 			       <3612672000>, <393216000>,
 			       <361267200>, <12288000>;
+	clocks = <&scmi_clk IMX95_CLK_BUSWAKEUP>, <&dummy>,
+		 <&scmi_clk IMX95_CLK_SAI3>, <&dummy>,
+		 <&dummy>, <&scmi_clk IMX95_CLK_AUDIOPLL1>,
+		 <&scmi_clk IMX95_CLK_AUDIOPLL2>;
+	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
+	pll-max-freq-MHz = <50>;
 	fsl,sai-mclk-direction-output;
 	status = "okay";
 };
@@ -305,6 +340,13 @@
 		fsl,pins = <
 			IMX95_PAD_I2C1_SCL__AONMIX_TOP_LPI2C1_SCL	0x40000b9e
 			IMX95_PAD_I2C1_SDA__AONMIX_TOP_LPI2C1_SDA	0x40000b9e
+		>;
+	};
+
+	pinctrl_lpi2c5: lpi2c5grp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO22__LPI2C5_SDA                 0x40000b9e
+			IMX95_PAD_GPIO_IO23__LPI2C5_SCL                 0x40000b9e
 		>;
 	};
 
