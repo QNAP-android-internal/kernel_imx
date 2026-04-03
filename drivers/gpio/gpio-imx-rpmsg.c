@@ -153,7 +153,6 @@ static int gpio_rpmsg_cb(struct rpmsg_device *rpdev,
 	void *data, int len, void *priv, u32 src)
 {
 	struct gpio_rpmsg_data *msg = (struct gpio_rpmsg_data *)data;
-	unsigned long flags;
 
 	if (msg->header.type == GPIO_RPMSG_REPLY) {
 		/* TBD: Add irq request_id check for A core msg */
@@ -161,9 +160,8 @@ static int gpio_rpmsg_cb(struct rpmsg_device *rpdev,
 		complete(&gpio_rpmsg.cmd_complete);
 	} else if (msg->header.type == GPIO_RPMSG_NOTIFY) {
 		*gpio_rpmsg.notify_msg = *msg;
-		local_irq_save(flags);
-		generic_handle_irq(irq_find_mapping(gpio_rpmsg.port_store[msg->port_idx]->domain, msg->pin_idx));
-		local_irq_restore(flags);
+		generic_handle_domain_irq_safe(gpio_rpmsg.port_store[msg->port_idx]->gc.irq.domain,
+					       msg->pin_idx);
 	} else
 		dev_err(&gpio_rpmsg.rpdev->dev, "wrong command type!\n");
 
@@ -290,24 +288,35 @@ static int imx_rpmsg_irq_set_type(struct irq_data *d, u32 type)
 	int edge = 0;
 	int ret = 0;
 
+	/*
+	* The gpio rpmsg should use handle_simple_irq() to handle edge irq.
+	* Because this controller don't need to clear the irq status in the
+	* irq_ack.
+	*/
 	switch (type) {
 	case IRQ_TYPE_EDGE_RISING:
 		edge = GPIO_RPMSG_TRI_RISING;
+		irq_set_handler_locked(d, handle_simple_irq);
 		break;
 	case IRQ_TYPE_EDGE_FALLING:
 		edge = GPIO_RPMSG_TRI_FALLING;
+		irq_set_handler_locked(d, handle_simple_irq);
 		break;
 	case IRQ_TYPE_EDGE_BOTH:
 		edge = GPIO_RPMSG_TRI_BOTH_EDGE;
+		irq_set_handler_locked(d, handle_simple_irq);
 		break;
 	case IRQ_TYPE_LEVEL_LOW:
 		edge = GPIO_RPMSG_TRI_LOW_LEVEL;
+		irq_set_handler_locked(d, handle_level_irq);
 		break;
 	case IRQ_TYPE_LEVEL_HIGH:
 		edge = GPIO_RPMSG_TRI_HIGH_LEVEL;
+		irq_set_handler_locked(d, handle_level_irq);
 		break;
 	default:
 		ret = -EINVAL;
+		irq_set_handler_locked(d, handle_bad_irq);
 		break;
 	}
 
@@ -407,10 +416,9 @@ static void imx_rpmsg_irq_bus_sync_unlock(struct irq_data *d)
 		msg->in.wakeup = 0;
 		port->gpio_pins[gpio_idx].irq_shutdown = 0;
 	} else {
-		 /* if not set irq type, then use low level as trigger type */
 		msg->out.event = port->gpio_pins[gpio_idx].irq_type;
 		if (!msg->out.event)
-			msg->out.event = GPIO_RPMSG_TRI_LOW_LEVEL;
+			msg->out.event = GPIO_RPMSG_TRI_IGNORE;
 		if (port->gpio_pins[gpio_idx].irq_unmask) {
 			msg->in.wakeup = 0;
 			port->gpio_pins[gpio_idx].irq_unmask = 0;
@@ -430,6 +438,7 @@ static struct irq_chip imx_rpmsg_irq_chip = {
 	.irq_shutdown = imx_rpmsg_irq_shutdown,
 	.irq_bus_lock = imx_rpmsg_irq_bus_lock,
 	.irq_bus_sync_unlock = imx_rpmsg_irq_bus_sync_unlock,
+	.flags = IRQCHIP_IMMUTABLE,
 };
 
 static int imx_rpmsg_gpio_probe(struct platform_device *pdev)
@@ -437,8 +446,8 @@ static int imx_rpmsg_gpio_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
 	struct imx_rpmsg_gpio_port *port;
+	struct gpio_irq_chip *girq;
 	struct gpio_chip *gc;
-	int i, irq_base;
 	int ret;
 
 	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
@@ -452,7 +461,9 @@ static int imx_rpmsg_gpio_probe(struct platform_device *pdev)
 	gpio_rpmsg.port_store[port->idx] = port;
 
 	gc = &port->gc;
+	gc->owner = THIS_MODULE;
 	gc->parent = dev;
+	gc->fwnode = of_fwnode_handle(np);
 	gc->label = kasprintf(GFP_KERNEL, "imx-rpmsg-gpio-%d", port->idx);
 	gc->ngpio = IMX_RPMSG_GPIO_PER_PORT;
 	gc->base = -1;
@@ -464,29 +475,14 @@ static int imx_rpmsg_gpio_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, port);
 
-	ret = devm_gpiochip_add_data(dev, gc, port);
-	if (ret < 0)
-		return ret;
+	girq = &gc->irq;
+	gpio_irq_chip_set_chip(girq, &imx_rpmsg_irq_chip);
+	girq->parent_handler = NULL;
+	girq->num_parents = 0;
+	girq->parents = NULL;
+	girq->chip->name = kasprintf(GFP_KERNEL, "rpmsg-irq-port-%d", port->idx);
 
-	/* generate one new irq domain */
-	port->chip = imx_rpmsg_irq_chip;
-	port->chip.name = kasprintf(GFP_KERNEL, "rpmsg-irq-port-%d", port->idx);
-
-	irq_base = devm_irq_alloc_descs(dev, -1, 0, IMX_RPMSG_GPIO_PER_PORT, numa_node_id());
-	WARN_ON(irq_base < 0);
-
-	port->domain = irq_domain_create_legacy(of_fwnode_handle(np), IMX_RPMSG_GPIO_PER_PORT,
-						irq_base, 0,
-						&irq_domain_simple_ops, port);
-	WARN_ON(!port->domain);
-	for (i = irq_base; i < irq_base + IMX_RPMSG_GPIO_PER_PORT; i++) {
-		irq_set_chip_and_handler(i, &port->chip, handle_level_irq);
-		irq_set_chip_data(i, port);
-		irq_clear_status_flags(i, IRQ_NOREQUEST);
-		irq_set_probe(i);
-	}
-
-	return 0;
+	return devm_gpiochip_add_data(dev, gc, port);
 }
 
 static void imx_rpmsg_gpio_remove(struct platform_device *pdev)
