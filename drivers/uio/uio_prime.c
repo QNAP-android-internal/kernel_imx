@@ -180,7 +180,7 @@ static int prime_probe(struct platform_device *pdev)
 
 static const struct of_device_id prime_of_match[] = {
 	{ .compatible = "fsl,imx94-mu-prime", },
-	{ .compatible = "fsl,imx95-mu-prime", },
+	{ .compatible = "fsl,imx952-mu-prime", },
 	{},
 };
 
