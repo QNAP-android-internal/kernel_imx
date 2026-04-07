@@ -7,6 +7,7 @@
 
 #include <linux/pm_runtime.h>
 #include "wave5-helper.h"
+#include "wave5-vpu-dbg.h"
 
 #define DEFAULT_BS_SIZE(width, height) ((width) * (height) / 8 * 3)
 
@@ -158,6 +159,8 @@ int wave5_vpu_release_device(struct file *filp,
 	struct vpu_device *dev = inst->dev;
 	int ret = 0;
 
+	wave5_vpu_remove_dbgfs_file(inst);
+	v4l2_m2m_ctx_release(inst->v4l2_fh.m2m_ctx);
 	if (inst->state != VPU_INST_STATE_NONE) {
 		u32 fail_res;
 
@@ -176,7 +179,6 @@ int wave5_vpu_release_device(struct file *filp,
 			pm_runtime_put_sync(inst->dev->dev);
 	}
 
-	v4l2_m2m_ctx_release(inst->v4l2_fh.m2m_ctx);
 	wave5_cleanup_instance(inst, filp);
 	if (dev->irq < 0) {
 		scoped_guard(mutex, &dev->dev_lock) {
