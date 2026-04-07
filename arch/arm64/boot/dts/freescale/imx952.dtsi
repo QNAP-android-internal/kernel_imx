@@ -1680,6 +1680,7 @@
 				reg = <0x20 0x100>;
 				clocks = <&cameramix_csr IMX952_CLK_CAMBLK_CSI2_FOR0>;
 				power-domains = <&scmi_devpd IMX952_PD_CAMERA>;
+				nxp,neoisp = <&neoisp0>;
 				status = "disabled";
 
 				ports {
@@ -1701,6 +1702,7 @@
 				reg = <0x120 0x100>;
 				clocks = <&cameramix_csr IMX952_CLK_CAMBLK_CSI2_FOR1>;
 				power-domains = <&scmi_devpd IMX952_PD_CAMERA>;
+				nxp,neoisp = <&neoisp0>;
 				status = "disabled";
 
 				ports {
