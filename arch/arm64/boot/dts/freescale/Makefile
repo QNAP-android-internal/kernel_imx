@@ -1201,6 +1201,7 @@ imx95-19x19-verdin-root-dtbs := imx95-19x19-verdin.dtb imx95-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-verdin-root.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm.dtb imx95-15x15-frdm-boe-wxga-lvds-panel.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-rpmsg.dtb
 
 imx95-15x15-frdm-root-dtbs := imx95-15x15-frdm.dtb imx95-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-root.dtb
