@@ -212,6 +212,14 @@
 		pinctrl-0 = <&pinctrl_i2c3_pcal6408>;
 		reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
 	};
+
+	eeprom_som: eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+		pagesize = <32>;
+		read-only;
+		status = "okay";
+	};
 };
 
 &lpi2c5 {
