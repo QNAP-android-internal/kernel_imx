@@ -242,12 +242,127 @@ static void p3h2x4x_default_configuration(struct device *dev)
 		p3h2x4x_i3c_hub->hub_config.tp_config[tp_count].mode =  P3H2X4X_TP_MODE_I3C;
 }
 
+static int p3h2x4x_i3c_hub_access_reg_get(void *dvrdata, u64 *val)
+{
+	struct p3h2x4x_i3c_hub_dev *p3h2x4x_i3c_hub = dvrdata;
+	u32 reg_val;
+	int ret;
+
+	ret = regmap_read(p3h2x4x_i3c_hub->regmap, p3h2x4x_i3c_hub->reg_addr, &reg_val);
+	if (ret)
+		return ret;
+
+	*val = reg_val & 0xFF;
+	return 0;
+}
+
+static int p3h2x4x_i3c_hub_access_reg_set(void *dvrdata, u64 val)
+{
+	struct p3h2x4x_i3c_hub_dev *p3h2x4x_i3c_hub = dvrdata;
+
+	return regmap_write(p3h2x4x_i3c_hub->regmap, p3h2x4x_i3c_hub->reg_addr, val & 0xFF);
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(p3h2x4x_i3c_hub_access_reg, p3h2x4x_i3c_hub_access_reg_get,
+			 p3h2x4x_i3c_hub_access_reg_set, "%llx\n");
+
+static int p3h2x4x_i3c_hub_debugfs_init(struct p3h2x4x_i3c_hub_dev *p3h2x4x_i3c_hub,
+					const char *hub_id)
+{
+	struct dentry *p3h2x4x_conf_dir;
+	struct dentry *sysdir;
+	struct dentry *tp_dir;
+	struct dentry *cp_dir;
+	struct dentry *reg_dir;
+
+	char file_name[32];
+	int i;
+
+	sysdir = debugfs_create_dir(hub_id, NULL);
+	if (IS_ERR(sysdir))
+		return PTR_ERR(sysdir);
+
+	p3h2x4x_i3c_hub->sysfs_debug_dir = sysdir;
+
+	sysdir = debugfs_create_dir("dt-p3h2x4x-conf", p3h2x4x_i3c_hub->sysfs_debug_dir);
+	if (IS_ERR(sysdir))
+		goto err_remove;
+
+	p3h2x4x_conf_dir = sysdir;
+
+	cp_dir = debugfs_create_dir("p3h2x4x-control-ports", p3h2x4x_conf_dir);
+	if (IS_ERR(cp_dir))
+		goto err_remove;
+
+	/* for control ports 0 */
+	debugfs_create_u32("cp0-io-strength-ohms", 0400, cp_dir,
+			   &p3h2x4x_i3c_hub->hub_config.cp0_io_strength);
+
+	/* for control ports 1 */
+	debugfs_create_u32("cp1-io-strength-ohms", 0400, cp_dir,
+			   &p3h2x4x_i3c_hub->hub_config.cp1_io_strength);
+
+	for (i = 0; i < P3H2X4X_TP_MAX_COUNT; ++i) {
+		sprintf(file_name, "target-port-%d", i);
+
+		tp_dir = debugfs_create_dir(file_name, p3h2x4x_conf_dir);
+		if (IS_ERR(tp_dir))
+			goto err_remove;
+
+		debugfs_create_u32("mode", 0400, tp_dir,
+				   (u32 *)&p3h2x4x_i3c_hub->hub_config.tp_config[i].mode);
+
+		debugfs_create_bool("pullup-enable", 0400, tp_dir,
+				    &p3h2x4x_i3c_hub->hub_config.tp_config[i].pullup_en);
+
+		debugfs_create_bool("IBI-enable", 0400, tp_dir,
+				    &p3h2x4x_i3c_hub->hub_config.tp_config[i].ibi_en);
+
+		debugfs_create_bool("always_enable", 0400, tp_dir,
+				    &p3h2x4x_i3c_hub->hub_config.tp_config[i].always_enable);
+
+		if ((i / 2) % 2 == 0) {  /* for target groups 0145*/
+			debugfs_create_u32("io-strength-ohms", 0400, tp_dir,
+					   &p3h2x4x_i3c_hub->hub_config.tp0145_io_strength);
+
+			debugfs_create_u32("internal-pullups-ohms", 0400, tp_dir,
+					   &p3h2x4x_i3c_hub->hub_config.tp0145_pullup);
+		} else {
+			debugfs_create_u32("io-strength-ohms", 0400, tp_dir,
+					   &p3h2x4x_i3c_hub->hub_config.tp2367_io_strength);
+
+			debugfs_create_u32("internal-pullups-ohms", 0400, tp_dir,
+					   &p3h2x4x_i3c_hub->hub_config.tp2367_pullup);
+		}
+	}
+
+	sysdir = debugfs_create_dir("reg", p3h2x4x_i3c_hub->sysfs_debug_dir);
+	if (IS_ERR(sysdir))
+		goto err_remove;
+
+	reg_dir = sysdir;
+
+	sysdir = debugfs_create_file_unsafe("access", 0600, reg_dir, p3h2x4x_i3c_hub,
+					    &p3h2x4x_i3c_hub_access_reg);
+	if (IS_ERR(sysdir))
+		goto err_remove;
+
+	debugfs_create_u8("offset", 0600, reg_dir, &p3h2x4x_i3c_hub->reg_addr);
+
+	return 0;
+
+err_remove:
+	debugfs_remove_recursive(p3h2x4x_i3c_hub->sysfs_debug_dir);
+	return PTR_ERR(sysdir);
+}
+
 static int p3h2x4x_i3c_hub_probe(struct platform_device *pdev)
 {
 	struct p3h2x4x_dev *p3h2x4x = dev_get_drvdata(pdev->dev.parent);
 	struct p3h2x4x_i3c_hub_dev *p3h2x4x_i3c_hub;
 	struct device *dev = &pdev->dev;
 	struct device_node *node;
+	char hub_id[64];
 	int ret, i;
 
 	p3h2x4x_i3c_hub = devm_kzalloc(dev, sizeof(*p3h2x4x_i3c_hub), GFP_KERNEL);
@@ -293,9 +408,17 @@ static int p3h2x4x_i3c_hub_probe(struct platform_device *pdev)
 	if (p3h2x4x->is_p3h2x4x_in_i3c) {
 		p3h2x4x_i3c_hub->i3cdev = p3h2x4x->i3cdev;
 		i3cdev_set_drvdata(p3h2x4x->i3cdev, p3h2x4x_i3c_hub);
+		sprintf(hub_id, "i3c-hub-device-%d-%llx",
+			i3c_dev_get_master(p3h2x4x_i3c_hub->i3cdev->desc)->bus.id,
+			p3h2x4x_i3c_hub->i3cdev->desc->info.pid);
 		ret = p3h2x4x_tp_i3c_algo(p3h2x4x_i3c_hub);
 		if (ret)
 			return dev_err_probe(dev, ret, "Failed to register i3c bus\n");
+	} else {
+		struct i2c_client *client = to_i2c_client(pdev->dev.parent);
+
+		snprintf(hub_id, sizeof(hub_id), "i3c-hub-device-%d",
+			 client->adapter->nr);
 	}
 
 	/* Register logic for native SMBus ports */
@@ -309,6 +432,10 @@ static int p3h2x4x_i3c_hub_probe(struct platform_device *pdev)
 	if (ret)
 		return dev_err_probe(dev, ret, "Failed to lock HUB's protected registers\n");
 
+	ret = p3h2x4x_i3c_hub_debugfs_init(p3h2x4x_i3c_hub, hub_id);
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to create I3C HUB debugfs\n");
+
 	return 0;
 }
 
@@ -317,6 +444,8 @@ static void p3h2x4x_i3c_hub_remove(struct platform_device *pdev)
 	struct p3h2x4x_i3c_hub_dev *p3h2x4x_i3c_hub = platform_get_drvdata(pdev);
 	struct p3h2x4x_dev *p3h2x4x = dev_get_drvdata(pdev->dev.parent);
 	u8 i;
+
+	debugfs_remove_recursive(p3h2x4x_i3c_hub->sysfs_debug_dir);
 
 	for (i = 0; i < P3H2X4X_TP_MAX_COUNT; i++) {
 		if (!p3h2x4x_i3c_hub->tp_bus[i].is_registered)
