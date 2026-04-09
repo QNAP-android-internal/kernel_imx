@@ -914,9 +914,6 @@ static int hantro_enc_write_regs(struct hantro_enc_device *encoder,
 	if (ret)
 		return -EINVAL;
 
-	for (int i = 0; i < count; i++)
-		hantro_enc_writel(core, reg_buf[i], regs->offset + i * 4);
-
 	return 0;
 }
 
@@ -946,8 +943,6 @@ static int hantro_enc_read_regs(struct hantro_enc_device *encoder,
 
 	count = regs->size >> 2;
 	reg_buf = &core->mirror_regs[regs->offset >> 2];
-	for (int i = 0; i < count; i++)
-		reg_buf[i] = hantro_enc_readl(core, regs->offset + i * 4);
 
 	ret = copy_to_user((void __user *)regs->regs, reg_buf, regs->size);
 	if (ret)
