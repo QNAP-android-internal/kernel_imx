@@ -118,6 +118,7 @@ struct hantro_dec_core {
 	int irq;
 	void __iomem *reg_base;
 	u32 *mirror_regs;
+	u32 *temp_regs;
 	u32 num_regs;
 	u32 num_org_regs;
 
@@ -418,7 +419,7 @@ static long hantro_dec_push_regs(struct hantro_dec_interface *iface, struct core
 
 	count = desc->size >> 2;
 	count = min(count, core->num_org_regs);
-	reg_buf = core->mirror_regs;
+	reg_buf = core->temp_regs;
 	ret = copy_from_user(reg_buf, (void __user *)desc->regs, count << 2);
 	if (ret) {
 		dev_err(core->dev, "copy_from_user failed, %d\n", ret);
@@ -434,8 +435,10 @@ static long hantro_dec_push_regs(struct hantro_dec_interface *iface, struct core
 	 */
 	wmb();
 	hantro_dec_writel(core, reg_buf[1], 4);
-	scoped_guard(spinlock_irqsave, &core->lock)
+	scoped_guard(spinlock_irqsave, &core->lock) {
 		core->is_enabled = 1;
+		hantro_dec_update_mirror_regs(core);
+	}
 
 	if (core->format < DWL_CLIENT_TYPE_MAX)
 		core->frame_num[core->format]++;
@@ -1189,6 +1192,12 @@ static int hantro_dec_init_core(struct hantro_dec_core *core)
 		ret = -ENOMEM;
 		goto exit;
 	}
+	core->temp_regs = (u32 *)vmalloc_user(PAGE_ALIGN(sizeof(u32) * core->num_org_regs));
+	if (!core->temp_regs) {
+		dev_err(core->dev, "Failed to allocate temp buffer for regs\n");
+		ret = -ENOMEM;
+		goto exit;
+	}
 	core->is_valid = 1;
 	spin_lock_init(&core->lock);
 
@@ -1206,9 +1215,15 @@ static int hantro_dec_init_core(struct hantro_dec_core *core)
 exit:
 	pm_runtime_mark_last_busy(core->dev);
 	pm_runtime_put_autosuspend(core->dev);
-	if (ret && core->mirror_regs) {
-		vfree(core->mirror_regs);
-		core->mirror_regs = NULL;
+	if (ret) {
+		if (core->mirror_regs) {
+			vfree(core->mirror_regs);
+			core->mirror_regs = NULL;
+		}
+		if (core->temp_regs) {
+			vfree(core->temp_regs);
+			core->temp_regs = NULL;
+		}
 	}
 	return ret;
 }
@@ -1398,6 +1413,7 @@ static void hantro_dec_remove(struct platform_device *pdev)
 	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	vfree(core->mirror_regs);
+	vfree(core->temp_regs);
 }
 
 static int hantro_dec_runtime_suspend(struct device *dev)
