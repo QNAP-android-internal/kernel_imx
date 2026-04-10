@@ -38,6 +38,10 @@
 #define NODE_NAME(node) \
 	(node_desc[(node)->id].ent_name + sizeof(NEOISP_NAME))
 
+static int standalone_mdev;
+module_param_named(standalone_mdev, standalone_mdev, uint, 0644);
+MODULE_PARM_DESC(standalone_mdev, " Create standalone neoisp media device, default is 0 (off)");
+
 static int enable_debugfs;
 module_param_named(enable_debugfs, enable_debugfs, uint, 0644);
 MODULE_PARM_DESC(enable_debugfs, " Turn on/off debugfs, default is 0 (off)");
@@ -1547,24 +1551,12 @@ err_unregister_queue:
 	return ret;
 }
 
-int neoisp_core_media_register(struct device *dev, struct v4l2_subdev *sd)
+static int neoisp_init_group(struct neoisp_dev_s *neoispd, struct media_device *mdev)
 {
-	struct neoisp_dev_s *neoispd = dev_get_drvdata(dev);
-	struct media_device *mdev = sd->v4l2_dev->mdev;
-	struct v4l2_device *v4l2_dev;
+	struct v4l2_device *v4l2_dev = &neoispd->v4l2_dev;
 	u32 num_registered = 0;
 	int ret;
 
-	if (!neoispd)
-		return -EINVAL;
-
-	if (neoispd->media_registered)
-		return 0;
-
-	neoispd->streaming_map = 0;
-	neoispd->dummy_buf = NULL;
-
-	v4l2_dev = &neoispd->v4l2_dev;
 	v4l2_dev->mdev = mdev;
 
 	/* Register the NEOISP subdevice. */
@@ -1583,11 +1575,10 @@ int neoisp_core_media_register(struct device *dev, struct v4l2_subdev *sd)
 	if (ret)
 		goto err_unregister_nodes;
 
-	neoispd->media_registered++;
 	return 0;
 
 err_unregister_nodes:
-	media_entity_cleanup(&sd->entity);
+	media_entity_cleanup(&neoispd->sd.entity);
 	while (num_registered-- > 0) {
 		video_unregister_device(&neoispd->node[num_registered].vfd);
 		vb2_queue_release(&neoispd->node[num_registered].queue);
@@ -1597,11 +1588,61 @@ err_unregister_v4l2:
 	v4l2_device_unregister(v4l2_dev);
 	return ret;
 }
+
+int neoisp_core_media_register(struct device *dev, struct v4l2_subdev *sd)
+{
+	struct neoisp_dev_s *neoispd = dev_get_drvdata(dev);
+	struct media_device *mdev = sd->v4l2_dev->mdev;
+	int ret;
+
+	if (!neoispd)
+		return -EINVAL;
+
+	if (neoispd->media_registered || standalone_mdev)
+		return 0;
+
+	ret = neoisp_init_group(neoispd, mdev);
+	if (ret)
+		return ret;
+
+	neoispd->media_registered++;
+	return 0;
+}
 EXPORT_SYMBOL_GPL(neoisp_core_media_register);
+
+static void neoisp_destroy_devices(struct neoisp_dev_s *neoispd)
+{
+	int i;
+
+	if (neoispd->context) {
+		dma_free_coherent(neoispd->dev,
+				  sizeof(struct neoisp_context_s),
+				  neoispd->context,
+				  neoispd->params_dma_addr);
+	}
+
+	if (standalone_mdev)
+		media_device_unregister(&neoispd->mdev);
+	else if (!neoispd->media_registered)
+		return;
+
+	dev_dbg(neoispd->dev, "Unregister from media controller\n");
+
+	v4l2_device_unregister_subdev(&neoispd->sd);
+	media_entity_cleanup(&neoispd->sd.entity);
+
+	for (i = NEOISP_NODES_COUNT - 1; i >= 0; i--) {
+		video_unregister_device(&neoispd->node[i].vfd);
+		vb2_queue_release(&neoispd->node[i].queue);
+	}
+
+	v4l2_device_unregister(&neoispd->v4l2_dev);
+}
 
 static int neoisp_init_devices(struct neoisp_dev_s *neoispd)
 {
 	struct v4l2_device *v4l2_dev;
+	struct media_device *mdev;
 	int ret;
 
 	v4l2_dev = &neoispd->v4l2_dev;
@@ -1622,38 +1663,34 @@ static int neoisp_init_devices(struct neoisp_dev_s *neoispd)
 		goto err_unregister_v4l2;
 	}
 
+	if (!standalone_mdev)
+		return 0;
+
+	/* Prepare neoisp media device in standalone mode only */
+	mdev = &neoispd->mdev;
+	mdev->dev = neoispd->dev;
+	strscpy(mdev->model, NEOISP_NAME, sizeof(mdev->model));
+	snprintf(mdev->bus_info, sizeof(mdev->bus_info),
+		 "platform:%s", dev_name(neoispd->dev));
+	media_device_init(mdev);
+
+	ret = neoisp_init_group(neoispd, mdev);
+	if (ret)
+		goto err_group;
+
+	ret = media_device_register(mdev);
+	if (ret)
+		goto err_media;
+
 	return 0;
 
+err_media:
+	neoisp_destroy_devices(neoispd);
+err_group:
+	media_device_cleanup(&neoispd->mdev);
 err_unregister_v4l2:
 	v4l2_device_unregister(v4l2_dev);
 	return ret;
-}
-
-static void neoisp_destroy_devices(struct neoisp_dev_s *neoispd)
-{
-	int i;
-
-	if (neoispd->context) {
-		dma_free_coherent(neoispd->dev,
-				  sizeof(struct neoisp_context_s),
-				  neoispd->context,
-				  neoispd->params_dma_addr);
-	}
-
-	if (!neoispd->media_registered)
-		return;
-
-	dev_dbg(neoispd->dev, "Unregister from media controller\n");
-
-	v4l2_device_unregister_subdev(&neoispd->sd);
-	media_entity_cleanup(&neoispd->sd.entity);
-
-	for (i = NEOISP_NODES_COUNT - 1; i >= 0; i--) {
-		video_unregister_device(&neoispd->node[i].vfd);
-		vb2_queue_release(&neoispd->node[i].queue);
-	}
-
-	v4l2_device_unregister(&neoispd->v4l2_dev);
 }
 
 static void neoisp_init_hw(struct neoisp_dev_s *neoispd)
@@ -1769,6 +1806,9 @@ static void neoisp_remove(struct platform_device *pdev)
 		neoisp_debugfs_exit(neoispd);
 
 	neoisp_destroy_devices(neoispd);
+
+	if (standalone_mdev)
+		media_device_cleanup(&neoispd->mdev);
 
 	pm_runtime_dont_use_autosuspend(neoispd->dev);
 	pm_runtime_disable(neoispd->dev);
