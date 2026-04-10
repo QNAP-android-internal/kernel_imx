@@ -292,11 +292,12 @@ static int imx_rpmsg_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	data->hp_jack.pin.pin = "Headphone Jack";
-	data->hp_jack.pin.mask = SND_JACK_HEADPHONE;
-	snd_soc_card_jack_new_pins(&data->card, "Headphone Jack", SND_JACK_HEADPHONE,
-				   &data->hp_jack.jack, &data->hp_jack.pin, 1);
-	snd_soc_jack_report(&data->hp_jack.jack, SND_JACK_HEADPHONE, SND_JACK_HEADPHONE);
+	if (of_property_present(np, "hp-det-gpios")) {
+		ret = simple_util_init_jack(&data->card, &data->hp_jack,
+					    1, NULL, "Headphone Jack");
+		if (ret)
+			goto fail;
+	}
 fail:
 	pdev->dev.of_node = NULL;
 	return ret;
