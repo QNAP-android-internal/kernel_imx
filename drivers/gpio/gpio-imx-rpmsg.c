@@ -157,10 +157,10 @@ static int gpio_rpmsg_cb(struct rpmsg_device *rpdev,
 
 	if (msg->header.type == GPIO_RPMSG_REPLY) {
 		/* TBD: Add irq request_id check for A core msg */
-		gpio_rpmsg.reply_msg = msg;
+		*gpio_rpmsg.reply_msg = *msg;
 		complete(&gpio_rpmsg.cmd_complete);
 	} else if (msg->header.type == GPIO_RPMSG_NOTIFY) {
-		gpio_rpmsg.notify_msg = msg;
+		*gpio_rpmsg.notify_msg = *msg;
 		local_irq_save(flags);
 		generic_handle_irq(irq_find_mapping(gpio_rpmsg.port_store[msg->port_idx]->domain, msg->pin_idx));
 		local_irq_restore(flags);
@@ -515,6 +515,18 @@ static int gpio_rpmsg_probe(struct rpmsg_device *rpdev)
 	gpio_rpmsg.rpdev = rpdev;
 	dev_info(&rpdev->dev, "new channel: 0x%x -> 0x%x!\n",
 			rpdev->src, rpdev->dst);
+
+	gpio_rpmsg.reply_msg = devm_kzalloc(&rpdev->dev,
+					    sizeof(struct gpio_rpmsg_data),
+					    GFP_KERNEL);
+	if (!gpio_rpmsg.reply_msg)
+		return -ENOMEM;
+
+	gpio_rpmsg.notify_msg = devm_kzalloc(&rpdev->dev,
+					    sizeof(struct gpio_rpmsg_data),
+					    GFP_KERNEL);
+	if (!gpio_rpmsg.notify_msg)
+		return -ENOMEM;
 
 	init_completion(&gpio_rpmsg.cmd_complete);
 	mutex_init(&gpio_rpmsg.lock);
