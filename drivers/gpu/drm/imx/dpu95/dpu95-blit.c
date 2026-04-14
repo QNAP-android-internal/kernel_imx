@@ -303,7 +303,7 @@ static int dpu95_be_fd_to_address(struct drm_device *drm_dev, int fd, unsigned l
 	struct dma_buf_attachment *attachment = NULL;
 
 	if (fd < 0)
-		return fd;
+		return -1;
 
 	dmabuf = dma_buf_get(fd);
 	if (IS_ERR(dmabuf)) {
@@ -332,20 +332,32 @@ err_put:
 	return ret;
 }
 
-static void dpu95_be_get_plane_addr(struct drm_device *drm_dev,
+static int dpu95_be_get_plane_addr(struct drm_device *drm_dev,
 	struct drm_imx_dpu_frame_plane_info plane_info,
 	unsigned long *src_plane_addr, unsigned long *dst_plane_addr)
 {
-	int i;
+	int i, ret;
 
 	for (i = 0; i < 3; i++) {
-		dpu95_be_fd_to_address(drm_dev,
+
+		ret = dpu95_be_fd_to_address(drm_dev,
 			plane_info.src_plane_fd[i], &src_plane_addr[i]);
-		src_plane_addr[i] += plane_info.src_plane_offset[i];
-		dpu95_be_fd_to_address(drm_dev,
-			plane_info.dst_plane_fd[i], &dst_plane_addr[i]);
-		dst_plane_addr[i] += plane_info.dst_plane_offset[i];
+		if (ret < -1)
+			return ret;
+		else if (ret == 0)
+			src_plane_addr[i] += plane_info.src_plane_offset[i];
 	}
+
+	for (i = 0; i < 3; i++) {
+		ret = dpu95_be_fd_to_address(drm_dev,
+			plane_info.dst_plane_fd[i], &dst_plane_addr[i]);
+		if (ret < -1)
+			return ret;
+		else if (ret == 0)
+			dst_plane_addr[i] += plane_info.dst_plane_offset[i];
+	}
+
+	return 0;
 }
 
 static void dpu95_be_set_plane_addr(struct dpu_bliteng *dpu_be,
@@ -630,8 +642,10 @@ static int imx_drm_dpu95_set_cmdlist_ioctl(struct drm_device *drm_dev, void *dat
 			return -EFAULT;
 		}
 
-		dpu95_be_get_plane_addr(drm_dev, plane_info,
+		ret = dpu95_be_get_plane_addr(drm_dev, plane_info,
 			src_plane_addr, dst_plane_addr);
+		if (ret < 0)
+			return ret;
 	}
 
 	ret = pm_runtime_resume_and_get(dpu_blit_eng->dev);
