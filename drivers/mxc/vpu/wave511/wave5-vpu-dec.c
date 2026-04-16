@@ -1330,6 +1330,8 @@ static void wave5_vpu_dec_reinit_dst_buffers(struct vpu_instance *inst)
 	struct vb2_queue *dst_vq = v4l2_m2m_get_dst_vq(inst->v4l2_fh.m2m_ctx);
 	unsigned int num_buffers = vb2_get_num_buffers(dst_vq);
 
+	inst->avail_dst_bufs = 0;
+
 	for (unsigned int i = 0; i < num_buffers; i++) {
 		struct vb2_buffer *vb = vb2_get_buffer(dst_vq, i);
 		struct vpu_dst_buffer *vpu_buf;
