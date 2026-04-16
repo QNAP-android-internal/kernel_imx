@@ -131,14 +131,6 @@
 		status = "okay";
 	};
 
-	reg_si5332_stby: regulator-si5332-stby {
-		compatible = "regulator-fixed";
-		regulator-name = "si5332-stby";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-always-on;
-	};
-
 };
 
 &adc1 {
