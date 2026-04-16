@@ -95,6 +95,17 @@
 		regulator-name = "+V1.8_SW";
 	};
 
+	reg_si5332_stby: regulator-si5332-stby {
+		compatible = "regulator-fixed";
+		regulator-name = "si5332-stby";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio2 2 GPIO_ACTIVE_LOW>;
+		regulator-always-on;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_si5332>;
+	};
+
 	cm7: imx95-cm7 {
 		compatible = "fsl,imx95-cm7";
 		mbox-names = "tx", "rx", "rxdb";
@@ -560,6 +571,12 @@
 		fsl,pins = <
 			IMX95_PAD_SAI1_TXD0__AONMIX_TOP_GPIO1_IO_BIT13		0x31e
 			IMX95_PAD_XSPI1_DATA1__GPIO5_IO_BIT1			0x31e
+		>;
+	};
+
+	pinctrl_si5332: si5332grp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO02__GPIO2_IO_BIT2		0x31e
 		>;
 	};
 };
