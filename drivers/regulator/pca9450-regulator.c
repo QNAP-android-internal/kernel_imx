@@ -1178,9 +1178,19 @@ static int pca9450_of_init(struct pca9450 *pca9450)
 	}
 
 	ret = of_property_read_u32(i2c->dev.of_node, "nxp,pmic-on-req-off-debounce-us", &val);
-	if (ret == -EINVAL)
-		t_off_deb = T_OFF_DEB_120US;
-	else if (ret)
+	if (ret == -EINVAL) {
+		switch (pca9450->type) {
+		case PCA9450_TYPE_PCA9451A:
+		case PCA9450_TYPE_PCA9452:
+			/* PCA9451A Rev.2.1 and PCA9452 Rev.1.0 default: 2ms */
+			t_off_deb = T_OFF_DEB_2MS;
+			break;
+		default:
+			/* Other variants default: 120us */
+			t_off_deb = T_OFF_DEB_120US;
+			break;
+		}
+	} else if (ret)
 		return ret;
 	else {
 		switch (val) {
