@@ -969,6 +969,7 @@ imx95-15x15-evk-root-dtbs := imx95-15x15-evk.dtb imx95-jailhouse-root.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-root.dtb
 
 dtb-$(CONFIG_ARCH_MXC) += imx95-jailhouse-inmate.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx95-19x19-frdm-pro-inmate.dtb
 
 imx95-15x15-evk-ox03c10-dtbs := imx95-15x15-evk.dtb imx95-15x15-evk-ox03c10.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-evk-ox03c10.dtb
