@@ -291,6 +291,8 @@
 
 	ethphy0: ethernet-phy@0 {
 		reg = <0>;
+		compatible = "ethernet-phy-ieee802.3-c22";
+		eee-broken-1000t;
 		reset-gpios = <&i2c2_gpio_expander_20 0 GPIO_ACTIVE_LOW>;
 		reset-assert-us = <35000>;
 		reset-deassert-us = <75000>;
