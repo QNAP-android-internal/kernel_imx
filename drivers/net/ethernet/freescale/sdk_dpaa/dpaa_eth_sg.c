@@ -1146,7 +1146,7 @@ int __hot dpa_tx_extended(struct sk_buff *skb, struct net_device *net_dev,
 		/* Code borrowed from skb_unshare(). */
 		if (skb_cloned(skb) && !skb_need_wa) {
 			nskb = skb_copy(skb, GFP_ATOMIC);
-			kfree_skb(skb);
+			consume_skb(skb);
 			skb = nskb;
 			skb_changed = true;
 
