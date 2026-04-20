@@ -339,6 +339,7 @@
 		reset-gpios = <&i2c2_gpio_expander_20 0 GPIO_ACTIVE_LOW>;
 		reset-assert-us = <35000>;
 		reset-deassert-us = <75000>;
+		rx-internal-delay-ps = <1900>;
 	};
 };
 
