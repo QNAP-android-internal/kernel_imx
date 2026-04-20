@@ -783,35 +783,39 @@ static irqreturn_t hantro_dec_isr(int irq, void *dev_id)
 	unsigned int handled = 0;
 	u32 irq_status;
 
-	irq_status = hantro_dec_readl(core, HANTRODEC_IRQ_STAT_DEC_OFF);
-	if (irq_status & HANTRODEC_DEC_IRQ) {
-		irq_status &= (~HANTRODEC_DEC_IRQ);
-		hantro_dec_writel(core, irq_status, HANTRODEC_IRQ_STAT_DEC_OFF);
-
-		if (irq_status & HANTRODEC_DEC_ERROR_MASK) {
-			if (irq_status & HANTRODEC_DEC_BUS_ERROR)
-				dev_dbg(core->dev, "bus error\n");
-			if (irq_status & HANTRODEC_DEC_STRM_BUF_EMPTY)
-				dev_dbg(core->dev, "stream buffer empty\n");
-			if (irq_status & HANTRODEC_DEC_ASO_DETECTED)
-				dev_dbg(core->dev, "detect ASO\n");
-			if (irq_status & HANTRODEC_DEC_STRM_INPUT_ERR)
-				dev_dbg(core->dev, "stream input error\n");
+	scoped_guard(spinlock_irqsave, &core->lock) {
+		if (!core->is_reserved) {
+			dev_dbg(core->dev, "irq received but core is not reserved\n");
+			return IRQ_HANDLED;
 		}
-		scoped_guard(spinlock_irqsave, &core->lock) {
-			if (core->is_reserved) {
-				core->irq_received = 1;
-				core->irq_status = irq_status;
-			} else {
-				dev_dbg(core->dev, "irq 0x%x received but core is not reserved\n",
-					irq_status);
+
+		irq_status = hantro_dec_readl(core, HANTRODEC_IRQ_STAT_DEC_OFF);
+		if (irq_status & HANTRODEC_DEC_IRQ) {
+			irq_status &= (~HANTRODEC_DEC_IRQ);
+			hantro_dec_writel(core, irq_status, HANTRODEC_IRQ_STAT_DEC_OFF);
+
+			if (irq_status & HANTRODEC_DEC_ERROR_MASK) {
+				if (irq_status & HANTRODEC_DEC_BUS_ERROR)
+					dev_dbg(core->dev, "bus error\n");
+				if (irq_status & HANTRODEC_DEC_STRM_BUF_EMPTY)
+					dev_dbg(core->dev, "stream buffer empty\n");
+				if (irq_status & HANTRODEC_DEC_ASO_DETECTED)
+					dev_dbg(core->dev, "detect ASO\n");
+				if (irq_status & HANTRODEC_DEC_STRM_INPUT_ERR)
+					dev_dbg(core->dev, "stream input error\n");
 			}
 
+			core->irq_received = 1;
+			core->irq_status = irq_status;
+
 			hantro_dec_update_mirror_regs(core);
+			handled++;
 		}
-		wake_up_all(&core->dec_done);
-		handled++;
 	}
+
+	dev_dbg(core->dev, "irq status 0x%x, handled %d\n", irq_status, handled);
+	if (handled)
+		wake_up_all(&core->dec_done);
 
 	return IRQ_RETVAL(handled);
 }
