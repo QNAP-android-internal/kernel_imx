@@ -630,9 +630,6 @@ static void hantro_enc_release_core(struct hantro_enc_core *core, struct file *f
 		val &= ~1;
 		hantro_enc_writel(core, val, core->resource->reg_enable);
 
-		pm_runtime_mark_last_busy(core->dev->dev);
-		pm_runtime_put_autosuspend(core->dev->dev);
-
 		scoped_guard(spinlock_irqsave, &core->lock) {
 			core->filp = NULL;
 			core->is_reserved = 0;
@@ -641,6 +638,10 @@ static void hantro_enc_release_core(struct hantro_enc_core *core, struct file *f
 			core->is_enabled = 0;
 
 		}
+
+		pm_runtime_mark_last_busy(core->dev->dev);
+		pm_runtime_put_autosuspend(core->dev->dev);
+
 		wake_up_interruptible_all(&core->dev->hw_queue);
 	}
 }
@@ -1147,6 +1148,7 @@ static irqreturn_t hantro_enc_isr(int irq, void *dev_id)
 {
 	struct hantro_enc_core *core = dev_id;
 	u32 irq_status;
+	u32 wakeup = 0;
 
 	scoped_guard(spinlock_irqsave, &core->lock) {
 		if (!core->is_reserved) {
@@ -1154,29 +1156,30 @@ static irqreturn_t hantro_enc_isr(int irq, void *dev_id)
 				"irq received but core[%d] is not reserved\n", core->id);
 			return IRQ_HANDLED;
 		}
-	}
 
-	irq_status = hantro_enc_readl(core, core->resource->reg_irq);
-	dev_dbg(core->dev->dev, "irq status 0x%x on core[%d]\n", irq_status, core->id);
+		irq_status = hantro_enc_readl(core, core->resource->reg_irq);
 
-	if (irq_status & HANTROENC_INT_STATUS_ENA) {
-		core->resource->clear_irq(core, irq_status);
+		if (irq_status & HANTROENC_INT_STATUS_ENA) {
+			core->resource->clear_irq(core, irq_status);
 
-		irq_status &= core->resource->irq_mask;
-		if (irq_status == HANTROENC_INT_STATUS_SLICE_DONE) {
-			dev_dbg(core->dev->dev, "Slice ready IRQ handled\n");
-			return IRQ_HANDLED;
-		}
+			irq_status &= core->resource->irq_mask;
+			if (irq_status == HANTROENC_INT_STATUS_SLICE_DONE) {
+				dev_dbg(core->dev->dev, "Slice ready IRQ handled\n");
+				return IRQ_HANDLED;
+			}
 
-		scoped_guard(spinlock_irqsave, &core->lock) {
 			core->irq_status = irq_status;
 			hantro_enc_update_mirror_regs(core);
 			hantro_enc_clear_status_on_ready(core);
 			core->irq_received = 1;
+			wakeup = 1;
 		}
-		wake_up_all(&core->dev->enc_done);
 	}
 
+	dev_dbg(core->dev->dev, "irq status 0x%x on core[%d]\n", irq_status, core->id);
+
+	if (wakeup)
+		wake_up_all(&core->dev->enc_done);
 	return IRQ_HANDLED;
 }
 
