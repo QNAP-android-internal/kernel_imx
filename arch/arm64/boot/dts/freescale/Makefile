@@ -278,7 +278,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx8mp-edm-g-wb.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx8mp-evk.dtb imx8mp-evk-rm67191.dtb imx8mp-evk-it6263-lvds-dual-channel.dtb \
 			  imx8mp-evk-rpmsg.dtb imx8mp-evk-ecspi-slave.dtb \
 			  imx8mp-evk-jdi-wuxga-lvds-panel.dtb imx8mp-evk-flexcan2.dtb \
-			  imx8mp-evk-root.dtb imx8mp-evk-inmate.dtb imx8mp-evk-ov2775.dtb \
+			  imx8mp-evk-root.dtb imx8mp-jailhouse-inmate.dtb imx8mp-evk-ov2775.dtb \
 			  imx8mp-evk-ov2775-ov5640.dtb imx8mp-evk-basler-ov5640.dtb imx8mp-evk-basler.dtb \
 			  imx8mp-evk-basler-ov2775.dtb imx8mp-evk-dual-basler.dtb \
 			  imx8mp-evk-dual-ov2775.dtb imx8mp-evk-spdif-lb.dtb imx8mp-evk-dsp.dtb \
@@ -442,6 +442,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx8mp-frdm-boe-wuxga-lvds0-panel.dtb imx8mp-frdm-boe-
 dtb-$(CONFIG_ARCH_MXC) += imx8mp-frdm-os08a20.dtb imx8mp-frdm-os08a20-dual.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx8mp-frdm-rpmsg.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx8mp-frdm-8mic-revE.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx8mp-frdm-root.dtb
 
 imx8mp-frdm-waveshare-7inch-c-panel-dtbs := imx8mp-frdm.dtb imx8mp-frdm-waveshare-7inch-c-panel.dtbo
 dtb-${CONFIG_ARCH_MXC} += imx8mp-frdm-waveshare-7inch-c-panel.dtb
