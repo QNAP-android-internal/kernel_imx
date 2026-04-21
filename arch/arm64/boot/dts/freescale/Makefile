@@ -1242,6 +1242,9 @@ imx95-15x15-frdm-lt9611uxc-dtbs := imx95-15x15-frdm.dtb \
 				   imx95-15x15-frdm-lt9611uxc.dtbo
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-lt9611uxc.dtb
 
+imx95-15x15-frdm-neutron-dtbs := imx95-15x15-frdm.dtb imx95-19x19-evk-neutron.dtbo
+dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-neutron.dtb
+
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-aud-hat.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-8mic-reve.dtb
 
