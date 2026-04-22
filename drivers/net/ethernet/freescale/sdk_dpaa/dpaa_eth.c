@@ -478,15 +478,15 @@ priv_rx_default_dqrr(struct qman_portal *portal, struct qman_fq *fq,
 	priv = netdev_priv(net_dev);
 	dpa_bp = priv->dpa_bp;
 
-	/* Trace the Rx fd */
-	trace_dpa_rx_fd(net_dev, fq, &dq->fd);
-
 	/* IRQ handler, non-migratable; safe to use raw_cpu_ptr here */
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
 	count_ptr = raw_cpu_ptr(priv->percpu_count);
 
 	if (unlikely(dpaa_eth_napi_schedule(percpu_priv, portal, sched_napi)))
 		return qman_cb_dqrr_stop;
+
+	/* Trace the Rx fd */
+	trace_dpa_rx_fd(net_dev, fq, &dq->fd);
 
 	/* Vale of plenty: make sure we didn't run out of buffers */
 
@@ -537,14 +537,14 @@ priv_tx_conf_default_dqrr(struct qman_portal *portal, struct qman_fq *fq,
 	net_dev = ((struct dpa_fq *)fq)->net_dev;
 	priv = netdev_priv(net_dev);
 
-	/* Trace the fd */
-	trace_dpa_tx_conf_fd(net_dev, fq, &dq->fd);
-
 	/* Non-migratable context, safe to use raw_cpu_ptr */
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
 
 	if (dpaa_eth_napi_schedule(percpu_priv, portal, sched_napi))
 		return qman_cb_dqrr_stop;
+
+	/* Trace the fd */
+	trace_dpa_tx_conf_fd(net_dev, fq, &dq->fd);
 
 	_dpa_tx_conf(net_dev, priv, percpu_priv, &dq->fd, fq->fqid);
 
