@@ -432,6 +432,13 @@ int dpa_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 }
 EXPORT_SYMBOL(dpa_ioctl);
 
+void dpa_destroy_cgr(struct qman_cgr *cgr)
+{
+	qman_delete_cgr_safe(cgr);
+	qman_release_cgrid(cgr->cgrid);
+}
+EXPORT_SYMBOL(dpa_destroy_cgr);
+
 void __cold dpa_remove(struct platform_device *of_dev)
 {
 	struct device		*dev;
@@ -450,10 +457,8 @@ void __cold dpa_remove(struct platform_device *of_dev)
 
 	dpa_fq_free(dev, &priv->dpa_fq_list);
 
-	qman_delete_cgr_safe(&priv->ingress_cgr);
-	qman_release_cgrid(priv->ingress_cgr.cgrid);
-	qman_delete_cgr_safe(&priv->cgr_data.cgr);
-	qman_release_cgrid(priv->cgr_data.cgr.cgrid);
+	dpa_destroy_cgr(&priv->ingress_cgr);
+	dpa_destroy_cgr(&priv->cgr_data.cgr);
 
 	dpa_private_napi_del(net_dev);
 
