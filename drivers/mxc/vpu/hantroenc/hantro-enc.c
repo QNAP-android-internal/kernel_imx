@@ -864,7 +864,7 @@ static void hantro_enc_cancel(struct hantro_enc_device *encoder, u32 core_info)
 static int hantro_enc_wait_core(struct hantro_enc_device *encoder, u32 core_info,
 				struct hantro_enc_done_status *done_status)
 {
-	struct hantro_enc_done_status status;
+	struct hantro_enc_done_status status = { 0 };
 
 	if (!encoder)
 		return -EINVAL;
