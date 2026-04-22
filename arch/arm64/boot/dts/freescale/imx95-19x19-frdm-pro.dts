@@ -542,11 +542,11 @@
 				  "";
 		vcc-supply = <&reg_3p3v>;
 
-		/* When low, select lpspi; When high, select gpio. */
+		/* When high, select lpspi; When low, select gpio. */
 		lpspi-gpio-sel-hog {
 			gpio-hog;
 			gpios = <16 GPIO_ACTIVE_HIGH>;
-			output-low;
+			output-high;
 		};
 	};
 };
