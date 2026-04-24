@@ -59,6 +59,7 @@ struct imx952_dsi2 {
 	union phy_configure_opts phy_cfg;
 	unsigned long target_pclk_rate;
 	unsigned long esc_clk_rate;
+	unsigned long mode_flags;
 };
 
 static int imx952_dsi2_get_clk(struct imx952_dsi2 *dsi)
@@ -451,26 +452,24 @@ static int imx952_dsi2_phy_get_timing(void *priv_data, unsigned int lane_mbps,
 				      struct dw_mipi_dsi2_phy_timing *timing)
 {
 	struct imx952_dsi2 *dsi = priv_data;
-	struct phy_configure_opts_mipi_dphy *cfg = &dsi->phy_cfg.mipi_dphy;
-	unsigned long long tmp;
-	unsigned long long hstx_clk;
+	unsigned int lp2hs_m, lp2hs_b;
+	unsigned int hs2lp_m, hs2lp_b;
 
-	hstx_clk = DIV_ROUND_CLOSEST_ULL(lane_mbps, 8);
+	/* PHY_LP2HS/HS2LP_TIME = DIV_ROUND_UP((lane_mbps * m), 100) + b */
+	if (dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS) {
+		lp2hs_m = 13;
+		lp2hs_b = 20;
+		hs2lp_m = 7;
+		hs2lp_b = 25;
+	} else {
+		lp2hs_m = 7;
+		lp2hs_b = 20;
+		hs2lp_m = 5;
+		hs2lp_b = 10;
+	}
 
-	/* PHY_LP2HS_TIME = (TLPX + THS-PREPARE + THS-ZERO) / Tphy_hstx_clk */
-	tmp = cfg->lpx + cfg->hs_prepare + cfg->hs_zero;
-	tmp = DIV_ROUND_CLOSEST_ULL((tmp * hstx_clk) << 16, USEC_PER_SEC);
-	timing->data_lp2hs = tmp;
-
-	/* PHY_HS2LP_TIME = (THS-TRAIL + THS-EXIT) / Tphy_hstx_clk */
-	tmp = cfg->hs_trail + cfg->hs_exit;
-
-	/* empirical fixup for 4Kp30/25 with 4 data lanes */
-	if (lane_mbps == 1782 && cfg->lanes == 4)
-		tmp *= 20;
-
-	tmp = DIV_ROUND_CLOSEST_ULL((tmp * hstx_clk) << 16, USEC_PER_SEC);
-	timing->data_hs2lp = tmp;
+	timing->data_lp2hs = (DIV_ROUND_UP(lane_mbps * lp2hs_m, 100) + lp2hs_b) << 16;
+	timing->data_hs2lp = (DIV_ROUND_UP(lane_mbps * hs2lp_m, 100) + hs2lp_b) << 16;
 
 	return 0;
 }
@@ -518,6 +517,7 @@ static int imx952_dsi2_imx_host_attach(void *priv_data,
 	struct imx952_dsi2 *dsi = priv_data;
 
 	dsi->format = device->format;
+	dsi->mode_flags = device->mode_flags;
 
 	return 0;
 }
