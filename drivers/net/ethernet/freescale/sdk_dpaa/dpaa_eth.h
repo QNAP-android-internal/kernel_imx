@@ -357,6 +357,7 @@ struct dpa_priv_s {
 	/* Use a per-port CGR for ingress traffic. */
 	bool use_ingress_cgr;
 	struct qman_cgr ingress_cgr;
+	struct qman_cgr ingress_cgr_hi_prio;
 
 #ifdef CONFIG_FSL_DPAA_TS
 	bool ts_tx_en; /* Tx timestamping enabled */

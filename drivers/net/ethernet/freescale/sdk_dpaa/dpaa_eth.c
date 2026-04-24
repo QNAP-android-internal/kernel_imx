@@ -780,28 +780,21 @@ dpa_priv_bp_probe(struct device *dev)
 	return dpa_bp;
 }
 
-/* Place all ingress FQs (Rx Default, Rx Error, PCD FQs) in a dedicated CGR.
- * We won't be sending congestion notifications to FMan; for now, we just use
- * this CGR to generate enqueue rejections to FMan in order to drop the frames
- * before they reach our ingress queues and eat up memory.
- */
-static int dpaa_eth_priv_ingress_cgr_init(struct dpa_priv_s *priv)
+static int dpaa_eth_priv_ingress_cgr_init(struct qman_cgr *cgr, u64 cs_th)
 {
 	struct qm_mcc_initcgr initcgr;
-	u32 cs_th;
 	int err;
 
-	err = qman_alloc_cgrid(&priv->ingress_cgr.cgrid);
+	err = qman_alloc_cgrid(&cgr->cgrid);
 	if (err < 0) {
 		pr_err("Error %d allocating CGR ID\n", err);
-		goto out_error;
+		return err;
 	}
 
 	/* Enable CS TD, but disable Congestion State Change Notifications. */
 	memset(&initcgr, 0, sizeof(initcgr));
 	initcgr.we_mask = QM_CGR_WE_CS_THRES;
 	initcgr.cgr.cscn_en = QM_CGR_EN;
-	cs_th = CONFIG_FSL_DPAA_INGRESS_CS_THRESHOLD;
 	qm_cgr_cs_thres_set64(&initcgr.cgr.cs_thres, cs_th, 1);
 
 	initcgr.we_mask |= QM_CGR_WE_CSTD_EN;
@@ -810,16 +803,41 @@ static int dpaa_eth_priv_ingress_cgr_init(struct dpa_priv_s *priv)
 	/* This is actually a hack, because this CGR will be associated with
 	 * our affine SWP. However, we'll place our ingress FQs in it.
 	 */
-	err = qman_create_cgr(&priv->ingress_cgr, QMAN_CGR_FLAG_USE_INIT,
-		&initcgr);
+	err = qman_create_cgr(cgr, QMAN_CGR_FLAG_USE_INIT, &initcgr);
 	if (err < 0) {
 		pr_err("Error %d creating ingress CGR with ID %d\n", err,
-			priv->ingress_cgr.cgrid);
-		qman_release_cgrid(priv->ingress_cgr.cgrid);
-		goto out_error;
+			cgr->cgrid);
+		qman_release_cgrid(cgr->cgrid);
+		return err;
 	}
-	pr_debug("Created ingress CGR %d for netdev with hwaddr %pM\n",
-		 priv->ingress_cgr.cgrid, priv->mac_dev->addr);
+
+	return 0;
+}
+
+/* Place all ingress FQs (Rx Default, Rx Error, PCD FQs) in a dedicated CGR.
+ * We won't be sending congestion notifications to FMan; for now, we just use
+ * this CGR to generate enqueue rejections to FMan in order to drop the frames
+ * before they reach our ingress queues and eat up memory.
+ */
+static int dpaa_eth_priv_ingress_cgrs_init(struct dpa_priv_s *priv)
+{
+	int ret;
+
+	ret = dpaa_eth_priv_ingress_cgr_init(&priv->ingress_cgr,
+					     CONFIG_FSL_DPAA_INGRESS_CS_THRESHOLD);
+	if (ret)
+		return ret;
+
+	ret = dpaa_eth_priv_ingress_cgr_init(&priv->ingress_cgr_hi_prio,
+					     CONFIG_FSL_DPAA_INGRESS_HI_PRIO_CS_THRESHOLD);
+	if (ret) {
+		dpa_destroy_cgr(&priv->ingress_cgr);
+		return ret;
+	}
+
+	pr_debug("Created ingress CGR %d and hi prio CGR %d for netdev with hwaddr %pM\n",
+		 priv->ingress_cgr.cgrid, priv->ingress_cgr_hi_prio.cgrid,
+		 priv->mac_dev->addr);
 
 	/* struct qman_cgr allows special cgrid values (i.e. outside the 0..255
 	 * range), but we have no common initialization path between the
@@ -828,8 +846,7 @@ static int dpaa_eth_priv_ingress_cgr_init(struct dpa_priv_s *priv)
 	 */
 	priv->use_ingress_cgr = true;
 
-out_error:
-	return err;
+	return 0;
 }
 
 static int dpa_priv_bp_create(struct net_device *net_dev, struct dpa_bp *dpa_bp,
@@ -1009,7 +1026,7 @@ dpaa_eth_priv_probe(struct platform_device *_of_dev)
 		dev_err(dev, "Error initializing CGR\n");
 		goto tx_cgr_init_failed;
 	}
-	err = dpaa_eth_priv_ingress_cgr_init(priv);
+	err = dpaa_eth_priv_ingress_cgrs_init(priv);
 	if (err < 0) {
 		dev_err(dev, "Error initializing ingress CGR\n");
 		goto rx_cgr_init_failed;
@@ -1097,6 +1114,7 @@ pfc_mapping_failed:
 	dpa_fq_free(dev, &priv->dpa_fq_list);
 fq_alloc_failed:
 	dpa_destroy_cgr(&priv->ingress_cgr);
+	dpa_destroy_cgr(&priv->ingress_cgr_hi_prio);
 rx_cgr_init_failed:
 	dpa_destroy_cgr(&priv->cgr_data.cgr);
 tx_cgr_init_failed:

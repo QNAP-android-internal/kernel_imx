@@ -458,6 +458,7 @@ void __cold dpa_remove(struct platform_device *of_dev)
 	dpa_fq_free(dev, &priv->dpa_fq_list);
 
 	dpa_destroy_cgr(&priv->ingress_cgr);
+	dpa_destroy_cgr(&priv->ingress_cgr_hi_prio);
 	dpa_destroy_cgr(&priv->cgr_data.cgr);
 
 	dpa_private_napi_del(net_dev);
@@ -1282,12 +1283,16 @@ int dpa_fq_init(struct dpa_fq *dpa_fq, bool td_enable)
 		if (priv->use_ingress_cgr &&
 		    (dpa_fq->fq_type == FQ_TYPE_RX_DEFAULT ||
 		     dpa_fq->fq_type == FQ_TYPE_RX_ERROR ||
-		     dpa_fq->fq_type == FQ_TYPE_RX_PCD ||
-		     dpa_fq->fq_type == FQ_TYPE_RX_PCD_HI_PRIO))
+		     dpa_fq->fq_type == FQ_TYPE_RX_PCD))
 			/* Set a fixed overhead accounting, just like for the
 			 * egress CGR.
 			 */
 			dpa_fq_init_cgr(&initfq, priv->ingress_cgr.cgrid, oal);
+
+		if (priv->use_ingress_cgr &&
+		    dpa_fq->fq_type == FQ_TYPE_RX_PCD_HI_PRIO)
+			dpa_fq_init_cgr(&initfq, priv->ingress_cgr_hi_prio.cgrid,
+					oal);
 
 		/* Initialization common to all ingress queues */
 		if (dpa_fq->flags & QMAN_FQ_FLAG_NO_ENQUEUE) {
