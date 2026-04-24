@@ -15,6 +15,9 @@
 #define VPU_DEC_DEV_NAME "C&M Wave5 VPU decoder"
 #define VPU_DEC_DRV_NAME "wave5-dec"
 
+#define IS_MISMATCH_IF_VALID(CUR, VAL, INVAL)		(((VAL) != (INVAL)) && ((VAL) != (CUR)))
+#define WAVE5_IS_MISMATCH(CUR, VAL)			IS_MISMATCH_IF_VALID(CUR, VAL, 0)
+
 static const struct v4l2_frmsize_stepwise dec_hevc_frmsize = {
 	.min_width = W5_MIN_DEC_PIC_8_WIDTH,
 	.max_width = W5_MAX_DEC_PIC_WIDTH,
@@ -452,6 +455,71 @@ set_default_color:
 	inst->xfer_func = V4L2_XFER_FUNC_DEFAULT;
 }
 
+static int wave5_compare_hdr10_cll_info(struct v4l2_ctrl_hdr10_cll_info *cur,
+					struct v4l2_ctrl_hdr10_cll_info *val)
+{
+	if (WAVE5_IS_MISMATCH(cur->max_content_light_level, val->max_content_light_level))
+		return 1;
+	if (WAVE5_IS_MISMATCH(cur->max_pic_average_light_level, val->max_pic_average_light_level))
+		return 1;
+
+	return 0;
+}
+
+static int wave5_compare_hdr10_mastering_display(struct v4l2_ctrl_hdr10_mastering_display *cur,
+						 struct v4l2_ctrl_hdr10_mastering_display *val)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(cur->display_primaries_x); i++) {
+		if (WAVE5_IS_MISMATCH(cur->display_primaries_x[i], val->display_primaries_x[i]))
+			return 1;
+	}
+	for (i = 0; i < ARRAY_SIZE(cur->display_primaries_y); i++) {
+		if (WAVE5_IS_MISMATCH(cur->display_primaries_y[i], val->display_primaries_y[i]))
+			return 1;
+	}
+	if (WAVE5_IS_MISMATCH(cur->white_point_x, val->white_point_x))
+		return 1;
+	if (WAVE5_IS_MISMATCH(cur->white_point_y, val->white_point_y))
+		return 1;
+	if (WAVE5_IS_MISMATCH(cur->max_display_mastering_luminance,
+			      val->max_display_mastering_luminance))
+		return 1;
+	if (WAVE5_IS_MISMATCH(cur->min_display_mastering_luminance,
+			      val->min_display_mastering_luminance))
+		return 1;
+
+	return 0;
+}
+
+static void wave5_update_hdr10_info(struct vpu_instance *inst)
+{
+	struct dec_initial_info *initial_info = &inst->codec_info->dec_info.initial_info;
+	struct v4l2_ctrl_hdr10_cll_info *cll;
+	struct v4l2_ctrl_hdr10_mastering_display *mastering;
+	struct v4l2_ctrl *ctrl;
+
+	if (inst->std != W_HEVC_DEC)
+		return;
+
+	cll = &initial_info->hdr10_cll_info;
+	mastering = &initial_info->hdr10_mastering_display;
+
+	ctrl = v4l2_ctrl_find(&inst->v4l2_ctrl_hdl, V4L2_CID_COLORIMETRY_HDR10_CLL_INFO);
+	if (ctrl) {
+		if (wave5_compare_hdr10_cll_info(ctrl->p_cur.p_hdr10_cll, cll))
+			v4l2_ctrl_s_ctrl_compound(ctrl, V4L2_CTRL_TYPE_HDR10_CLL_INFO, cll);
+	}
+
+	ctrl = v4l2_ctrl_find(&inst->v4l2_ctrl_hdl, V4L2_CID_COLORIMETRY_HDR10_MASTERING_DISPLAY);
+	if (ctrl)
+		if (wave5_compare_hdr10_mastering_display(ctrl->p_cur.p_hdr10_mastering, mastering))
+			v4l2_ctrl_s_ctrl_compound(ctrl,
+						  V4L2_CTRL_TYPE_HDR10_MASTERING_DISPLAY,
+						  mastering);
+}
+
 static int start_decode(struct vpu_instance *inst)
 {
 	struct v4l2_m2m_ctx *m2m_ctx = inst->v4l2_fh.m2m_ctx;
@@ -693,6 +761,8 @@ static int handle_dynamic_resolution_change(struct vpu_instance *inst, u32 seq_c
 				     true);
 
 		wave5_update_output_format_info(inst);
+
+		wave5_update_hdr10_info(inst);
 	}
 
 	v4l2_event_queue_fh(fh, &vpu_event_src_ch);
@@ -776,6 +846,7 @@ static void wave5_vpu_dec_finish_decode(struct vpu_instance *inst)
 	}
 
 	wave5_vpu_dec_decoding_error(inst, &dec_info);
+	wave5_update_hdr10_info(inst);
 
 	wave5_handle_src_buffer(inst, &dec_info);
 
@@ -2119,6 +2190,11 @@ static const struct v4l2_m2m_ops wave5_vpu_dec_m2m_ops = {
 
 static int wave5_vpu_open_dec(struct file *filp)
 {
+	const struct v4l2_ctrl_hdr10_mastering_display p_hdr10_mastering = {
+		{ 34000, 13250, 7500 },
+		{ 16000, 34500, 3000 }, 15635, 16450, 10000000, 500,
+	};
+	const struct v4l2_ctrl_hdr10_cll_info p_hdr10_cll = { 1000, 400 };
 	struct video_device *vdev = video_devdata(filp);
 	struct vpu_device *dev = video_drvdata(filp);
 	struct vpu_instance *inst = NULL;
@@ -2165,6 +2241,16 @@ static int wave5_vpu_open_dec(struct file *filp)
 			  V4L2_CID_MPEG_VIDEO_DEC_DISPLAY_DELAY, 0, 0, 1, 0);
 	v4l2_ctrl_new_std(&inst->v4l2_ctrl_hdl, NULL,
 			  V4L2_CID_MPEG_VIDEO_DEC_DISPLAY_DELAY_ENABLE, 0, 1, 1, 0);
+	v4l2_ctrl_new_std_compound(&inst->v4l2_ctrl_hdl, NULL,
+				   V4L2_CID_COLORIMETRY_HDR10_CLL_INFO,
+				   v4l2_ctrl_ptr_create((void *)&p_hdr10_cll),
+				   v4l2_ctrl_ptr_create(NULL),
+				   v4l2_ctrl_ptr_create(NULL));
+	v4l2_ctrl_new_std_compound(&inst->v4l2_ctrl_hdl, NULL,
+				   V4L2_CID_COLORIMETRY_HDR10_MASTERING_DISPLAY,
+				   v4l2_ctrl_ptr_create((void *)&p_hdr10_mastering),
+				   v4l2_ctrl_ptr_create(NULL),
+				   v4l2_ctrl_ptr_create(NULL));
 	imx_mur_new_v4l2_ctrl(&inst->v4l2_ctrl_hdl, inst->recorder);
 
 	if (inst->v4l2_ctrl_hdl.error) {

@@ -327,6 +327,9 @@ struct dec_initial_info {
 	u32 vlc_buf_size;
 	u32 param_buf_size;
 	struct color_param color;
+
+	struct v4l2_ctrl_hdr10_cll_info hdr10_cll_info;
+	struct v4l2_ctrl_hdr10_mastering_display hdr10_mastering_display;
 };
 
 struct dec_output_info {
