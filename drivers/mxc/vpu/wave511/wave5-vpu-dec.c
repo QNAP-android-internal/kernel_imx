@@ -635,12 +635,10 @@ static int handle_dynamic_resolution_change(struct vpu_instance *inst, u32 seq_c
 		return -EINVAL;
 	}
 
-	if ((seq_change_info & SEQ_CHANGE_WITHOUT_REALLOCATION) == seq_change_info) {
+	if ((seq_change_info & SEQ_CHANGE_WITHOUT_REALLOCATION) == seq_change_info)
 		inst->needs_reallocation = false;
-	} else {
+	else
 		inst->needs_reallocation = true;
-		wave5_vpu_dec_give_command(inst, DEC_RESET_FRAMEBUF_INFO, NULL);
-	}
 	inst->fbc_buf_count = initial_info->min_frame_buffer_count + 1;
 	inst->disp_buf_count = max(initial_info->reorder_delay + 1, wave5_vpu_cq_depth(inst->dev));
 	if (inst->disp_buf_count != v4l2_m2m_num_dst_bufs_ready(m2m_ctx)) {
@@ -1506,6 +1504,8 @@ static int wave5_vpu_dec_queue_setup(struct vb2_queue *q, unsigned int *num_buff
 static int wave5_vpu_dec_allocate_internal_buffers(struct vpu_instance *inst)
 {
 	int ret = 0;
+
+	wave5_vpu_dec_give_command(inst, DEC_RESET_FRAMEBUF_INFO, NULL);
 
 	for (int index = 0; index < inst->fbc_buf_count; index++) {
 		ret = wave5_vpu_dec_allocate_fbc_buffer(inst, index);
