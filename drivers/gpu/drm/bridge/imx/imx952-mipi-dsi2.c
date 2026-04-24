@@ -34,7 +34,7 @@
 
 #define PIXEL_LINK_STREAMS		2
 
-#define ESC_CLK_RATE_HZ			18562500
+#define MAX_ESC_CLK_RATE_HZ		20000000
 
 enum dsi_pixel_link_format {
 	RGB_24BIT,
@@ -58,6 +58,7 @@ struct imx952_dsi2 {
 	struct dw_mipi_dsi2_plat_data pdata;
 	union phy_configure_opts phy_cfg;
 	unsigned long target_pclk_rate;
+	unsigned long esc_clk_rate;
 };
 
 static int imx952_dsi2_get_clk(struct imx952_dsi2 *dsi)
@@ -216,23 +217,32 @@ static int imx952_dsi2_phy_init(void *priv_data)
 		return ret;
 	}
 
-	ret = phy_configure(dsi->phy, &dsi->phy_cfg);
+	return 0;
+}
+
+static void imx952_dsi2_phy_power_on(void *priv_data)
+{
+	struct imx952_dsi2 *dsi = priv_data;
+	union phy_configure_opts *phy_cfg = &dsi->phy_cfg;
+	struct phy_configure_opts_mipi_dphy *dphy_opts = &phy_cfg->mipi_dphy;
+	int ret;
+
+	if (WARN_ON(dsi->esc_clk_rate == 0))
+		return;
+
+	dphy_opts->lpx = PSEC_PER_SEC / dsi->esc_clk_rate;
+
+	dev_dbg(dsi->dev, "PHY lpx = %ups\n", dphy_opts->lpx);
+
+	ret = phy_configure(dsi->phy, phy_cfg);
 	if (ret < 0) {
 		dev_err(dsi->dev, "failed to configure phy: %d\n", ret);
-		goto uninit_phy;
+		return;
 	}
 
 	ret = phy_power_on(dsi->phy);
-	if (ret < 0) {
+	if (ret < 0)
 		dev_err(dsi->dev, "failed to power on phy: %d\n", ret);
-		goto uninit_phy;
-	}
-
-	return 0;
-
-uninit_phy:
-	phy_exit(dsi->phy);
-	return ret;
 }
 
 static void imx952_dsi2_phy_power_off(void *priv_data)
@@ -468,13 +478,33 @@ static int imx952_dsi2_phy_get_timing(void *priv_data, unsigned int lane_mbps,
 static int
 imx952_dsi2_phy_get_esc_clk_rate(void *priv_data, unsigned long *esc_clk_rate)
 {
-	*esc_clk_rate = ESC_CLK_RATE_HZ;
+	struct imx952_dsi2 *dsi = priv_data;
+	unsigned long pclk_rate;
+	unsigned int div = 2;
+
+	pclk_rate = clk_get_rate(dsi->clk_pixel);
+	if (pclk_rate == 0)
+		return -EINVAL;
+
+	*esc_clk_rate = pclk_rate;
+	while (*esc_clk_rate > MAX_ESC_CLK_RATE_HZ) {
+		*esc_clk_rate = pclk_rate / div;
+		div = div + 2;
+
+		if (div > 126)
+			return -EINVAL;
+	}
+
+	dsi->esc_clk_rate = *esc_clk_rate;
+
+	dev_dbg(dsi->dev, "get esc_clk_rate = %lu\n", *esc_clk_rate);
 
 	return 0;
 }
 
 static const struct dw_mipi_dsi2_phy_ops imx952_dsi2_phy_ops = {
 	.init = imx952_dsi2_phy_init,
+	.power_on = imx952_dsi2_phy_power_on,
 	.power_off = imx952_dsi2_phy_power_off,
 	.get_interface = imx952_dsi2_phy_get_iface,
 	.get_lane_mbps = imx952_dsi2_phy_get_lane_mbps,
