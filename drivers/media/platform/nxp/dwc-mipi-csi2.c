@@ -694,10 +694,7 @@ static int dwc_csi_get_dphy_configuration(struct dwc_csi_device *csidev,
 
 static int dwc_csi_device_init(struct dwc_csi_device *csidev)
 {
-	struct device *dev = csidev->dev;
 	union phy_configure_opts opts;
-	u32 phy_stopstate;
-	u32 val;
 	int ret;
 
 	ret = dwc_csi_get_dphy_configuration(csidev, &opts);
@@ -711,18 +708,26 @@ static int dwc_csi_device_init(struct dwc_csi_device *csidev)
 	phy_power_on(csidev->phy);
 	dwc_csi_write(csidev, CSI2RX_HOST_RESETN, 0x1);
 
+	return 0;
+}
+
+static int dwc_csi_wait_for_phy_stopstate(struct dwc_csi_device *csidev)
+{
+	struct device *dev = csidev->dev;
+	u32 phy_stopstate;
+	u32 val;
+	int ret;
+
 	/* Check if lanes are in stop state */
 	phy_stopstate = CSI2RX_DPHY_STOPSTATE_CLK_LANE;
 	phy_stopstate |= GENMASK(csidev->bus.num_data_lanes - 1, 0);
 	ret = readl_poll_timeout(csidev->regs + CSI2RX_DPHY_STOPSTATE,
 				 val, (val & phy_stopstate) == phy_stopstate,
 				 10, 10000);
-	if (ret) {
+	if (ret)
 		dev_err(dev, "Lanes are not in stop state(%#x)\n", val);
-		return ret;
-	}
 
-	return 0;
+	return ret;
 }
 
 static void dwc_csi_device_hs_rx_start(struct dwc_csi_device *csidev)
@@ -1172,14 +1177,27 @@ static int dwc_csi_enable_streams(struct v4l2_subdev *sd,
 	ret = v4l2_subdev_enable_streams(csidev->source_sd, csidev->remote_pad,
 					 sink_streams);
 	if (ret)
-		return ret;
+		goto err_csi_stop;
+
+	if (!csidev->enabled_streams) {
+		ret = dwc_csi_wait_for_phy_stopstate(csidev);
+		if (ret)
+			goto err_disable_stream;
+	}
 
 	csidev->enabled_streams |= streams_mask;
 
 	return 0;
 
+err_disable_stream:
+	v4l2_subdev_disable_streams(csidev->source_sd, csidev->remote_pad,
+				    sink_streams);
+err_csi_stop:
+	if (!csidev->enabled_streams)
+		dwc_csi_stop_stream(csidev);
 err_runtime_put:
-	pm_runtime_put(csidev->dev);
+	if (!csidev->enabled_streams)
+		pm_runtime_put(csidev->dev);
 	return ret;
 }
 
