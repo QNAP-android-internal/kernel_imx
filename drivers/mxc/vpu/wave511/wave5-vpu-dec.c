@@ -635,6 +635,7 @@ static int handle_dynamic_resolution_change(struct vpu_instance *inst, u32 seq_c
 		return -EINVAL;
 	}
 
+	inst->disp_buf_mask = 0;
 	if ((seq_change_info & SEQ_CHANGE_WITHOUT_REALLOCATION) == seq_change_info)
 		inst->needs_reallocation = false;
 	else
@@ -694,7 +695,6 @@ static int handle_dynamic_resolution_change(struct vpu_instance *inst, u32 seq_c
 		wave5_update_output_format_info(inst);
 	}
 
-	wave5_vpu_dec_reset_disp_buf(inst);
 	v4l2_event_queue_fh(fh, &vpu_event_src_ch);
 
 	return 0;
@@ -1633,12 +1633,15 @@ static void wave5_vpu_dec_buf_queue_dst(struct vb2_buffer *vb)
 		send_eos_event(inst);
 		v4l2_m2m_last_buffer_done(m2m_ctx, vbuf);
 	} else {
-		if (vpu_buf->registered && !test_bit(vb->index, &inst->disp_buf_mask)) {
-			vpu_buf->registered = false;
-			vpu_buf->display = false;
+		if (vpu_buf->registered) {
+			if (!test_bit(vb->index, &inst->disp_buf_mask)) {
+				vpu_buf->registered = false;
+				vpu_buf->display = false;
+				vpu_buf->error = false;
+			} else {
+				vpu_buf->display = true;
+			}
 		}
-		if (vpu_buf->registered)
-			vpu_buf->display = true;
 
 		v4l2_m2m_buf_queue(m2m_ctx, vbuf);
 
@@ -2009,7 +2012,6 @@ static void wave5_vpu_dec_device_run(void *priv)
 		}
 
 		break;
-
 	case VPU_INST_STATE_INIT_SEQ:
 		/*
 		 * Do this early, preparing the fb can trigger an IRQ before
@@ -2025,6 +2027,7 @@ static void wave5_vpu_dec_device_run(void *priv)
 		 */
 		wave5_vpu_dec_give_command(inst, DEC_GET_QUEUE_STATUS, &q_status);
 
+		wave5_vpu_dec_reset_disp_buf(inst);
 		wave5_handle_dst_buffer(inst);
 		/*
 		 * The sequence must be analyzed first to calculate the proper

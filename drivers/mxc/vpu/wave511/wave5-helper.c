@@ -404,7 +404,6 @@ struct vb2_v4l2_buffer *wave5_vpu_get_display_buffer(struct vpu_instance *inst, 
 		return NULL;
 
 	vpu_buf = wave5_to_vpu_dst_buf(vbuf);
-	vpu_buf->display = true;
 
 	return vbuf;
 }

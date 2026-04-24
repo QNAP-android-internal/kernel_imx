@@ -644,8 +644,6 @@ void wave5_vpu_dec_reset_disp_buf(struct vpu_instance *inst)
 
 	for (int i = 0; i < WAVE5_MAX_FBS; i++)
 		memset(&p_dec_info->disp_buf[i], 0, sizeof(struct frame_buffer));
-
-	inst->disp_buf_mask = 0;
 }
 
 int wave5_vpu_dec_give_command(struct vpu_instance *inst, enum codec_command cmd, void *parameter)
