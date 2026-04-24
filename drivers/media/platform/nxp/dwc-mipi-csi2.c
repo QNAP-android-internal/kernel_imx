@@ -715,7 +715,7 @@ static int dwc_csi_device_init(struct dwc_csi_device *csidev)
 	phy_stopstate = CSI2RX_DPHY_STOPSTATE_CLK_LANE;
 	phy_stopstate |= GENMASK(csidev->bus.num_data_lanes - 1, 0);
 	ret = readl_poll_timeout(csidev->regs + CSI2RX_DPHY_STOPSTATE,
-				 val, (val & phy_stopstate) != phy_stopstate,
+				 val, (val & phy_stopstate) == phy_stopstate,
 				 10, 10000);
 	if (ret) {
 		dev_err(dev, "Lanes are not in stop state(%#x)\n", val);
