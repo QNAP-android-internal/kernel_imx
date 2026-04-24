@@ -917,34 +917,54 @@ imx952_mipi_dphy_static_configure(struct imx952_mipi_dphy_priv *priv)
 	writew(val, priv->regs + PPI_RW_COMMON_CFG);
 }
 
-#define MULTI5(x)			((x) * 5)
+#define MULTI_1_1(x)			((x) * 11 / 10)
+#define LPTX_EN_DLY			5
 #define D2A_HSTX_DLY			3
 
 /* T_DCO_MAX = 4.77 */
-#define T_DCO_MAX_DIV_ROUND_UP(x)	DIV_ROUND_UP((x) * 100, 477)
-#define T_DCO_MAX_PS_DIV_ROUND_UP(x)	DIV_ROUND_UP((x) * 100, 477 * 1000)
-#define T_DCO_MAX_PS_DIV_ROUND_DOWN(x)	DIV_ROUND_DOWN_ULL((x) * 100, 477 * 1000)
-#define T_DCO_MAX_PS_MULTI(x)		((477 * 1000 * (x)) / 100)
+#define T_DCO_MAX			477
+#define T_DCO_MAX_NS_DIV_ROUND_UP(x)	DIV_ROUND_UP((x) * 100, T_DCO_MAX)
+#define T_DCO_MAX_PS_DIV_ROUND_UP(x)	DIV_ROUND_UP((x) * 100, T_DCO_MAX * 1000)
+#define T_DCO_MAX_PS_DIV_ROUND_DOWN(x)	DIV_ROUND_DOWN_ULL((x) * 100, T_DCO_MAX * 1000)
+#define T_DCO_MAX_PS_MULTI(x)		((T_DCO_MAX * 1000 * (x)) / 100)
+
+/* T_DCO_CUSTOM = 5.02 */
+#define T_DCO_CUSTOM			502
+#define T_DCO_CUSTOM_PS_DIV_ROUND_UP(x)	DIV_ROUND_UP((x) * 100, T_DCO_CUSTOM * 1000)
+
+#define T_CLK_PREPARE_NS_MIN		38
+#define T_CLK_PREPARE_NS_MAX		95
+#define T_CLK_PREPARE_PS_MIN		(T_CLK_PREPARE_NS_MIN * 1000)
+#define T_CLK_PREPARE_PS_MAX		(T_CLK_PREPARE_NS_MAX * 1000)
+
+#define T_CLK_PREPARE_CLK_ZERO_NS_MIN	300
+#define T_CLK_PREPARE_CLK_ZERO_PS_MIN	(T_CLK_PREPARE_CLK_ZERO_NS_MIN * 1000)
+
+#define T_LPX_NS_MIN			50
+#define T_LPX_PS_MIN			(50 * 1000)
+#define T_HS_EXIT_NS_MIN		100
+
+#define LPTX_IO_SR0_FALL_DLY_PS		25000
+#define LPTX_IO_SR0_FALL_DLY_DIV2_PS	(LPTX_IO_SR0_FALL_DLY_PS / 2)
 
 static void
 imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 				   struct phy_configure_opts_mipi_dphy *cfg)
 {
 	unsigned long t_hs_trail_ps, eot_ps, hs_trail_reg, hs_trail_dco_reg;
+	unsigned long t_clk_trail_ps, clk_trail_reg, clk_trail_dco_reg;
 	unsigned long lptx_clk_rate_hz = PSEC_PER_SEC / cfg->lpx;
+	unsigned long clk_prepare_dco_ps, clk_prepare_dco_reg;
 	unsigned long hs_prepare_dco_ps, hs_prepare_dco_reg;
-	unsigned long clk_prepare_ps, clk_prepare_dco_reg;
 	unsigned long fout = priv->cur_pll_cfg.fout;
 	unsigned long clk_post_ps, clk_post_reg;
 	unsigned long clk_zero_ps, clk_zero_reg;
-	unsigned long lpx_ns = cfg->lpx / 1000;
 	unsigned long hs_zero_ps, hs_zero_reg;
-	unsigned long lptx_io_sr0_fall_dly_ps;
 	unsigned long tlp11init_dco_reg;
 	unsigned long wordclk_period_ps;
 	unsigned long tlptxoverlap_reg;
+	unsigned long hs_exit_dco_reg;
 	unsigned long tlpx_dco_reg;
-	unsigned long hs_exit_reg;
 	unsigned long hs_clk_rate;
 	unsigned long ui;
 	u16 val;
@@ -1010,7 +1030,7 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + DIG_IOCTRL_RW_AFE_LANE4_CTRL_2_3);
 
 	/* tlptxoverlap_reg */
-	tlptxoverlap_reg = T_DCO_MAX_DIV_ROUND_UP(5);
+	tlptxoverlap_reg = T_DCO_MAX_NS_DIV_ROUND_UP(LPTX_EN_DLY);
 	val = HS_TX_3_TLPTXOVERLAP_REG(tlptxoverlap_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 3));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 3));
@@ -1018,7 +1038,7 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(3, 3));
 
 	/* tlp11init_dco_reg */
-	tlp11init_dco_reg = T_DCO_MAX_DIV_ROUND_UP(5000 / (lptx_clk_rate_hz / MHZ(1))) - 1;
+	tlp11init_dco_reg = T_DCO_MAX_NS_DIV_ROUND_UP(5 * NSEC_PER_SEC / lptx_clk_rate_hz) - 1;
 	val = HS_TX_10_TLP11INIT_DCO_REG(tlp11init_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 10));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 10));
@@ -1026,7 +1046,7 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(3, 10));
 
 	/* tlpx_dco_reg */
-	tlpx_dco_reg = T_DCO_MAX_DIV_ROUND_UP(lpx_ns) - 1;
+	tlpx_dco_reg = T_DCO_MAX_NS_DIV_ROUND_UP(MULTI_1_1(T_LPX_NS_MIN)) - 1;
 	val = HS_TX_4_TLPX_DCO_REG(tlpx_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 4));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 4));
@@ -1035,9 +1055,10 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 
 	/* hs_prepare_dco_reg */
 	hs_prepare_dco_ps = 40000 + 4 * ui +
-			    DIV_ROUND_DOWN_ULL((85000 + 6 * ui) - (40000 + 4 * ui), 2);
-	lptx_io_sr0_fall_dly_ps = 12500;
-	hs_prepare_dco_reg = T_DCO_MAX_PS_DIV_ROUND_UP(hs_prepare_dco_ps + lptx_io_sr0_fall_dly_ps) - 1;
+		DIV_ROUND_DOWN_ULL((85000 + 6 * ui) - (40000 + 4 * ui), 2);
+	hs_prepare_dco_ps = MULTI_1_1(hs_prepare_dco_ps);
+	hs_prepare_dco_reg =
+		T_DCO_CUSTOM_PS_DIV_ROUND_UP(hs_prepare_dco_ps + LPTX_IO_SR0_FALL_DLY_DIV2_PS) - 1;
 	val = HS_TX_9_THSPRPR_DCO_REG(hs_prepare_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 9));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 9));
@@ -1046,8 +1067,9 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 
 	/* hs_zero_reg */
 	hs_zero_ps = 145000 + 10 * ui - hs_prepare_dco_ps;
-	hs_zero_reg = DIV_ROUND_UP_ULL((hs_zero_ps + cfg->lpx + hs_prepare_dco_ps +
-		T_DCO_MAX_PS_MULTI(5) - 3 * wordclk_period_ps), wordclk_period_ps) - 1;
+	hs_zero_reg = DIV_ROUND_UP_ULL((MULTI_1_1(T_LPX_PS_MIN) + hs_prepare_dco_ps + hs_zero_ps +
+					T_DCO_MAX_PS_MULTI(5) - 3 * wordclk_period_ps),
+				       wordclk_period_ps) - 1;
 	val = HS_TX_1_THSZERO_REG(hs_zero_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 1));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 1));
@@ -1081,9 +1103,9 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(2, 6));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(3, 6));
 
-	/* hs_exit_reg */
-	hs_exit_reg = T_DCO_MAX_DIV_ROUND_UP(MULTI5(100)) - 1;
-	val = HS_TX_12_THSEXIT_DCO_REG(hs_exit_reg);
+	/* hs_exit_dco_reg */
+	hs_exit_dco_reg = T_DCO_MAX_NS_DIV_ROUND_UP(MULTI_1_1(T_HS_EXIT_NS_MIN)) - 1;
+	val = HS_TX_12_THSEXIT_DCO_REG(hs_exit_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 12));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 12));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(2, 12));
@@ -1097,45 +1119,56 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	val = HS_TX_4_TLPX_DCO_REG(tlpx_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(4));
 
-	/* clk_zero_reg */
-	/* clk_prepare_ns = floor(38.0 + ((95.0 - 38.0) / 2)) */
-	clk_prepare_ps = 66000;
-	clk_zero_ps = MULTI5(300000 - clk_prepare_ps);
-	clk_zero_reg = DIV_ROUND_UP_ULL((cfg->lpx + clk_prepare_ps + clk_zero_ps +
-		T_DCO_MAX_PS_MULTI(5) - 3 * wordclk_period_ps), wordclk_period_ps) - 1;
-	val = HS_TX_1_THSZERO_REG(clk_zero_reg);
-	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(1));
-
 	/* clk_prepare_dco_reg */
-	clk_prepare_dco_reg = T_DCO_MAX_PS_DIV_ROUND_UP(clk_prepare_ps + lptx_io_sr0_fall_dly_ps) - 1;
+	clk_prepare_dco_ps = MULTI_1_1(T_CLK_PREPARE_PS_MIN +
+		DIV_ROUND_DOWN_ULL(T_CLK_PREPARE_PS_MAX - T_CLK_PREPARE_PS_MIN, 2));
+	clk_prepare_dco_reg =
+		T_DCO_CUSTOM_PS_DIV_ROUND_UP(clk_prepare_dco_ps + LPTX_IO_SR0_FALL_DLY_DIV2_PS) - 1;
 	val = HS_TX_9_THSPRPR_DCO_REG(clk_prepare_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(9));
 
+	/* clk_zero_reg */
+	clk_zero_ps = MULTI_1_1(T_CLK_PREPARE_CLK_ZERO_PS_MIN - clk_prepare_dco_ps);
+	clk_zero_reg = DIV_ROUND_UP_ULL((MULTI_1_1(T_LPX_PS_MIN) + clk_prepare_dco_ps +
+		clk_zero_ps + T_DCO_MAX_PS_MULTI(5) - 3 * wordclk_period_ps), wordclk_period_ps)
+		- 1;
+	val = HS_TX_1_THSZERO_REG(clk_zero_reg);
+	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(1));
+
 	val = HS_TX_2_TCLKPRE_REG(D2A_HSTX_DLY);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(2));
-	val = HS_TX_0_THSTRAIL_REG(hs_trail_reg);
+
+	t_clk_trail_ps = 60000 + (eot_ps - 60000) / 2;
+	clk_trail_reg = DIV_ROUND_UP(t_clk_trail_ps, wordclk_period_ps) - 1 + D2A_HSTX_DLY;
+	val = HS_TX_0_THSTRAIL_REG(clk_trail_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(0));
-	val = HS_TX_5_THSTRAIL_DCO_REG(hs_trail_dco_reg);
+
+	clk_trail_dco_reg = T_DCO_MAX_PS_DIV_ROUND_DOWN(clk_trail_reg * wordclk_period_ps -
+							T_DCO_MAX_PS_MULTI(4)) - 1;
+	val = HS_TX_5_THSTRAIL_DCO_REG(clk_trail_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(5));
 
-	clk_post_ps = MULTI5(60000 + 52 * ui);
+	clk_post_ps = MULTI_1_1(60000 + 52 * ui);
 	clk_post_reg = DIV_ROUND_UP_ULL(clk_post_ps, wordclk_period_ps) - 3;
 	val = HS_TX_8_TCLKPOST_REG(clk_post_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(8));
 
 	val = HS_TX_6_TLP11END_DCO_REG(tlp11init_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(6));
-	val = HS_TX_12_THSEXIT_DCO_REG(hs_exit_reg);
+	val = HS_TX_12_THSEXIT_DCO_REG(hs_exit_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(12));
 
-	dev_dbg(priv->dev, "fout: %luHz, ui: %lups, tlp11init_dco_reg: 0x%lx, "
-		"tlpx_dco_reg: 0x%lx, hs_prepare_dco_reg: 0x%lx, "
-		"hs_trail_dco_reg: 0x%lx, hs_zero_reg: 0x%lx, "
-		"hs_trail_reg: 0x%lx, hs_exit_reg: 0x%lx, clk_zero_reg: 0x%lx, "
-		"clk_prepare_dco_reg: 0x%lx, clk_post_reg: 0x%lx\n",
-		fout, ui, tlp11init_dco_reg, tlpx_dco_reg, hs_prepare_dco_reg,
-		hs_trail_dco_reg, hs_zero_reg, hs_trail_reg, hs_exit_reg,
-		clk_zero_reg, clk_prepare_dco_reg, clk_post_reg);
+	dev_dbg(priv->dev, "fout: %luHz, ui: %lups, tlptxoverlap_reg: 0x%lx, "
+		"tlp11init_dco_reg: 0x%lx, tlpx_dco_reg: 0x%lx, "
+		"hs_prepare_dco_reg: 0x%lx, hs_trail_dco_reg: 0x%lx, "
+		"hs_zero_reg: 0x%lx, hs_trail_reg: 0x%lx, "
+		"hs_exit_dco_reg: 0x%lx, clk_zero_reg: 0x%lx, "
+		"clk_prepare_dco_reg: 0x%lx, clk_trail_reg: 0x%lx, "
+		"clk_trail_dco_reg: 0x%lx, clk_post_reg: 0x%lx\n",
+		fout, ui, tlptxoverlap_reg, tlp11init_dco_reg, tlpx_dco_reg,
+		hs_prepare_dco_reg, hs_trail_dco_reg, hs_zero_reg, hs_trail_reg,
+		hs_exit_dco_reg, clk_zero_reg, clk_prepare_dco_reg,
+		clk_trail_reg, clk_trail_dco_reg, clk_post_reg);
 }
 
 static int
