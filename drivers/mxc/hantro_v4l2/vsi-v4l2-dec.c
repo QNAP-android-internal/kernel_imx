@@ -286,11 +286,13 @@ int vsi_dec_capture_on(struct vsi_v4l2_ctx *ctx)
 	if (ret == 0)
 		vsi_dec_dec2drain(ctx);
 	if (test_bit(CTX_FLAG_ENDOFSTRM_BIT, &ctx->flag)) {
-		struct vb2_buffer *vb = ctx->output_que.bufs[0];
+		struct vb2_buffer *vb = vb2_get_buffer(&ctx->output_que, 0);
 
-		vb->planes[0].bytesused = 0;
-		ctx->lastcapbuffer_idx = 0;
-		vb2_buffer_done(vb, VB2_BUF_STATE_DONE);
+		if (vb) {
+			vb->planes[0].bytesused = 0;
+			ctx->lastcapbuffer_idx = 0;
+			vb2_buffer_done(vb, VB2_BUF_STATE_DONE);
+		}
 	}
 	ctx->need_capture_on = false;
 	ctx->reschange_notified = false;
@@ -524,15 +526,17 @@ static int vsi_dec_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 		return -EBUSY;
 	ret = vb2_dqbuf(q, p, file->f_flags & O_NONBLOCK);
 	if (ret == 0) {
-		vb = q->bufs[p->index];
-		vsibuf = vb_to_vsibuf(vb);
-		list_del(&vsibuf->list);
-		if (!binputqueue(p->type) && !(p->flags & V4L2_BUF_FLAG_LAST)) {
-			clear_bit(BUF_FLAG_DONE, &ctx->vbufflag[p->index]);
-			ctx->buffed_capnum--;
-			ctx->buffed_cropcapnum--;
-		} else
-			clear_bit(BUF_FLAG_DONE, &ctx->srcvbufflag[p->index]);
+		vb = vb2_get_buffer(q, p->index);
+		if (vb) {
+			vsibuf = vb_to_vsibuf(vb);
+			list_del(&vsibuf->list);
+			if (!binputqueue(p->type) && !(p->flags & V4L2_BUF_FLAG_LAST)) {
+				clear_bit(BUF_FLAG_DONE, &ctx->vbufflag[p->index]);
+				ctx->buffed_capnum--;
+				ctx->buffed_cropcapnum--;
+			} else
+				clear_bit(BUF_FLAG_DONE, &ctx->srcvbufflag[p->index]);
+		}
 	}
 	if (!binputqueue(p->type)) {
 		p->reserved = ctx->rfc_luma_offset[p->index];
@@ -749,8 +753,12 @@ static int vsi_dec_start_cmd(struct vsi_v4l2_ctx *ctx)
 		return ret;
 
 	for (i = 0; i < vb2_get_num_buffers(q); ++i) {
-		if (q->bufs[i]->state == VB2_BUF_STATE_ACTIVE) {
-			ret = vsiv4l2_execcmd(ctx, V4L2_DAEMON_VIDIOC_BUF_RDY, q->bufs[i]);
+		struct vb2_buffer *vb = vb2_get_buffer(q, i);
+
+		if (!vb)
+			continue;
+		if (vb->state == VB2_BUF_STATE_ACTIVE) {
+			ret = vsiv4l2_execcmd(ctx, V4L2_DAEMON_VIDIOC_BUF_RDY, vb);
 			if (ret < 0)
 				return ret;
 		}
@@ -1008,14 +1016,12 @@ static int vsi_v4l2_dec_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 		ctrl->val = ctx->mediacfg.minbuf_4output;
 		break;
 	case V4L2_CID_HDR10META:
-		if (ctrl->p_new.p) {
-			if (!test_bit(CTX_FLAG_SRCCHANGED_BIT, &ctx->flag))
-				memset(ctrl->p_new.p, 0, sizeof(struct v4l2_hdr10_meta));
-			else
-				memcpy(ctrl->p_new.p,
-					&ctx->mediacfg.decparams.dec_info.dec_info.vpu_hdr10_meta,
-					sizeof(struct v4l2_hdr10_meta));
-		}
+		if (!test_bit(CTX_FLAG_SRCCHANGED_BIT, &ctx->flag))
+			memset(ctrl->p_new.p, 0, sizeof(struct v4l2_hdr10_meta));
+		else
+			memcpy(ctrl->p_new.p,
+				&ctx->mediacfg.decparams.dec_info.dec_info.vpu_hdr10_meta,
+				sizeof(struct v4l2_hdr10_meta));
 		break;
 	default:
 		return -EINVAL;
