@@ -1158,7 +1158,7 @@ static void hantro_dec_create_debugfs(struct hantro_dec_core *core)
 {
 	char name[64];
 
-	if (!core || !core->iface || !core->iface->debugfs)
+	if (!core->iface->debugfs)
 		return;
 	if (hantro_dec_is_g1(core))
 		scnprintf(name, sizeof(name), "g1");
