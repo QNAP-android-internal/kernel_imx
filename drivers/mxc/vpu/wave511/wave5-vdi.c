@@ -115,7 +115,7 @@ EXPORT_SYMBOL_GPL(wave5_vdi_free_dma_memory);
 int wave5_vdi_allocate_array(struct device *dev, struct vpu_buf *array, unsigned int count,
 			     size_t size)
 {
-	struct vpu_buf vb_buf;
+	struct vpu_buf vb_buf = { 0 };
 	int i, ret = 0;
 
 	vb_buf.size = size;
