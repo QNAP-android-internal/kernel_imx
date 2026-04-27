@@ -1557,25 +1557,21 @@ exit:
 static int se_ioctl_get_v2x_version(struct se_if_device_ctx *dev_ctx,
 				    u64 arg)
 {
+	struct se_ioctl_get_v2x_version v2x_version = {0};
 	struct se_if_priv *priv = dev_ctx->priv;
-	struct se_ioctl_get_v2x_version v2x_version;
-	int err = 0;
 
-	if (v2x_get_version(priv, &v2x_version)) {
-		err = -EFAULT;
-		goto exit;
-	}
+	if (v2x_get_version(priv, &v2x_version))
+		return -EFAULT;
 
-	if (copy_to_user((u8 __user *)arg, &v2x_version, sizeof(v2x_version))) {
+	if (v2x_version.commit_id &&
+	    copy_to_user((u8 __user *)arg, &v2x_version, sizeof(v2x_version))) {
 		dev_err(priv->dev,
 			"%s: Failed to copy V2X version to user\n",
 			dev_ctx->devname);
-		err = -EFAULT;
-		goto exit;
+		return -EFAULT;
 	}
 
-exit:
-	return err;
+	return 0;
 }
 
 static int se_ioctl_get_mu_info(struct se_if_device_ctx *dev_ctx,
