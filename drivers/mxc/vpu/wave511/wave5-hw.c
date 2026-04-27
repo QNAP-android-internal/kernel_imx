@@ -198,7 +198,7 @@ void wave5_vpu_check_state(struct vpu_device *vpu_dev)
 					VPU_POLL_CHECK_INTERVAL,
 					VPU_BUSY_CHECK_TIMEOUT, false,
 					vpu_dev, W5_VCPU_CUR_PC);
-		if (!ret)
+		if (!ret && vpu_dev->entity.on_boot)
 			vpu_dev->entity.on_boot(vpu_dev->dev);
 	}
 }

@@ -36,7 +36,7 @@ module_param(debug, uint, 0644);
 
 #define call_void_op(entity, op, args...)				\
 	do {								\
-		if ((entity)->op)					\
+		if ((entity) && (entity)->op)					\
 			(entity)->op((entity)->dev, ##args);		\
 	} while (0)
 
@@ -464,9 +464,6 @@ static int wave5_vpu_ctrl_init_vpu(struct vpu_ctrl *ctrl)
 
 static void wave5_vpu_ctrl_on_boot(struct wave5_vpu_entity *entity)
 {
-	if (!entity->on_boot)
-		return;
-
 	if (!entity->booted) {
 		call_void_op(entity, on_boot);
 		entity->booted = true;
