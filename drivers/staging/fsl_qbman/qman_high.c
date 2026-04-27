@@ -191,17 +191,6 @@ static inline void put_affine_portal(void)
 {
 	put_cpu_var(qman_affine_portal);
 }
-/* Exception: poll functions assume the caller is cpu-affine and in no risk of
- * re-entrance, which are the two reasons we usually use the get/put_cpu_var()
- * semantic - ie. to disable pre-emption. Some use-cases expect the execution
- * context to remain as non-atomic during poll-triggered callbacks as it was
- * when the poll API was first called (eg. NAPI), so we go out of our way in
- * this case to not disable pre-emption. */
-static inline struct qman_portal *get_poll_portal(void)
-{
-	return &get_cpu_var(qman_affine_portal);
-}
-#define put_poll_portal()
 
 /* This gives a FQID->FQ lookup to cover the fact that we can't directly demux
  * retirement notifications (the fact they are sometimes h/w-consumed means that
@@ -450,15 +439,6 @@ void qman_enable_irqs(void)
 	pr_debug("QMan: IRQs enabled\n");
 }
 
-/* In the case that slow- and fast-path handling are both done by qman_poll()
- * (ie. because there is no interrupt handling), we ought to balance how often
- * we do the fast-path poll versus the slow-path poll. We'll use two decrementer
- * sources, so we call the fast poll 'n' times before calling the slow poll
- * once. The idle decrementer constant is used when the last slow-poll detected
- * no work to do, and the busy decrementer constant when the last slow-poll had
- * work to do. */
-#define SLOW_POLL_IDLE   1000
-#define SLOW_POLL_BUSY   10
 static u32 __poll_portal_slow(struct qman_portal *p, u32 is);
 static inline unsigned int __poll_portal_fast(struct qman_portal *p,
 					      unsigned int poll_limit,
@@ -1333,18 +1313,6 @@ done:
 	return limit;
 }
 
-u32 qman_irqsource_get(void)
-{
-	/* "irqsource" and "poll" APIs mustn't redirect when sharing, they
-	 * should shut the user out if they are not the primary CPU hosting the
-	 * portal. That's why we use the "raw" interface. */
-	struct qman_portal *p = get_raw_affine_portal();
-	u32 ret = p->irq_sources & QM_PIRQ_VISIBLE;
-	put_affine_portal();
-	return ret;
-}
-EXPORT_SYMBOL(qman_irqsource_get);
-
 int qman_p_irqsource_add(struct qman_portal *p, u32 bits __maybe_unused)
 {
 	__maybe_unused unsigned long irqflags;
@@ -1458,16 +1426,6 @@ int qman_p_poll_dqrr(struct qman_portal *p, unsigned int limit)
 }
 EXPORT_SYMBOL(qman_p_poll_dqrr);
 
-int qman_poll_dqrr(unsigned int limit)
-{
-	struct qman_portal *p = get_poll_portal();
-	int ret;
-	ret = qman_p_poll_dqrr(p, limit);
-	put_poll_portal();
-	return ret;
-}
-EXPORT_SYMBOL(qman_poll_dqrr);
-
 u32 qman_p_poll_slow(struct qman_portal *p)
 {
 	u32 ret;
@@ -1484,47 +1442,6 @@ u32 qman_p_poll_slow(struct qman_portal *p)
 	return ret;
 }
 EXPORT_SYMBOL(qman_p_poll_slow);
-
-u32 qman_poll_slow(void)
-{
-	struct qman_portal *p = get_poll_portal();
-	u32 ret;
-	ret = qman_p_poll_slow(p);
-	put_poll_portal();
-	return ret;
-}
-EXPORT_SYMBOL(qman_poll_slow);
-
-/* Legacy wrapper */
-void qman_p_poll(struct qman_portal *p)
-{
-#ifdef CONFIG_FSL_DPA_PORTAL_SHARE
-	if (unlikely(p->sharing_redirect))
-		return;
-#endif
-	if ((~p->irq_sources) & QM_PIRQ_SLOW) {
-		if (!(p->slowpoll--)) {
-			u32 is = qm_isr_status_read(&p->p) & ~p->irq_sources;
-			u32 active = __poll_portal_slow(p, is);
-			if (active) {
-				qm_isr_status_clear(&p->p, active);
-				p->slowpoll = SLOW_POLL_BUSY;
-			} else
-				p->slowpoll = SLOW_POLL_IDLE;
-		}
-	}
-	if ((~p->irq_sources) & QM_PIRQ_DQRI)
-		__poll_portal_fast(p, CONFIG_FSL_QMAN_POLL_LIMIT, false);
-}
-EXPORT_SYMBOL(qman_p_poll);
-
-void qman_poll(void)
-{
-	struct qman_portal *p = get_poll_portal();
-	qman_p_poll(p);
-	put_poll_portal();
-}
-EXPORT_SYMBOL(qman_poll);
 
 void qman_p_stop_dequeues(struct qman_portal *p)
 {
