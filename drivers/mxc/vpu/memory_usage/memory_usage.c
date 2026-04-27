@@ -247,6 +247,9 @@ static void imx_mur_delete_node(struct imx_mur_node *node)
 {
 	struct imx_mur_node *child, *tmp;
 
+	if (!node || !node->recorder)
+		return;
+
 	list_for_each_entry_safe(child, tmp, &node->children, list)
 		imx_mur_delete_node(child);
 
