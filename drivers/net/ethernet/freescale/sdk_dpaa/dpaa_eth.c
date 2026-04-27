@@ -590,26 +590,24 @@ EXPORT_SYMBOL(private_fq_cbs);
 static void dpaa_eth_napi_enable(struct dpa_priv_s *priv)
 {
 	struct dpa_percpu_priv_s *percpu_priv;
-	int i, j;
+	int i;
 
 	for_each_possible_cpu(i) {
 		percpu_priv = per_cpu_ptr(priv->percpu_priv, i);
 
-		for (j = 0; j < qman_portal_max; j++)
-			napi_enable(&percpu_priv->np[j].napi);
+		napi_enable(&percpu_priv->np.napi);
 	}
 }
 
 static void dpaa_eth_napi_disable(struct dpa_priv_s *priv)
 {
 	struct dpa_percpu_priv_s *percpu_priv;
-	int i, j;
+	int i;
 
 	for_each_possible_cpu(i) {
 		percpu_priv = per_cpu_ptr(priv->percpu_priv, i);
 
-		for (j = 0; j < qman_portal_max; j++)
-			napi_disable(&percpu_priv->np[j].napi);
+		napi_disable(&percpu_priv->np.napi);
 	}
 }
 
@@ -656,13 +654,9 @@ static void dpaa_eth_poll_controller(struct net_device *net_dev)
 	struct dpa_priv_s *priv = netdev_priv(net_dev);
 	struct dpa_percpu_priv_s *percpu_priv =
 		raw_cpu_ptr(priv->percpu_priv);
-	struct qman_portal *p;
-	const struct qman_portal_config *pc;
 	struct dpa_napi_portal *np;
 
-	p = (struct qman_portal *)qman_get_affine_portal(smp_processor_id());
-	pc = qman_p_get_portal_config(p);
-	np = &percpu_priv->np[pc->index];
+	np = &percpu_priv->np;
 
 	qman_p_irqsource_remove(np->p, QM_PIRQ_DQRI);
 	qman_p_poll_dqrr(np->p, np->napi.weight);
@@ -694,23 +688,12 @@ static int dpa_private_napi_add(struct net_device *net_dev)
 {
 	struct dpa_priv_s *priv = netdev_priv(net_dev);
 	struct dpa_percpu_priv_s *percpu_priv;
-	int i, cpu;
+	int cpu;
 
 	for_each_possible_cpu(cpu) {
 		percpu_priv = per_cpu_ptr(priv->percpu_priv, cpu);
 
-		percpu_priv->np = devm_kzalloc(net_dev->dev.parent,
-			qman_portal_max * sizeof(struct dpa_napi_portal),
-			GFP_KERNEL);
-
-		if (unlikely(percpu_priv->np == NULL)) {
-			dev_err(net_dev->dev.parent, "devm_kzalloc() failed\n");
-			return -ENOMEM;
-		}
-
-		for (i = 0; i < qman_portal_max; i++)
-			netif_napi_add(net_dev, &percpu_priv->np[i].napi,
-					dpaa_eth_poll);
+		netif_napi_add(net_dev, &percpu_priv->np.napi, dpaa_eth_poll);
 	}
 
 	return 0;
@@ -720,17 +703,12 @@ void dpa_private_napi_del(struct net_device *net_dev)
 {
 	struct dpa_priv_s *priv = netdev_priv(net_dev);
 	struct dpa_percpu_priv_s *percpu_priv;
-	int i, cpu;
+	int cpu;
 
 	for_each_possible_cpu(cpu) {
 		percpu_priv = per_cpu_ptr(priv->percpu_priv, cpu);
 
-		if (percpu_priv->np) {
-			for (i = 0; i < qman_portal_max; i++)
-				netif_napi_del(&percpu_priv->np[i].napi);
-
-			devm_kfree(net_dev->dev.parent, percpu_priv->np);
-		}
+		netif_napi_del(&percpu_priv->np.napi);
 	}
 }
 EXPORT_SYMBOL(dpa_private_napi_del);

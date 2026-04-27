@@ -296,7 +296,7 @@ struct dpa_napi_portal {
 
 struct dpa_percpu_priv_s {
 	struct net_device *net_dev;
-	struct dpa_napi_portal *np;
+	struct dpa_napi_portal np;
 	u64 in_interrupt;
 	u64 tx_returned;
 	u64 tx_confirm;
@@ -443,18 +443,12 @@ static inline int dpaa_eth_napi_schedule(struct dpa_percpu_priv_s *percpu_priv,
 {
 	if (sched_napi) {
 		/* Disable QMan IRQ and invoke NAPI */
-		int ret = qman_p_irqsource_remove(portal, QM_PIRQ_DQRI);
-		if (likely(!ret)) {
-			const struct qman_portal_config *pc =
-					qman_p_get_portal_config(portal);
-			struct dpa_napi_portal *np =
-					&percpu_priv->np[pc->index];
+		qman_p_irqsource_remove(portal, QM_PIRQ_DQRI);
 
-			np->p = portal;
-			napi_schedule(&np->napi);
-			percpu_priv->in_interrupt++;
-			return 1;
-		}
+		percpu_priv->np.p = portal;
+		napi_schedule(&percpu_priv->np.napi);
+		percpu_priv->in_interrupt++;
+		return 1;
 	}
 	return 0;
 }

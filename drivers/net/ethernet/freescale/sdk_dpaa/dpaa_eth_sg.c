@@ -618,9 +618,7 @@ void __hot _dpa_rx(struct net_device *net_dev,
 	skb_record_rx_queue(skb, raw_smp_processor_id());
 
 	if (use_gro) {
-		const struct qman_portal_config *pc =
-					qman_p_get_portal_config(portal);
-		struct dpa_napi_portal *np = &percpu_priv->np[pc->index];
+		struct dpa_napi_portal *np = &percpu_priv->np;
 
 		np->p = portal;
 		/* The stack doesn't report if the frame was dropped but it
