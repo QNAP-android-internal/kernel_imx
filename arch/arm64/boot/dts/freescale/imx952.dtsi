@@ -830,6 +830,8 @@
 				assigned-clocks = <&scmi_clk IMX952_CLK_XSPI1>;
 				assigned-clock-parents = <&scmi_clk IMX952_CLK_SYSPLL1_PFD1>;
 				assigned-clock-rates = <200000000>;
+				dmas = <&edma2 53 0 0>, <&edma2 54 0 FSL_EDMA_RX>;
+				dma-names = "tx", "rx";
 				status = "disabled";
 			};
 		};
