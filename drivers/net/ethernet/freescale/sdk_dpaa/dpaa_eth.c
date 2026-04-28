@@ -382,7 +382,7 @@ int dpaa_eth_poll(struct napi_struct *napi, int budget)
 	struct dpa_napi_portal *np =
 			container_of(napi, struct dpa_napi_portal, napi);
 
-	int cleaned = qman_p_poll_dqrr(np->p, budget);
+	int cleaned = qman_p_poll_dqrr(np->p, budget, napi);
 
 	if (cleaned < budget && napi_complete_done(napi, cleaned)) {
 		int tmp;
@@ -434,7 +434,8 @@ static void __hot _dpa_tx_conf(struct net_device	*net_dev,
 static enum qman_cb_dqrr_result priv_rx_error_dqrr(struct qman_portal *portal,
 						   struct qman_fq *fq,
 						   const struct qm_dqrr_entry *dq,
-						   bool sched_napi)
+						   bool sched_napi,
+						   struct qman_poll_ctx *ctx)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -464,7 +465,8 @@ static enum qman_cb_dqrr_result priv_rx_error_dqrr(struct qman_portal *portal,
 
 static enum qman_cb_dqrr_result __hot
 priv_rx_default_dqrr(struct qman_portal *portal, struct qman_fq *fq,
-		     const struct qm_dqrr_entry *dq, bool sched_napi)
+		     const struct qm_dqrr_entry *dq, bool sched_napi,
+		     struct qman_poll_ctx *ctx)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -496,14 +498,15 @@ priv_rx_default_dqrr(struct qman_portal *portal, struct qman_fq *fq,
 		dpa_fd_release(net_dev, &dq->fd);
 	else
 		_dpa_rx(net_dev, portal, priv, percpu_priv, &dq->fd, fq->fqid,
-			count_ptr);
+			count_ptr, ctx);
 
 	return qman_cb_dqrr_consume;
 }
 
 static enum qman_cb_dqrr_result
 priv_tx_conf_error_dqrr(struct qman_portal *portal, struct qman_fq *fq,
-		        const struct qm_dqrr_entry *dq, bool sched_napi)
+		        const struct qm_dqrr_entry *dq, bool sched_napi,
+		        struct qman_poll_ctx *ctx)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -524,7 +527,8 @@ priv_tx_conf_error_dqrr(struct qman_portal *portal, struct qman_fq *fq,
 
 static enum qman_cb_dqrr_result __hot
 priv_tx_conf_default_dqrr(struct qman_portal *portal, struct qman_fq *fq,
-			  const struct qm_dqrr_entry *dq, bool sched_napi)
+			  const struct qm_dqrr_entry *dq, bool sched_napi,
+			  struct qman_poll_ctx *ctx)
 {
 	struct net_device		*net_dev;
 	struct dpa_priv_s		*priv;
@@ -655,11 +659,13 @@ static void dpaa_eth_poll_controller(struct net_device *net_dev)
 	struct dpa_percpu_priv_s *percpu_priv =
 		raw_cpu_ptr(priv->percpu_priv);
 	struct dpa_napi_portal *np;
+	struct napi_struct *napi;
 
 	np = &percpu_priv->np;
+	napi = &np->napi;
 
 	qman_p_irqsource_remove(np->p, QM_PIRQ_DQRI);
-	qman_p_poll_dqrr(np->p, np->napi.weight);
+	qman_p_poll_dqrr(np->p, napi->weight, napi);
 	qman_p_irqsource_add(np->p, QM_PIRQ_DQRI);
 }
 #endif

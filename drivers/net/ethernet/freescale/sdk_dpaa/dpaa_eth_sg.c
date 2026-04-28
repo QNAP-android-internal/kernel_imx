@@ -553,7 +553,8 @@ void __hot _dpa_rx(struct net_device *net_dev,
 		struct dpa_percpu_priv_s *percpu_priv,
 		const struct qm_fd *fd,
 		u32 fqid,
-		int *count_ptr)
+		int *count_ptr,
+		struct qman_poll_ctx *ctx)
 {
 	bool dcl4c_valid = !!(net_dev->features & NETIF_F_RXCSUM);
 	bool use_gro = !!(net_dev->features & NETIF_F_GRO);
@@ -624,7 +625,7 @@ void __hot _dpa_rx(struct net_device *net_dev,
 		/* The stack doesn't report if the frame was dropped but it
 		 * will increment rx_dropped automatically.
 		 */
-		napi_gro_receive(&np->napi, skb);
+		qman_portal_napi_gro_receive(ctx, &np->napi, skb);
 	} else if (unlikely(netif_receive_skb(skb) == NET_RX_DROP))
 		return;
 

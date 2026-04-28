@@ -399,7 +399,8 @@ void __hot _dpa_rx(struct net_device *net_dev,
 		struct dpa_percpu_priv_s *percpu_priv,
 		const struct qm_fd *fd,
 		u32 fqid,
-		int *count_ptr);
+		int *count_ptr,
+		struct qman_poll_ctx *ctx);
 int __hot dpa_tx(struct sk_buff *skb, struct net_device *net_dev);
 int __hot dpa_tx_extended(struct sk_buff *skb, struct net_device *net_dev,
 		struct qman_fq *egress_fq, struct qman_fq *conf_fq);

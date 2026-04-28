@@ -83,7 +83,8 @@ static spinlock_t lock;
 static enum qman_cb_dqrr_result qm_tx_conf_dqrr_cb(struct qman_portal *portal,
 						   struct qman_fq *fq,
 						   const struct qm_dqrr_entry *dq,
-						   bool sched_napi)
+						   bool sched_napi,
+						   struct qman_poll_ctx *ctx)
 {
 	t_LnxWrpFmDev *p_LnxWrpFmDev = ((t_FmTestFq *) fq)->h_Arg;
 	unsigned long flags;
@@ -112,7 +113,8 @@ static enum qman_cb_dqrr_result qm_tx_conf_dqrr_cb(struct qman_portal *portal,
 static enum qman_cb_dqrr_result qm_tx_dqrr_cb(struct qman_portal *portal,
 					      struct qman_fq *fq,
 					      const struct qm_dqrr_entry *dq,
-					      bool sched_napi)
+					      bool sched_napi,
+					      struct qman_poll_ctx *ctx)
 {
 	WARN(1, "FMD: failure at %s:%d/%s()!\n", __FILE__, __LINE__,
 	     __func__);

@@ -55,7 +55,8 @@
 static enum qman_cb_dqrr_result cb_dqrr(struct qman_portal *,
 					struct qman_fq *,
 					const struct qm_dqrr_entry *,
-					bool sched_napi);
+					bool sched_napi,
+					struct qman_poll_ctx *ctx);
 static void cb_ern(struct qman_portal *, struct qman_fq *,
 			const struct qm_mr_entry *);
 static void cb_fqs(struct qman_portal *, struct qman_fq *,
@@ -183,7 +184,8 @@ void qman_test_high(void)
 static enum qman_cb_dqrr_result cb_dqrr(struct qman_portal *p,
 					struct qman_fq *fq,
 					const struct qm_dqrr_entry *dq,
-					bool sched_napi)
+					bool sched_napi,
+					struct qman_poll_ctx *ctx)
 {
 	if (fd_cmp(&fd_dq, &dq->fd)) {
 		pr_err("BADNESS: dequeued frame doesn't match;\n");
