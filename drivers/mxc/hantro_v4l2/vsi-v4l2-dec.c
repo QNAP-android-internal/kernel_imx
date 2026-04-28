@@ -1053,14 +1053,6 @@ static int vsi_v4l2_dec_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_MIN_BUFFERS_FOR_OUTPUT:
 		ctrl->val = ctx->mediacfg.minbuf_4output;
 		break;
-	case V4L2_CID_HDR10META:
-		if (!test_bit(CTX_FLAG_SRCCHANGED_BIT, &ctx->flag))
-			memset(ctrl->p_new.p, 0, sizeof(struct v4l2_hdr10_meta));
-		else
-			memcpy(ctrl->p_new.p,
-				&ctx->mediacfg.decparams.dec_info.dec_info.vpu_hdr10_meta,
-				sizeof(struct v4l2_hdr10_meta));
-		break;
 	default:
 		return -EINVAL;
 	}
@@ -1109,19 +1101,6 @@ static const struct v4l2_ctrl_ops vsi_dec_ctrl_ops = {
 };
 
 static struct v4l2_ctrl_config vsi_v4l2_dec_ctrl_defs[] = {
-	{
-		.ops = &vsi_dec_ctrl_ops,
-		.type_ops = &vsi_dec_type_ops,
-		.id = V4L2_CID_HDR10META,
-		.name = "vsi get 10bit meta",
-		.type = VSI_V4L2_CMPTYPE_HDR10META,
-		.flags = V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_READ_ONLY,
-		.min = 0,
-		.max = 1,
-		.step = 1,
-		.def = 0,
-		.elem_size = sizeof(struct v4l2_hdr10_meta),
-	},
 	/* kernel defined controls */
 	{
 		.id = V4L2_CID_MPEG_VIDEO_H264_PROFILE,

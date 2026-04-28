@@ -63,7 +63,6 @@ extern int vsi_kloglvl;
 //compound type for extension ctrls
 #define VSI_V4L2_CMPTYPE_ROI				(V4L2_CTRL_COMPOUND_TYPES + 100)
 #define VSI_V4L2_CMPTYPE_IPCM				(V4L2_CTRL_COMPOUND_TYPES + 101)
-#define VSI_V4L2_CMPTYPE_HDR10META		(V4L2_CTRL_COMPOUND_TYPES + 102)
 
 enum {
 	LOGLVL_VERBOSE = 0,	//log all
