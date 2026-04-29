@@ -331,6 +331,10 @@ enum query_opt {
 #define W5_CMD_DEC_FORCE_FB_LATENCY_PLUS1       (W5_REG_BASE + 0x0134)
 #define W5_USE_SEC_AXI                          (W5_REG_BASE + 0x0150)
 
+#define W5_CMD_DEC_USER_BASE                    (W5_REG_BASE + 0x0170)
+#define W5_CMD_DEC_USER_SIZE                    (W5_REG_BASE + 0x0174)
+#define W5_CMD_DEC_USER_PARAM                   (W5_REG_BASE + 0x0178)
+
 /************************************************************************/
 /* DECODER - QUERY : GET_VPU_INFO                                       */
 /************************************************************************/

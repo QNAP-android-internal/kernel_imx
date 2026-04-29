@@ -529,6 +529,9 @@ int wave5_vpu_dec_init_seq(struct vpu_instance *inst)
 
 	vpu_write_reg(inst->dev, W5_COMMAND_OPTION, cmd_option);
 	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_MASK, p_dec_info->user_data_enable);
+	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_BASE, 0);
+	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_SIZE, 0);
+	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_PARAM, 0);
 
 	ret = send_firmware_command(inst, W5_INIT_SEQ, true, &reg_val, &fail_res);
 	if (ret)
@@ -952,6 +955,9 @@ int wave5_vpu_decode(struct vpu_instance *inst, u32 *fail_res)
 
 	/* set attributes of user buffer */
 	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_MASK, p_dec_info->user_data_enable);
+	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_BASE, 0);
+	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_SIZE, 0);
+	vpu_write_reg(inst->dev, W5_CMD_DEC_USER_PARAM, 0);
 
 	vpu_write_reg(inst->dev, W5_COMMAND_OPTION, DEC_PIC_NORMAL);
 	vpu_write_reg(inst->dev, W5_CMD_DEC_TEMPORAL_ID_PLUS1,
