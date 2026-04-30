@@ -19,6 +19,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ioctl.h>
+#include <media/v4l2-isp.h>
 #include <media/videobuf2-dma-contig.h>
 
 #include "neoisp.h"
@@ -2619,6 +2620,15 @@ void neoisp_ctx_get_stats(struct neoisp_dev_s *neoispd, struct neoisp_buffer_s *
 	}
 
 	stats = (struct v4l2_isp_buffer *)get_vaddr(buf);
+
+	/*
+	 * Set data_size field with maximum allowed length _before_ filling the
+	 * statistics buffer, to let the `__counted_by` macro of the v4l2_isp_buffer
+	 * structure correctly verify that we are not out of bound when filling the
+	 * buffer.
+	 * The effective data_size if set after all blocks are copied anyway.
+	 */
+	stats->data_size = v4l2_isp_buffer_size(NEOISP_EXT_STATS_MAX_SIZE);
 
 	offset = 0;
 	blk_list = (u32 *)neoisp_stats_blocks_v1;
