@@ -708,7 +708,7 @@ static int handle_dynamic_resolution_change(struct vpu_instance *inst, u32 seq_c
 		inst->needs_reallocation = false;
 	else
 		inst->needs_reallocation = true;
-	inst->fbc_buf_count = initial_info->min_frame_buffer_count + 1;
+	inst->fbc_buf_count = initial_info->min_frame_buffer_count;
 	inst->disp_buf_count = max(initial_info->reorder_delay + 1, wave5_vpu_cq_depth(inst->dev));
 	if (inst->disp_buf_count != v4l2_m2m_num_dst_bufs_ready(m2m_ctx)) {
 		struct v4l2_ctrl *ctrl;
