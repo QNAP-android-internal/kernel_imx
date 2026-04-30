@@ -820,31 +820,31 @@ static irqreturn_t hantro_dec_isr(int irq, void *dev_id)
 	return IRQ_RETVAL(handled);
 }
 
-static inline int hantro_dec_read_irq_received(struct hantro_dec_core *core)
+static inline int hantro_dec_is_ready_to_sleep(struct hantro_dec_core *core)
 {
 	guard(spinlock_irqsave)(&core->lock);
+
+	if (!core->is_reserved || !core->is_enabled)
+		return 1;
 
 	return core->irq_received;
 }
 
 static int hantro_dec_pause(struct hantro_dec_core *core)
 {
+	u32 data;
 	int ret;
 
 	if (!core || !core->is_valid)
 		return 0;
-	if (!core->is_reserved)
-		return 0;
 
-	if (core->is_enabled) {
-		u32 data;
-
-		ret = read_poll_timeout(hantro_dec_read_irq_received, data, data, 10,
-					HANTRO_DEC_TIMEOUT_MS * USEC_PER_MSEC, false, core);
-		if (ret) {
-			dev_err(core->dev, "wait core[%d] done timeout\n", core->id);
-			return -EINVAL;
-		}
+	ret = read_poll_timeout(hantro_dec_is_ready_to_sleep, data, data, 10,
+				HANTRO_DEC_TIMEOUT_MS * USEC_PER_MSEC, false, core);
+	if (ret) {
+		dev_err(core->dev, "wait core[%d] done timeout, status %d, %d, %d, 0x%x\n",
+			core->id, core->is_reserved, core->is_enabled,
+			core->irq_received, core->irq_status);
+		return -EINVAL;
 	}
 
 	dev_dbg(core->dev, "suspend, irq_status = 0x%x\n", core->irq_status);
