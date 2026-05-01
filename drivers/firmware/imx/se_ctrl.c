@@ -1439,6 +1439,7 @@ static int se_ioctl_cmd_snd_rcv_rsp_handler(struct se_if_device_ctx *dev_ctx,
 	struct se_if_priv *priv = dev_ctx->priv;
 	struct se_api_msg *tx_msg __free(kfree) = NULL;
 	struct se_api_msg *rx_msg __free(kfree) = NULL;
+	int rsp_status_err = 0;
 	int err = 0;
 
 	if (copy_from_user(&cmd_snd_rcv_rsp_info, (u8 __user *)arg,
@@ -1501,14 +1502,14 @@ static int se_ioctl_cmd_snd_rcv_rsp_handler(struct se_if_device_ctx *dev_ctx,
 	if (err < 0)
 		goto exit;
 
-	err = se_val_rsp_hdr_n_status(priv,
-				      rx_msg,
-				      tx_msg->header.command,
-				      cmd_snd_rcv_rsp_info.rx_buf_sz,
-				      tx_msg->header.ver == priv->if_defs->fw_api_ver ? false : true);
+	rsp_status_err
+		= se_val_rsp_hdr_n_status(priv, rx_msg, tx_msg->header.command,
+					  cmd_snd_rcv_rsp_info.rx_buf_sz,
+					  tx_msg->header.ver
+					     == priv->if_defs->fw_api_ver ? false : true);
 
-	if (!err && (rx_msg->header.command == SE_OPEN_SESS_REQ ||
-		    rx_msg->header.command == SE_CLOSE_SESS_REQ))
+	if (!rsp_status_err && (rx_msg->header.command == SE_OPEN_SESS_REQ ||
+				rx_msg->header.command == SE_CLOSE_SESS_REQ))
 		manage_sess_hdl(dev_ctx, rx_msg);
 
 	dev_dbg(priv->dev,
@@ -1520,11 +1521,8 @@ static int se_ioctl_cmd_snd_rcv_rsp_handler(struct se_if_device_ctx *dev_ctx,
 	/* We may need to copy the output data to user before
 	 * delivering the completion message.
 	 */
-	if (!err) {
+	if (!rsp_status_err)
 		err = se_dev_ctx_cpy_out_data(dev_ctx);
-		if (err < 0)
-			goto exit;
-	}
 
 	/* Copy data from the buffer */
 	print_hex_dump_debug("to user ", DUMP_PREFIX_OFFSET, 4, 4,
