@@ -331,9 +331,6 @@
 };
 
 &ldb {
-	assigned-clocks = <&scmi_clk IMX95_CLK_LDBPLL_VCO>,
-			  <&scmi_clk IMX95_CLK_LDBPLL>;
-	assigned-clock-rates = <4158000000>, <1039500000>;
 	status = "okay";
 
 	channel@1 {
