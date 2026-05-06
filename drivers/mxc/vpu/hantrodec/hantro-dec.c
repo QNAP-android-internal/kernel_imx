@@ -840,12 +840,10 @@ static int hantro_dec_pause(struct hantro_dec_core *core)
 
 	ret = read_poll_timeout(hantro_dec_is_ready_to_sleep, data, data, 10,
 				HANTRO_DEC_TIMEOUT_MS * USEC_PER_MSEC, false, core);
-	if (ret) {
+	if (ret)
 		dev_err(core->dev, "wait core[%d] done timeout, status %d, %d, %d, 0x%x\n",
 			core->id, core->is_reserved, core->is_enabled,
 			core->irq_received, core->irq_status);
-		return -EINVAL;
-	}
 
 	dev_dbg(core->dev, "suspend, irq_status = 0x%x\n", core->irq_status);
 
