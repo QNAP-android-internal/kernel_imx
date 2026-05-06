@@ -28,12 +28,6 @@
 
 #include "mali_kbase_config_platform.h"
 
-#ifndef IMX_GPU_BLK_CTRL
-#if KERNEL_VERSION(6, 12, 0) >= LINUX_VERSION_CODE
-#define IMX_GPU_BLK_CTRL 1
-#endif
-#endif
-
 static struct kbase_platform_config dummy_platform_config;
 
 struct kbase_platform_config *kbase_get_platform_config(void)
