@@ -349,10 +349,8 @@ static void hantro_dec_put_core(struct hantro_dec_core *core, struct file *filp,
 			}
 		}
 	}
-	if (flag && poweroff) {
-		pm_runtime_mark_last_busy(core->dev);
+	if (flag && poweroff)
 		pm_runtime_put_autosuspend(core->dev);
-	}
 
 	wake_up_interruptible_all(&iface->hw_queue);
 }
@@ -1220,7 +1218,6 @@ static int hantro_dec_init_core(struct hantro_dec_core *core)
 
 	hantro_dec_create_debugfs(core);
 exit:
-	pm_runtime_mark_last_busy(core->dev);
 	pm_runtime_put_autosuspend(core->dev);
 	if (ret) {
 		if (core->mirror_regs) {
