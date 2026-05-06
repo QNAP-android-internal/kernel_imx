@@ -639,7 +639,6 @@ static void hantro_enc_release_core(struct hantro_enc_core *core, struct file *f
 
 		}
 
-		pm_runtime_mark_last_busy(core->dev->dev);
 		pm_runtime_put_autosuspend(core->dev->dev);
 
 		wake_up_interruptible_all(&core->dev->hw_queue);
@@ -1299,7 +1298,6 @@ static int hantro_enc_init_cores(struct hantro_enc_device *encoder)
 		num_cores++;
 	}
 
-	pm_runtime_mark_last_busy(encoder->dev);
 	pm_runtime_put_autosuspend(encoder->dev);
 
 	if (!num_cores)
