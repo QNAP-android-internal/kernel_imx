@@ -336,6 +336,137 @@ imx952_dsi2_validate_phy(struct imx952_dsi2 *dsi, unsigned long pclk_rate,
 	return MODE_OK;
 }
 
+static const u8 adv7535_vics[] = {
+4, 16, 19, 31, 32, 33, 34, 68, 69, 72, 73, 74, 75, 76, };
+
+struct dmt_mini_mode {
+	int hdisplay;
+	int vdisplay;
+	int vrefresh;
+	bool rb;
+};
+
+static const struct dmt_mini_mode adv7535_valid_dmt_mini_modes[] = {
+	/* 0x09 - 800x600@60Hz */
+	{ 800, 600, 60, false },
+	/* 0x10 - 1024x768@60Hz */
+	{ 1024, 768, 60, false },
+	/* 0x1b - 1280x800@60Hz RB */
+	{ 1280, 800, 60, true },
+	/* 0x1c - 1280x800@60Hz */
+	{ 1280, 800, 60, false },
+	/* 0x52 - 1920x1080@60Hz */
+	{ 1920, 1080, 60, false },
+};
+
+static bool is_adv7535_valid_cea_mode(const struct drm_display_mode *mode)
+{
+	u8 vic;
+	int i;
+
+	vic = drm_match_cea_mode(mode);
+	if (vic > 0) {
+		for (i = 0; i < ARRAY_SIZE(adv7535_vics); i++) {
+			if (vic == adv7535_vics[i])
+				return true;
+		}
+	}
+
+	return false;
+}
+
+static bool check_vendor_dmt_mode(struct drm_device *drm,
+				  const struct drm_display_mode *mode,
+				  const struct dmt_mini_mode *dmt_mini_modes,
+				  int num_dmt_mini_modes)
+{
+	const struct dmt_mini_mode *mini_mode;
+	struct drm_display_mode *dmt_mode;
+	int i;
+
+	for (i = 0; i < num_dmt_mini_modes; i++) {
+		mini_mode = &dmt_mini_modes[i];
+
+		dmt_mode = drm_mode_find_dmt(drm,
+					     mini_mode->hdisplay,
+					     mini_mode->vdisplay,
+					     mini_mode->vrefresh,
+					     mini_mode->rb);
+		if (WARN_ON(!dmt_mode))
+			continue;
+
+		if (drm_mode_equal(dmt_mode, mode)) {
+			drm_mode_destroy(drm, dmt_mode);
+			return true;
+		}
+
+		drm_mode_destroy(drm, dmt_mode);
+	}
+
+	return false;
+}
+
+static bool is_adv7535_valid_dmt_mode(struct drm_device *drm,
+				      const struct drm_display_mode *mode)
+{
+	return check_vendor_dmt_mode(drm, mode, adv7535_valid_dmt_mini_modes,
+				     ARRAY_SIZE(adv7535_valid_dmt_mini_modes));
+}
+
+static const u8 dsi_serdes_vics[] = { 1, 2, 3, 16, 17, 18, 76, };
+
+static const struct dmt_mini_mode dsi_serdes_valid_dmt_mini_modes[] = {
+	/* 0x04 - 640x480@60Hz */
+	{ 640, 480, 60, false },
+	/* 0x09 - 800x600@60Hz */
+	{ 800, 600, 60, false },
+	/* 0x0b - 800x600@75Hz */
+	{ 800, 600, 75, false },
+	/* 0x10 - 1024x768@60Hz */
+	{ 1024, 768, 60, false },
+	/* 0x1b - 1280x800@60Hz RB */
+	{ 1280, 800, 60, true },
+};
+
+static bool is_dsi_serdes_valid_cea_mode(const struct drm_display_mode *mode)
+{
+	u8 vic;
+	int i;
+
+	vic = drm_match_cea_mode(mode);
+	if (vic > 0) {
+		for (i = 0; i < ARRAY_SIZE(dsi_serdes_vics); i++) {
+			if (vic == dsi_serdes_vics[i])
+				return true;
+		}
+	}
+
+	return false;
+}
+
+static bool is_dsi_serdes_valid_dmt_mode(struct drm_device *drm,
+					 const struct drm_display_mode *mode)
+{
+	return check_vendor_dmt_mode(drm, mode, dsi_serdes_valid_dmt_mini_modes,
+				     ARRAY_SIZE(dsi_serdes_valid_dmt_mini_modes));
+}
+
+static const struct dmt_mini_mode lt9611uxc_invalid_dmt_mini_modes[] = {
+	/* 0x1b - 1280x800@60Hz RB */
+	{ 1280, 800, 60, true },
+	/* 0x1c - 1280x800@60Hz */
+	{ 1280, 800, 60, false },
+	/* 0x51 - 1366x768@60Hz */
+	{ 1366, 768, 60, false },
+};
+
+static bool is_lt9611uxc_invalid_dmt_mode(struct drm_device *drm,
+					  const struct drm_display_mode *mode)
+{
+	return check_vendor_dmt_mode(drm, mode, lt9611uxc_invalid_dmt_mini_modes,
+				     ARRAY_SIZE(lt9611uxc_invalid_dmt_mini_modes));
+}
+
 static enum drm_mode_status
 imx952_dsi2_mode_valid(void *priv_data, const struct drm_display_mode *mode,
 		       unsigned long mode_flags, u32 lanes, u32 format)
@@ -347,7 +478,6 @@ imx952_dsi2_mode_valid(void *priv_data, const struct drm_display_mode *mode,
 	struct device *dev = dsi->dev;
 	struct drm_encoder *encoder;
 	enum drm_mode_status ret;
-	u8 vic;
 
 	bridge = dw_mipi_dsi2_get_bridge(dsi->dmd);
 	encoder = bridge->encoder;
@@ -357,18 +487,6 @@ imx952_dsi2_mode_valid(void *priv_data, const struct drm_display_mode *mode,
 		    !(iter->ops & DRM_BRIDGE_OP_EDID))
 			continue;
 
-		/*
-		 * Since clk_round_rate() returns unreasonable rate for
-		 * dsi->clk_pixel, we have to validate mode against magic mode
-		 * clock rates.
-		 */
-		if (mode->clock != 297000 && mode->clock != 148500 && mode->clock != 74250)
-			return MODE_NOCLOCK;
-
-		/* Allow VIC 94 & 95(3840x2160@25/30) for 4K */
-		vic = drm_match_cea_mode(mode);
-		if (mode->clock == 297000 && vic != 94 && vic != 95)
-			return MODE_BAD;
 
 		/* Allow +/-0.5% pixel clock rate deviation */
 		target_pclk_rate = clk_round_rate(dsi->clk_pixel, pclk_rate);
@@ -377,6 +495,41 @@ imx952_dsi2_mode_valid(void *priv_data, const struct drm_display_mode *mode,
 			dev_dbg(dev, "failed to round clock for mode " DRM_MODE_FMT "\n",
 				DRM_MODE_ARG(mode));
 			return MODE_NOCLOCK;
+		}
+
+		if (!iter->product)
+			break;
+
+		if (strcmp(iter->product, "ADV7535") == 0) {
+			bool vic_match, dmt_match = false;
+
+			vic_match = is_adv7535_valid_cea_mode(mode);
+
+			if (!vic_match)
+				dmt_match = is_adv7535_valid_dmt_mode(encoder->dev, mode);
+
+			if (!vic_match && !dmt_match)
+				return MODE_BAD;
+		} else if (strcmp(iter->product, "IT6263") == 0) {
+			bool vic_match, dmt_match = false;
+
+			vic_match = is_dsi_serdes_valid_cea_mode(mode);
+
+			if (!vic_match)
+				dmt_match = is_dsi_serdes_valid_dmt_mode(encoder->dev, mode);
+
+			if (!vic_match && !dmt_match)
+				return MODE_BAD;
+		} else if (strcmp(iter->product, "LT9611UXC") == 0) {
+			u8 vic;
+
+			/* Allow VIC 94 & 95(3840x2160@25/30) for 4K */
+			vic = drm_match_cea_mode(mode);
+			if (mode->clock == 297000 && vic != 94 && vic != 95)
+				return MODE_BAD;
+
+			if (is_lt9611uxc_invalid_dmt_mode(encoder->dev, mode))
+				return MODE_BAD;
 		}
 
 		break;
