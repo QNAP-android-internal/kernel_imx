@@ -313,6 +313,7 @@ struct imx952_mipi_dphy_priv {
 	/* clk provider */
 	struct clk_hw hw;
 	struct phy_pll_config cur_pll_cfg;
+	int submode;
 };
 
 struct phy_pll_vco30 {
@@ -917,7 +918,6 @@ imx952_mipi_dphy_static_configure(struct imx952_mipi_dphy_priv *priv)
 	writew(val, priv->regs + PPI_RW_COMMON_CFG);
 }
 
-#define MULTI_1_1(x)			((x) * 11 / 10)
 #define LPTX_EN_DLY			5
 #define D2A_HSTX_DLY			3
 
@@ -946,6 +946,12 @@ imx952_mipi_dphy_static_configure(struct imx952_mipi_dphy_priv *priv)
 
 #define LPTX_IO_SR0_FALL_DLY_PS		25000
 #define LPTX_IO_SR0_FALL_DLY_DIV2_PS	(LPTX_IO_SR0_FALL_DLY_PS / 2)
+
+static inline unsigned long
+multi(struct imx952_mipi_dphy_priv *priv, unsigned long x)
+{
+	return x * (priv->submode ? 55 : 11) / 10;
+}
 
 static void
 imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
@@ -1046,7 +1052,7 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(3, 10));
 
 	/* tlpx_dco_reg */
-	tlpx_dco_reg = T_DCO_MAX_NS_DIV_ROUND_UP(MULTI_1_1(T_LPX_NS_MIN)) - 1;
+	tlpx_dco_reg = T_DCO_MAX_NS_DIV_ROUND_UP(multi(priv, T_LPX_NS_MIN)) - 1;
 	val = HS_TX_4_TLPX_DCO_REG(tlpx_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 4));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 4));
@@ -1066,7 +1072,7 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 
 	/* hs_zero_reg */
 	hs_zero_ps = 145000 + 10 * ui - hs_prepare_dco_ps;
-	hs_zero_reg = DIV_ROUND_UP_ULL((MULTI_1_1(T_LPX_PS_MIN) + hs_prepare_dco_ps + hs_zero_ps +
+	hs_zero_reg = DIV_ROUND_UP_ULL((multi(priv, T_LPX_PS_MIN) + hs_prepare_dco_ps + hs_zero_ps +
 					T_DCO_MAX_PS_MULTI(5) - 3 * wordclk_period_ps),
 				       wordclk_period_ps) - 1;
 	val = HS_TX_1_THSZERO_REG(hs_zero_reg);
@@ -1103,7 +1109,7 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(3, 6));
 
 	/* hs_exit_dco_reg */
-	hs_exit_dco_reg = T_DCO_MAX_NS_DIV_ROUND_UP(MULTI_1_1(T_HS_EXIT_NS_MIN)) - 1;
+	hs_exit_dco_reg = T_DCO_MAX_NS_DIV_ROUND_UP(multi(priv, T_HS_EXIT_NS_MIN)) - 1;
 	val = HS_TX_12_THSEXIT_DCO_REG(hs_exit_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(0, 12));
 	writew(val, priv->regs + CORE_DIG_DLANE_RW_HS_TX(1, 12));
@@ -1127,8 +1133,8 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(9));
 
 	/* clk_zero_reg */
-	clk_zero_ps = MULTI_1_1(T_CLK_PREPARE_CLK_ZERO_PS_MIN - clk_prepare_dco_ps);
-	clk_zero_reg = DIV_ROUND_UP_ULL((MULTI_1_1(T_LPX_PS_MIN) + clk_prepare_dco_ps +
+	clk_zero_ps = multi(priv, T_CLK_PREPARE_CLK_ZERO_PS_MIN - clk_prepare_dco_ps);
+	clk_zero_reg = DIV_ROUND_UP_ULL((multi(priv, T_LPX_PS_MIN) + clk_prepare_dco_ps +
 		clk_zero_ps + T_DCO_MAX_PS_MULTI(5) - 3 * wordclk_period_ps), wordclk_period_ps)
 		- 1;
 	val = HS_TX_1_THSZERO_REG(clk_zero_reg);
@@ -1147,7 +1153,7 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	val = HS_TX_5_THSTRAIL_DCO_REG(clk_trail_dco_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(5));
 
-	clk_post_ps = MULTI_1_1(60000 + 52 * ui);
+	clk_post_ps = multi(priv, 60000 + 52 * ui);
 	clk_post_reg = DIV_ROUND_UP_ULL(clk_post_ps, wordclk_period_ps) - 3;
 	val = HS_TX_8_TCLKPOST_REG(clk_post_reg);
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(8));
@@ -1232,6 +1238,17 @@ imx952_mipi_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
 }
 
 static int
+imx952_mipi_dphy_set_mode(struct phy *phy, enum phy_mode mode, int submode)
+{
+	struct imx952_mipi_dphy_priv *priv = phy_get_drvdata(phy);
+
+	priv->submode = submode;
+	dev_dbg(priv->dev, "set submode %d\n", submode);
+
+	return 0;
+}
+
+static int
 imx952_mipi_dphy_validate(struct phy *phy, enum phy_mode mode, int submode,
 			  union phy_configure_opts *opts)
 {
@@ -1257,6 +1274,7 @@ static const struct phy_ops imx952_mipi_dphy_phy_ops = {
 	.init = imx952_mipi_dphy_init,
 	.exit = imx952_mipi_dphy_exit,
 	.power_off = imx952_mipi_dphy_power_off,
+	.set_mode = imx952_mipi_dphy_set_mode,
 	.configure = imx952_mipi_dphy_configure,
 	.validate = imx952_mipi_dphy_validate,
 	.owner = THIS_MODULE,
