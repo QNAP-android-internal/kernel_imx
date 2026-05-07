@@ -1056,7 +1056,6 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	/* hs_prepare_dco_reg */
 	hs_prepare_dco_ps = 40000 + 4 * ui +
 		DIV_ROUND_DOWN_ULL((85000 + 6 * ui) - (40000 + 4 * ui), 2);
-	hs_prepare_dco_ps = MULTI_1_1(hs_prepare_dco_ps);
 	hs_prepare_dco_reg =
 		T_DCO_CUSTOM_PS_DIV_ROUND_UP(hs_prepare_dco_ps + LPTX_IO_SR0_FALL_DLY_DIV2_PS) - 1;
 	val = HS_TX_9_THSPRPR_DCO_REG(hs_prepare_dco_reg);
@@ -1120,8 +1119,8 @@ imx952_mipi_dphy_dynamic_configure(struct imx952_mipi_dphy_priv *priv,
 	writew(val, priv->regs + CORE_DIG_DLANE_CLK_RW_HS_TX(4));
 
 	/* clk_prepare_dco_reg */
-	clk_prepare_dco_ps = MULTI_1_1(T_CLK_PREPARE_PS_MIN +
-		DIV_ROUND_DOWN_ULL(T_CLK_PREPARE_PS_MAX - T_CLK_PREPARE_PS_MIN, 2));
+	clk_prepare_dco_ps = T_CLK_PREPARE_PS_MIN +
+		DIV_ROUND_DOWN_ULL(T_CLK_PREPARE_PS_MAX - T_CLK_PREPARE_PS_MIN, 2);
 	clk_prepare_dco_reg =
 		T_DCO_CUSTOM_PS_DIV_ROUND_UP(clk_prepare_dco_ps + LPTX_IO_SR0_FALL_DLY_DIV2_PS) - 1;
 	val = HS_TX_9_THSPRPR_DCO_REG(clk_prepare_dco_reg);
