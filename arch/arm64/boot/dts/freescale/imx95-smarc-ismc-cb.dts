@@ -38,13 +38,6 @@
 		id-gpios = <&gpio5 2 GPIO_ACTIVE_HIGH>;
 	};
 
-	fan0: pwm-fan {
-		compatible = "pwm-fan";
-		#cooling-cells = <2>;
-		pwms = <&tpm6 2 4000000 PWM_POLARITY_INVERTED>;
-		cooling-levels = <64 128 192 255>;
-	};
-
 	reg_audio_pwr: regulator-audio-pwr {
 		compatible = "regulator-fixed";
 		regulator-name = "audio-pwr";
@@ -384,12 +377,6 @@
 		>;
 	};
 
-	pinctrl_tpm6: tpm6grp {
-		fsl,pins = <
-			IMX95_PAD_GPIO_IO19__TPM6_CH2			0x51e
-		>;
-	};
-
 	pinctrl_uart5: uart5grp {
 		fsl,pins = <
 			IMX95_PAD_DAP_TDO_TRACESWO__LPUART5_TX			0x31e
@@ -501,30 +488,7 @@
 			};
 		};
 
-		cooling-maps {
-			map1 {
-				trip = <&atrip2>;
-				cooling-device = <&fan0 0 1>;
-			};
-
-			map2 {
-				trip = <&atrip3>;
-				cooling-device = <&fan0 1 2>;
-			};
-
-			map3 {
-				trip = <&atrip4>;
-				cooling-device = <&fan0 2 3>;
-			};
-		};
 	};
-};
-
-&tpm6 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_tpm6>;
-	pwm-rst;
-	status = "okay";
 };
 
 &lpuart5 {
