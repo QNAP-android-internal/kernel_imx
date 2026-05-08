@@ -1867,8 +1867,6 @@ static int streamoff_output(struct vb2_queue *q)
 	/* Ensure that the irq_thread has been done */
 	wave5_vpu_disable_instance(inst);
 
-	wave5_return_bufs(v4l2_m2m_get_src_vq(inst->v4l2_fh.m2m_ctx), VB2_BUF_STATE_ERROR);
-
 	inst->seek_flag = true;
 	inst->next_frame = NULL;
 	v4l2_m2m_set_src_buffered(m2m_ctx, false);
@@ -1899,7 +1897,6 @@ static int streamoff_capture(struct vb2_queue *q)
 {
 	struct vpu_instance *inst = vb2_get_drv_priv(q);
 
-	wave5_return_bufs(v4l2_m2m_get_dst_vq(inst->v4l2_fh.m2m_ctx), VB2_BUF_STATE_ERROR);
 	v4l2_m2m_clear_state(inst->v4l2_fh.m2m_ctx);
 	inst->avail_dst_bufs = 0;
 
@@ -1921,7 +1918,7 @@ static void wave5_vpu_dec_stop_streaming(struct vb2_queue *q)
 				      inst->queued_dst_buf_num, inst->displayed_buf_num);
 
 	if (inst->state == VPU_INST_STATE_NONE)
-		return;
+		goto exit;
 
 	wave5_vpu_dec_wait_cq(inst);
 
@@ -1929,6 +1926,9 @@ static void wave5_vpu_dec_stop_streaming(struct vb2_queue *q)
 		streamoff_output(q);
 	else
 		streamoff_capture(q);
+
+exit:
+	wave5_return_bufs(v4l2_m2m_get_vq(inst->v4l2_fh.m2m_ctx, q->type), VB2_BUF_STATE_ERROR);
 }
 
 static int wave5_vpu_dec_buf_init(struct vb2_buffer *vb)
