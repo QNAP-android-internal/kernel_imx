@@ -2,7 +2,7 @@
 /*
  *
  * COPYRIGHT 2015-2023 ARM Limited. All rights reserved.
- * COPYRIGHT 2023, 2025 NXP
+ * COPYRIGHT 2023, 2025 - 2026 NXP
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -82,11 +82,6 @@ static int platform_init_func(struct kbase_device *kbdev)
 	ictx->kbdev = kbdev;
 	kbdev->platform_context = ictx;
 	imx_waveform_start(kbdev);
-
-#ifdef MALI_BUILD_BY
-	dev_info(kbdev->dev, "module built by %s at %s",
-			MALI_BUILD_BY, MALI_BUILD_TM);
-#endif
 
 	if (of_machine_is_compatible("fsl,imx952")) {
 		callbacks->power_runtime_on_callback = NULL;
