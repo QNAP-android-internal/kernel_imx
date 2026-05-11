@@ -60,6 +60,7 @@ struct imx952_dsi2 {
 	unsigned long target_pclk_rate;
 	unsigned long esc_clk_rate;
 	unsigned long mode_flags;
+	bool phy_submode;
 };
 
 static int imx952_dsi2_get_clk(struct imx952_dsi2 *dsi)
@@ -206,7 +207,7 @@ static int imx952_dsi2_phy_init(void *priv_data)
 		return -EINVAL;
 	}
 
-	ret = phy_set_mode(dsi->phy, PHY_MODE_MIPI_DPHY);
+	ret = phy_set_mode_ext(dsi->phy, PHY_MODE_MIPI_DPHY, dsi->phy_submode);
 	if (ret) {
 		dev_err(dsi->dev, "failed to set phy mode: %d\n", ret);
 		return ret;
@@ -510,6 +511,15 @@ imx952_dsi2_mode_valid(void *priv_data, const struct drm_display_mode *mode,
 
 			if (!vic_match && !dmt_match)
 				return MODE_BAD;
+
+			/*
+			 * For display modes with pixel clock running higher
+			 * than or equal to 40MHz, use PHY submode.  The PHY
+			 * submode condition check or the clock rate are subject
+			 * to update if more display modes are supported in the
+			 * future.
+			 */
+			dsi->phy_submode = mode->clock >= 40000;
 		} else if (strcmp(iter->product, "IT6263") == 0) {
 			bool vic_match, dmt_match = false;
 
