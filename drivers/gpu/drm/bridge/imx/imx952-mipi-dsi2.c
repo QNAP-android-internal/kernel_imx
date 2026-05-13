@@ -61,6 +61,7 @@ struct imx952_dsi2 {
 	unsigned long esc_clk_rate;
 	unsigned long mode_flags;
 	bool phy_submode;
+	bool hs2lp_lp2hs_quirk;
 };
 
 static int imx952_dsi2_get_clk(struct imx952_dsi2 *dsi)
@@ -339,6 +340,12 @@ imx952_dsi2_validate_phy(struct imx952_dsi2 *dsi, unsigned long pclk_rate,
 
 static const u8 adv7535_vics[] = {
 4, 16, 19, 31, 32, 33, 34, 68, 69, 72, 73, 74, 75, 76, };
+static const bool adv7535_vic_quirks[] = {
+	true, /* 4 */	true, /* 16 */	false,/* 19 */	true, /* 31 */
+	false,/* 32 */	false,/* 33 */	true, /* 34 */	false,/* 68 */
+	true, /* 69 */	false,/* 72 */	false,/* 73 */	true, /* 74 */
+	true, /* 75 */	true, /* 76 */
+};
 
 struct dmt_mini_mode {
 	int hdisplay;
@@ -360,16 +367,20 @@ static const struct dmt_mini_mode adv7535_valid_dmt_mini_modes[] = {
 	{ 1920, 1080, 60, false },
 };
 
-static bool is_adv7535_valid_cea_mode(const struct drm_display_mode *mode)
+static const bool adv7535_dmt_quirks[] = { true, false, true, true, true, };
+
+static bool is_adv7535_valid_cea_mode(const struct drm_display_mode *mode, int *i)
 {
 	u8 vic;
-	int i;
+	int j;
 
 	vic = drm_match_cea_mode(mode);
 	if (vic > 0) {
-		for (i = 0; i < ARRAY_SIZE(adv7535_vics); i++) {
-			if (vic == adv7535_vics[i])
+		for (j = 0; j < ARRAY_SIZE(adv7535_vics); j++) {
+			if (vic == adv7535_vics[j]) {
+				*i = j;
 				return true;
+			}
 		}
 	}
 
@@ -379,14 +390,14 @@ static bool is_adv7535_valid_cea_mode(const struct drm_display_mode *mode)
 static bool check_vendor_dmt_mode(struct drm_device *drm,
 				  const struct drm_display_mode *mode,
 				  const struct dmt_mini_mode *dmt_mini_modes,
-				  int num_dmt_mini_modes)
+				  int num_dmt_mini_modes, int *i)
 {
 	const struct dmt_mini_mode *mini_mode;
 	struct drm_display_mode *dmt_mode;
-	int i;
+	int j;
 
-	for (i = 0; i < num_dmt_mini_modes; i++) {
-		mini_mode = &dmt_mini_modes[i];
+	for (j = 0; j < num_dmt_mini_modes; j++) {
+		mini_mode = &dmt_mini_modes[j];
 
 		dmt_mode = drm_mode_find_dmt(drm,
 					     mini_mode->hdisplay,
@@ -398,6 +409,8 @@ static bool check_vendor_dmt_mode(struct drm_device *drm,
 
 		if (drm_mode_equal(dmt_mode, mode)) {
 			drm_mode_destroy(drm, dmt_mode);
+			if (i)
+				*i = j;
 			return true;
 		}
 
@@ -408,10 +421,12 @@ static bool check_vendor_dmt_mode(struct drm_device *drm,
 }
 
 static bool is_adv7535_valid_dmt_mode(struct drm_device *drm,
-				      const struct drm_display_mode *mode)
+				      const struct drm_display_mode *mode,
+				      int *i)
 {
 	return check_vendor_dmt_mode(drm, mode, adv7535_valid_dmt_mini_modes,
-				     ARRAY_SIZE(adv7535_valid_dmt_mini_modes));
+				     ARRAY_SIZE(adv7535_valid_dmt_mini_modes),
+				     i);
 }
 
 static const u8 dsi_serdes_vics[] = { 1, 2, 3, 16, 17, 18, 76, };
@@ -449,7 +464,8 @@ static bool is_dsi_serdes_valid_dmt_mode(struct drm_device *drm,
 					 const struct drm_display_mode *mode)
 {
 	return check_vendor_dmt_mode(drm, mode, dsi_serdes_valid_dmt_mini_modes,
-				     ARRAY_SIZE(dsi_serdes_valid_dmt_mini_modes));
+				     ARRAY_SIZE(dsi_serdes_valid_dmt_mini_modes),
+				     NULL);
 }
 
 static const struct dmt_mini_mode lt9611uxc_invalid_dmt_mini_modes[] = {
@@ -465,7 +481,8 @@ static bool is_lt9611uxc_invalid_dmt_mode(struct drm_device *drm,
 					  const struct drm_display_mode *mode)
 {
 	return check_vendor_dmt_mode(drm, mode, lt9611uxc_invalid_dmt_mini_modes,
-				     ARRAY_SIZE(lt9611uxc_invalid_dmt_mini_modes));
+				     ARRAY_SIZE(lt9611uxc_invalid_dmt_mini_modes),
+				     NULL);
 }
 
 static enum drm_mode_status
@@ -503,11 +520,17 @@ imx952_dsi2_mode_valid(void *priv_data, const struct drm_display_mode *mode,
 
 		if (strcmp(iter->product, "ADV7535") == 0) {
 			bool vic_match, dmt_match = false;
+			int i;
 
-			vic_match = is_adv7535_valid_cea_mode(mode);
+			vic_match = is_adv7535_valid_cea_mode(mode, &i);
 
-			if (!vic_match)
-				dmt_match = is_adv7535_valid_dmt_mode(encoder->dev, mode);
+			if (vic_match) {
+				dsi->hs2lp_lp2hs_quirk = adv7535_vic_quirks[i];
+			} else {
+				dmt_match = is_adv7535_valid_dmt_mode(encoder->dev, mode, &i);
+				if (dmt_match)
+					dsi->hs2lp_lp2hs_quirk = adv7535_dmt_quirks[i];
+			}
 
 			if (!vic_match && !dmt_match)
 				return MODE_BAD;
@@ -617,6 +640,14 @@ static int imx952_dsi2_phy_get_timing(void *priv_data, unsigned int lane_mbps,
 	struct imx952_dsi2 *dsi = priv_data;
 	unsigned int lp2hs_m, lp2hs_b;
 	unsigned int hs2lp_m, hs2lp_b;
+
+	if (dsi->hs2lp_lp2hs_quirk) {
+		timing->data_lp2hs = 0x10000;
+		timing->data_hs2lp = 0x10000;
+		dev_dbg(dsi->dev, "hs2lp_lp2hs_quirk\n");
+
+		return 0;
+	}
 
 	/* PHY_LP2HS/HS2LP_TIME = DIV_ROUND_UP((lane_mbps * m), 100) + b */
 	if (dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS) {
