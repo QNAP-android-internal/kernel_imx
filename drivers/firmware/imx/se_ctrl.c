@@ -189,7 +189,7 @@ static struct se_if_node_info_list imx95_info = {
 				.base_api_ver = MESSAGING_VERSION_6,
 				.fw_api_ver = MESSAGING_VERSION_7,
 			},
-			.reserved_dma_ranges = false,
+			.reserved_dma_ranges = true,
 			.start_rng = ele_start_rng,
 			.init_trng = ele_trng_init,
 			.se_if_early_init = NULL,
