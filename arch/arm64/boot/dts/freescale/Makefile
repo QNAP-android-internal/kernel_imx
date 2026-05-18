@@ -977,5 +977,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx8qm-mek-sof-cs42888.dtb imx8qm-mek-sof-wm8960.dtb \
 
 dtb-$(CONFIG_ARCH_MXC) += imx95-smarc-ismc-cb.dtb
 dtb-$(CONFIG_ARCH_MXC) += imx95-smarc-mipi2hdmi-lt9611.dtb
+dtb-$(CONFIG_ARCH_MXC) += imx95-smarc-mipi2hdmi-lt9611uxd-4k.dtb
 
 imx95-smarc-mipi2hdmi-lt9611-dtbs := imx95-smarc-ismc-cb.dtb imx95-smarc-mipi2hdmi-lt9611.dtbo
+imx95-smarc-mipi2hdmi-lt9611uxd-4k-dtbs := imx95-smarc-ismc-cb.dtb imx95-smarc-mipi2hdmi-lt9611uxd-4k.dtbo
