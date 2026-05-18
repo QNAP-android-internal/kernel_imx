@@ -162,4 +162,7 @@ int se_dump_to_logfl(struct se_if_device_ctx *dev_ctx,
 		     u8 caller_type, int buf_size,
 		     const char *buf, ...);
 char *get_se_if_name(u8 se_if_id);
+int get_shared_mem_slot(struct se_if_device_ctx *dev_ctx, u32 flags,
+			u32 length, dma_addr_t *ele_dma_addr, void **ptr);
+void se_dev_ctx_shared_mem_cleanup(struct se_if_device_ctx *dev_ctx);
 #endif

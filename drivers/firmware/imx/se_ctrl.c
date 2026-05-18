@@ -1262,7 +1262,7 @@ static int se_dev_ctx_cpy_out_data(struct se_if_device_ctx *dev_ctx)
  * whether its Input Data copied from user buffers, or
  * Data received from FW.
  */
-static void se_dev_ctx_shared_mem_cleanup(struct se_if_device_ctx *dev_ctx)
+void se_dev_ctx_shared_mem_cleanup(struct se_if_device_ctx *dev_ctx)
 {
 	struct se_shared_mem_mgmt_info *se_shared_mem_mgmt = &dev_ctx->se_shared_mem_mgmt;
 	struct list_head *pending_lists[] = {&se_shared_mem_mgmt->pending_in,
@@ -1372,17 +1372,17 @@ static int init_device_context(struct se_if_priv *priv, int ch_id,
 
 	*new_dev_ctx = dev_ctx;
 
+	ret = init_se_shared_mem(dev_ctx);
+	if (ret < 0) {
+		kfree(dev_ctx->devname);
+		kfree(dev_ctx);
+		*new_dev_ctx = NULL;
+		return ret;
+	}
+
 	if (ch_id) {
 		list_add_tail(&dev_ctx->link, &priv->dev_ctx_list);
 		priv->active_devctx_count++;
-
-		ret = init_se_shared_mem(dev_ctx);
-		if (ret < 0) {
-			kfree(dev_ctx->devname);
-			kfree(dev_ctx);
-			*new_dev_ctx = NULL;
-			return ret;
-		}
 
 		return ret;
 	}
@@ -1617,6 +1617,71 @@ exit:
 	return err;
 }
 
+int get_shared_mem_slot(struct se_if_device_ctx *dev_ctx, uint32_t flags,
+			u32 length, dma_addr_t *ele_dma_addr, void **ptr)
+{
+	struct se_shared_mem *shared_mem = NULL;
+	u32 pos;
+
+	/* Select the shared memory to be used for this buffer. */
+	if (flags & SE_IO_BUF_FLAGS_USE_MU_BUF)
+		shared_mem = &dev_ctx->priv->mu_mem;
+	else {
+		if ((flags & SE_IO_BUF_FLAGS_USE_SEC_MEM) &&
+		    (dev_ctx->priv->flags & SCU_MEM_CFG)) {
+			/* App requires to use secure memory for this buffer.*/
+			shared_mem = &dev_ctx->se_shared_mem_mgmt.secure_mem;
+		} else {
+			/* No specific requirement for this buffer. */
+			shared_mem = &dev_ctx->se_shared_mem_mgmt.non_secure_mem;
+		}
+	}
+	/* Check there is enough space in the shared memory. */
+	dev_dbg(dev_ctx->priv->dev,
+		"%s: req_size = %d, max_size= %d, curr_pos = %d",
+		dev_ctx->devname,
+		round_up(length, 8u),
+		shared_mem->size, shared_mem->pos);
+
+	if (shared_mem->size < shared_mem->pos ||
+		round_up(length, 8u) > (shared_mem->size - shared_mem->pos)) {
+		dev_err(dev_ctx->priv->dev,
+			"%s: Not enough space in shared memory\n",
+			dev_ctx->devname);
+		if (flags & SE_IO_BUF_FLAGS_RESET_ON_ERROR) {
+			if (shared_mem->pos)
+				memset_io(shared_mem->ptr, 0, shared_mem->pos);
+			else
+				memset(shared_mem->ptr, 0, shared_mem->pos);
+
+			shared_mem->pos = 0;
+		}
+		return -ENOMEM;
+	}
+
+	/* Allocate space in shared memory. 8 bytes aligned. */
+	pos = shared_mem->pos;
+	shared_mem->pos += round_up(length, 8u);
+	*ele_dma_addr = (u64)shared_mem->dma_addr + pos;
+	*ptr = shared_mem->ptr + pos;
+
+	if (dev_ctx->priv->flags & SCU_MEM_CFG) {
+		if ((flags & SE_IO_BUF_FLAGS_USE_SEC_MEM) &&
+		    !(flags & SE_IO_BUF_FLAGS_USE_SHORT_ADDR)) {
+			/*Add base address to get full address.#TODO: Add API*/
+			*ele_dma_addr += SECURE_RAM_BASE_ADDRESS_SCU;
+			*ptr += SECURE_RAM_BASE_ADDRESS_SCU;
+		}
+	}
+
+	if (dev_ctx->priv->mu_mem.pos)
+		memset_io(shared_mem->ptr + pos, 0, length);
+	else
+		memset(shared_mem->ptr + pos, 0, length);
+
+	return 0;
+}
+
 /*
  * Copy a buffer of data to/from the user and return the address to use in
  * messages
@@ -1624,10 +1689,9 @@ exit:
 static int se_ioctl_setup_iobuf_handler(struct se_if_device_ctx *dev_ctx,
 					u64 arg)
 {
-	struct se_shared_mem *shared_mem = NULL;
+	void *dma_buf_ptr = NULL;
 	struct se_ioctl_setup_iobuf io = {0};
 	int err = 0;
-	u32 pos;
 
 	if (copy_from_user(&io, (u8 __user *)arg, sizeof(io))) {
 		dev_err(dev_ctx->priv->dev,
@@ -1653,61 +1717,9 @@ static int se_ioctl_setup_iobuf_handler(struct se_if_device_ctx *dev_ctx,
 		goto copy;
 	}
 
-	/* Select the shared memory to be used for this buffer. */
-	if (io.flags & SE_IO_BUF_FLAGS_USE_MU_BUF)
-		shared_mem = &dev_ctx->priv->mu_mem;
-	else {
-		if ((io.flags & SE_IO_BUF_FLAGS_USE_SEC_MEM) &&
-				(dev_ctx->priv->flags & SCU_MEM_CFG)) {
-			/* App requires to use secure memory for this buffer.*/
-			shared_mem = &dev_ctx->se_shared_mem_mgmt.secure_mem;
-		} else {
-			/* No specific requirement for this buffer. */
-			shared_mem = &dev_ctx->se_shared_mem_mgmt.non_secure_mem;
-		}
-	}
-
-	/* Check there is enough space in the shared memory. */
-	dev_dbg(dev_ctx->priv->dev,
-		"%s: req_size = %d, max_size= %d, curr_pos = %d",
-		dev_ctx->devname,
-		round_up(io.length, 8u),
-		shared_mem->size, shared_mem->pos);
-
-	if (shared_mem->size < shared_mem->pos ||
-		round_up(io.length, 8u) > (shared_mem->size - shared_mem->pos)) {
-		dev_err(dev_ctx->priv->dev,
-			"%s: Not enough space in shared memory\n",
-			dev_ctx->devname);
-		if (io.flags & SE_IO_BUF_FLAGS_RESET_ON_ERROR) {
-			if (shared_mem->pos)
-				memset_io(shared_mem->ptr, 0, shared_mem->pos);
-			else
-				memset(shared_mem->ptr, 0, shared_mem->pos);
-
-			shared_mem->pos = 0;
-		}
-		err = -ENOMEM;
+	err = get_shared_mem_slot(dev_ctx, io.flags, io.length, &io.ele_addr, &dma_buf_ptr);
+	if (err)
 		goto exit;
-	}
-
-	/* Allocate space in shared memory. 8 bytes aligned. */
-	pos = shared_mem->pos;
-	shared_mem->pos += round_up(io.length, 8u);
-	io.ele_addr = (u64)shared_mem->dma_addr + pos;
-
-	if (dev_ctx->priv->flags & SCU_MEM_CFG) {
-		if ((io.flags & SE_IO_BUF_FLAGS_USE_SEC_MEM) &&
-				!(io.flags & SE_IO_BUF_FLAGS_USE_SHORT_ADDR)) {
-			/*Add base address to get full address.#TODO: Add API*/
-			io.ele_addr += SECURE_RAM_BASE_ADDRESS_SCU;
-		}
-	}
-
-	if (dev_ctx->priv->mu_mem.pos)
-		memset_io(shared_mem->ptr + pos, 0, io.length);
-	else
-		memset(shared_mem->ptr + pos, 0, io.length);
 
 	if ((io.flags & SE_IO_BUF_FLAGS_IS_INPUT) ||
 	    (io.flags & SE_IO_BUF_FLAGS_IS_IN_OUT)) {
@@ -1715,7 +1727,7 @@ static int se_ioctl_setup_iobuf_handler(struct se_if_device_ctx *dev_ctx,
 		 * buffer is input:
 		 * copy data from user space to this allocated buffer.
 		 */
-		if (copy_from_user(shared_mem->ptr + pos, io.user_buf,
+		if (copy_from_user(dma_buf_ptr, io.user_buf,
 				   io.length)) {
 			dev_err(dev_ctx->priv->dev,
 				"%s: Failed copy data to shared memory\n",
@@ -1725,7 +1737,7 @@ static int se_ioctl_setup_iobuf_handler(struct se_if_device_ctx *dev_ctx,
 		}
 	}
 
-	err = add_b_desc_to_pending_list(shared_mem->ptr + pos,
+	err = add_b_desc_to_pending_list(dma_buf_ptr,
 					 &io,
 					 dev_ctx);
 	if (err < 0)
