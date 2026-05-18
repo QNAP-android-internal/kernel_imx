@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2026 Jason Yang <jasonyang@ieiworld.com>
+ *
+ * DPU clock override for 4K resolution output via LT9611UXD
+ */
+
+/dts-v1/;
+/plugin/;
+
+&dpu {
+	assigned-clock-rates = <0>, <2673000000>, <297000000>;
+};
