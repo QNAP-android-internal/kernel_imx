@@ -433,11 +433,11 @@ static long hantro_dec_push_regs(struct hantro_dec_interface *iface, struct core
 	 * before enabling the decoder.
 	 */
 	wmb();
-	hantro_dec_writel(core, reg_buf[1], 4);
 	scoped_guard(spinlock_irqsave, &core->lock) {
 		core->is_enabled = 1;
 		hantro_dec_update_mirror_regs(core);
 	}
+	hantro_dec_writel(core, reg_buf[1], 4);
 
 	if (core->format < DWL_CLIENT_TYPE_MAX)
 		core->frame_num[core->format]++;
