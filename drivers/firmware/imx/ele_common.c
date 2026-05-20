@@ -32,6 +32,7 @@ int ele_msg_rcv(struct se_if_device_ctx *dev_ctx,
 {
 	struct se_if_priv *priv = dev_ctx->priv;
 	bool wait_timeout_enabled = true;
+	unsigned long flags;
 	unsigned int wait;
 	int err;
 
@@ -65,9 +66,18 @@ int ele_msg_rcv(struct se_if_device_ctx *dev_ctx,
 		}
 		if (err == 0) {
 			if (wait_timeout_enabled) {
+				/*
+				 * Take the lock so that a concurrently-running
+				 * se_if_rx_callback() that already snapshot a
+				 * valid rx_msg finishes its memcpy before we
+				 * return and the caller frees the buffer.
+				 */
+				spin_lock_irqsave(&priv->clbk_rx_lock, flags);
+				se_clbk_hdl->rx_msg = NULL;
+				spin_unlock_irqrestore(&priv->clbk_rx_lock, flags);
 				err = -ETIMEDOUT;
 				dev_err(priv->dev,
-					"Fatal Error: SE interface: %s%d, hangs indefinitely.\n",
+					"Could be fatal error: SE interface: %s%d, hung.\n",
 					get_se_if_name(priv->if_defs->se_if_type),
 					priv->if_defs->se_instance_id);
 			}
@@ -139,8 +149,12 @@ int ele_msg_send_rcv(struct se_if_device_ctx *dev_ctx,
 
 	/* Capture request timer */
 	ktime_get_raw_ts64(&dev_ctx->time_frame.t_start);
+
+	reinit_completion(&priv->waiting_rsp_clbk_hdl.done);
+
 	priv->waiting_rsp_clbk_hdl.dev_ctx = dev_ctx;
 	priv->waiting_rsp_clbk_hdl.rx_msg_sz = exp_rx_msg_sz;
+
 	priv->waiting_rsp_clbk_hdl.rx_msg = rx_msg;
 
 	err = ele_msg_send(dev_ctx, tx_msg, tx_msg_sz);
@@ -154,14 +168,15 @@ int ele_msg_send_rcv(struct se_if_device_ctx *dev_ctx,
 		priv->waiting_rsp_clbk_hdl.signal_rcvd = false;
 		dev_err(priv->dev,
 			"%s: Err[0x%x]:Interrupted by signal.\n",
-			dev_ctx->devname,
-			err);
+			dev_ctx->devname, err);
 	}
-	priv->waiting_rsp_clbk_hdl.dev_ctx = NULL;
 
 	/* Capture response timer */
 	ktime_get_raw_ts64(&dev_ctx->time_frame.t_end);
 exit:
+	priv->waiting_rsp_clbk_hdl.rx_msg = NULL;
+	priv->waiting_rsp_clbk_hdl.dev_ctx = NULL;
+
 	if (do_unlock)
 		se_halt_to_enforce_msg_seq_flow(&priv->se_msg_sq_ctl);
 
@@ -195,6 +210,7 @@ void se_if_rx_callback(struct mbox_client *mbox_cl, void *msg)
 	struct device *dev = mbox_cl->dev;
 	struct se_msg_hdr *header;
 	struct se_if_priv *priv;
+	unsigned long flags;
 	u32 rx_msg_sz;
 
 	priv = dev_get_drvdata(dev);
@@ -242,31 +258,46 @@ void se_if_rx_callback(struct mbox_client *mbox_cl, void *msg)
 			se_clbk_hdl->rx_msg_sz = MAX_NVM_MSG_LEN;
 		}
 		se_clbk_hdl->rx_msg_sz = rx_msg_sz;
-
+		memcpy(se_clbk_hdl->rx_msg, msg, se_clbk_hdl->rx_msg_sz);
 	} else if (header->tag == priv->if_defs->rsp_tag) {
+		/* Size mismatch expected. */
+		bool sz_mismatch = exception_for_size(priv, header);
+		u32 exp_rx_msg_sz = 0;
+
 		se_clbk_hdl = &priv->waiting_rsp_clbk_hdl;
+		spin_lock_irqsave(&priv->clbk_rx_lock, flags);
+		if (!se_clbk_hdl->rx_msg) {
+			spin_unlock_irqrestore(&priv->clbk_rx_lock, flags);
+			return;
+		}
+
 		dev_dbg(dev,
 			"Selecting resp waiter:%s for mesg header:0x%x.",
 			se_clbk_hdl->dev_ctx->devname,
 			*(u32 *) header);
 
-		if (rx_msg_sz != se_clbk_hdl->rx_msg_sz
-				&& !exception_for_size(priv, header)) {
+		if (rx_msg_sz != se_clbk_hdl->rx_msg_sz && !sz_mismatch) {
+			/* Printing size mismatch error message out of spin-lock */
+			sz_mismatch = true;
+			exp_rx_msg_sz = se_clbk_hdl->rx_msg_sz;
+
+			se_clbk_hdl->rx_msg_sz = min(rx_msg_sz, se_clbk_hdl->rx_msg_sz);
+		}
+		memcpy(se_clbk_hdl->rx_msg, msg, se_clbk_hdl->rx_msg_sz);
+		spin_unlock_irqrestore(&priv->clbk_rx_lock, flags);
+
+		if (sz_mismatch && exp_rx_msg_sz)
 			dev_err(dev,
 				"%s: Rsp to CMD: hdr(0x%x) with different sz(%d != %d).\n",
 				se_clbk_hdl->dev_ctx->devname,
 				*(u32 *) header,
-				rx_msg_sz, se_clbk_hdl->rx_msg_sz);
+				rx_msg_sz, exp_rx_msg_sz);
 
-			se_clbk_hdl->rx_msg_sz = min(rx_msg_sz, se_clbk_hdl->rx_msg_sz);
-		}
 	} else {
 		dev_err(dev, "Failed to select a device for message: %.8x\n",
 			*((u32 *) header));
 		return;
 	}
-
-	memcpy(se_clbk_hdl->rx_msg, msg, se_clbk_hdl->rx_msg_sz);
 
 	/* Allow user to read */
 	complete(&se_clbk_hdl->done);

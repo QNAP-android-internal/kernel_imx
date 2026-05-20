@@ -129,6 +129,13 @@ struct se_if_priv {
 	 */
 	struct se_clbk_handle waiting_rsp_clbk_hdl;
 	/*
+	 * Serialise the timeout path in ele_msg_rcv() against
+	 * se_if_rx_callback() so that the callback can never
+	 * memcpy into a buffer that the timeout path has already
+	 * freed.
+	 */
+	spinlock_t clbk_rx_lock;
+	/*
 	 * prevent new command to be sent on the se interface while previous
 	 * command is still processing. (response is awaited)
 	 */
