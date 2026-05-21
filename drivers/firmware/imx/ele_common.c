@@ -74,12 +74,22 @@ int ele_msg_rcv(struct se_if_device_ctx *dev_ctx,
 				 */
 				spin_lock_irqsave(&priv->clbk_rx_lock, flags);
 				se_clbk_hdl->rx_msg = NULL;
+				/*
+				 * Open circuit breaker: reject future commands until ELE responds.
+				 */
+				if (!completion_done(&se_clbk_hdl->done))
+					atomic_set(&priv->fw_busy, 1);
 				spin_unlock_irqrestore(&priv->clbk_rx_lock, flags);
+				/*
+				 * Increment timeout counter for telemetry.
+				 */
+				atomic_inc(&priv->timeout_count);
 				err = -ETIMEDOUT;
 				dev_err(priv->dev,
-					"Could be fatal error: SE interface: %s%d, hung.\n",
+					"Could be fatal error: SE interface: %s%d, hung (timeout #%d).\n",
 					get_se_if_name(priv->if_defs->se_if_type),
-					priv->if_defs->se_instance_id);
+					priv->if_defs->se_instance_id,
+					atomic_read(&priv->timeout_count));
 			}
 			break;
 		}
@@ -146,6 +156,14 @@ int ele_msg_send_rcv(struct se_if_device_ctx *dev_ctx,
 	do_unlock = se_qualify_msg_seq_flow(&priv->se_msg_sq_ctl, tx_msg);
 
 	guard(mutex)(&priv->se_if_cmd_lock);
+
+	if (atomic_read(&priv->fw_busy)) {
+		dev_dbg(priv->dev, "%s: ELE became unresponsive while waiting for mutex\n",
+			dev_ctx->devname);
+		if (do_unlock)
+			se_halt_to_enforce_msg_seq_flow(&priv->se_msg_sq_ctl);
+		return -EBUSY;
+	}
 
 	/* Capture request timer */
 	ktime_get_raw_ts64(&dev_ctx->time_frame.t_start);
@@ -259,6 +277,7 @@ void se_if_rx_callback(struct mbox_client *mbox_cl, void *msg)
 		}
 		se_clbk_hdl->rx_msg_sz = rx_msg_sz;
 		memcpy(se_clbk_hdl->rx_msg, msg, se_clbk_hdl->rx_msg_sz);
+		complete(&se_clbk_hdl->done);
 	} else if (header->tag == priv->if_defs->rsp_tag) {
 		/* Size mismatch expected. */
 		bool sz_mismatch = exception_for_size(priv, header);
@@ -267,7 +286,14 @@ void se_if_rx_callback(struct mbox_client *mbox_cl, void *msg)
 		se_clbk_hdl = &priv->waiting_rsp_clbk_hdl;
 		spin_lock_irqsave(&priv->clbk_rx_lock, flags);
 		if (!se_clbk_hdl->rx_msg) {
+			/* Close circuit breaker on spinlock race */
+			atomic_set(&priv->fw_busy, 0);
 			spin_unlock_irqrestore(&priv->clbk_rx_lock, flags);
+
+			atomic_inc(&priv->recovery_count);
+			dev_info(dev, "ELE responded (late), "
+				 "closing circuit breaker (recovery #%d).\n",
+				 atomic_read(&priv->recovery_count));
 			return;
 		}
 
@@ -284,6 +310,7 @@ void se_if_rx_callback(struct mbox_client *mbox_cl, void *msg)
 			se_clbk_hdl->rx_msg_sz = min(rx_msg_sz, se_clbk_hdl->rx_msg_sz);
 		}
 		memcpy(se_clbk_hdl->rx_msg, msg, se_clbk_hdl->rx_msg_sz);
+		complete(&se_clbk_hdl->done);
 		spin_unlock_irqrestore(&priv->clbk_rx_lock, flags);
 
 		if (sz_mismatch && exp_rx_msg_sz)
@@ -292,15 +319,10 @@ void se_if_rx_callback(struct mbox_client *mbox_cl, void *msg)
 				se_clbk_hdl->dev_ctx->devname,
 				*(u32 *) header,
 				rx_msg_sz, exp_rx_msg_sz);
-
 	} else {
 		dev_err(dev, "Failed to select a device for message: %.8x\n",
 			*((u32 *) header));
-		return;
 	}
-
-	/* Allow user to read */
-	complete(&se_clbk_hdl->done);
 }
 
 int se_val_rsp_hdr_n_status(struct se_if_priv *priv,

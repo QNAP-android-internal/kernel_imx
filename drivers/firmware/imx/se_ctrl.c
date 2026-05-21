@@ -2332,6 +2332,11 @@ static int se_if_probe(struct platform_device *pdev)
 	spin_lock_init(&priv->clbk_rx_lock);
 	mutex_init(&priv->se_msg_sq_ctl.se_msg_sq_lk);
 
+	/* Initialize circuit breaker state */
+	atomic_set(&priv->fw_busy, 0);
+	atomic_set(&priv->timeout_count, 0);
+	atomic_set(&priv->recovery_count, 0);
+
 	init_completion(&priv->waiting_rsp_clbk_hdl.done);
 	init_completion(&priv->cmd_receiver_clbk_hdl.done);
 

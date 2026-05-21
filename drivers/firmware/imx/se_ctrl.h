@@ -140,6 +140,12 @@ struct se_if_priv {
 	 * command is still processing. (response is awaited)
 	 */
 	struct mutex se_if_cmd_lock;
+	/*
+	 * Circuit breaker: set on timeout, cleared when ELE responds.
+	 * Prevents hammering ELE when it's overloaded (OP-TEE contention).
+	 * Accessed from both process and ISR context → use atomic ops.
+	 */
+	atomic_t fw_busy;
 	struct se_msg_seq_ctrl se_msg_sq_ctl;
 
 	struct mbox_client se_mb_cl;
@@ -157,6 +163,15 @@ struct se_if_priv {
 	struct list_head dev_ctx_list;
 	u32 active_devctx_count;
 	u32 dev_ctx_mono_count;
+
+	/*
+	 * Telemetry: track timeout and recovery events.
+	 * timeout_count: incremented each time a command times out
+	 * recovery_count: incremented each time circuit breaker closes
+	 * Accessed from both process and ISR context → use atomic_t
+	 */
+	atomic_t timeout_count;
+	atomic_t recovery_count;
 };
 
 #define SE_DUMP_IOCTL_BUFS	0
