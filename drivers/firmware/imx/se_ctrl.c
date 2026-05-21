@@ -567,6 +567,64 @@ static const struct of_device_id se_match[] = {
 	{},
 };
 
+/* Device attribute show/store functions */
+static ssize_t timeout_count_show(struct device *dev,
+				  struct device_attribute *attr,
+				  char *buf)
+{
+	struct se_if_priv *priv = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%u\n", atomic_read(&priv->timeout_count));
+}
+
+static DEVICE_ATTR_RO(timeout_count);
+
+static ssize_t recovery_count_show(struct device *dev,
+				   struct device_attribute *attr,
+				   char *buf)
+{
+	struct se_if_priv *priv = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%u\n", atomic_read(&priv->recovery_count));
+}
+static DEVICE_ATTR_RO(recovery_count);
+
+static ssize_t circuit_breaker_state_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	struct se_if_priv *priv = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%s\n", atomic_read(&priv->fw_busy) ? "open" : "closed");
+}
+static DEVICE_ATTR_RO(circuit_breaker_state);
+
+static ssize_t circuit_breaker_reset_store(struct device *dev,
+					   struct device_attribute *attr,
+					   const char *buf, size_t count)
+{
+	struct se_if_priv *priv = dev_get_drvdata(dev);
+
+	atomic_set(&priv->fw_busy, 0);
+	dev_info(dev, "Circuit breaker manually reset\n");
+
+	return count;
+}
+static DEVICE_ATTR_WO(circuit_breaker_reset);
+
+static struct attribute *se_dev_attrs[] = {
+	&dev_attr_timeout_count.attr,
+	&dev_attr_recovery_count.attr,
+	&dev_attr_circuit_breaker_state.attr,
+	&dev_attr_circuit_breaker_reset.attr,
+	NULL,
+};
+
+static const struct attribute_group se_dev_attr_group = {
+	.attrs = se_dev_attrs,
+	.name = "ele_stats",  /* Creates a subdirectory */
+};
+
 char *get_se_if_name(u8 se_if_id)
 {
 	switch (se_if_id) {
@@ -2186,6 +2244,8 @@ static void se_if_probe_cleanup(void *plat_dev)
 	priv = dev_get_drvdata(dev);
 	load_fw = get_load_fw_instance(priv);
 
+	sysfs_remove_group(&dev->kobj, &se_dev_attr_group);
+
 	/* Cancel work if it exists */
 	cancel_work_sync(&se_fw_load_work);
 
@@ -2300,6 +2360,12 @@ static int se_if_probe(struct platform_device *pdev)
 	if (ret)
 		goto exit;
 
+	/* Create device attribute group */
+	ret = sysfs_create_group(&dev->kobj, &se_dev_attr_group);
+	if (ret) {
+		dev_warn(dev, "Failed to create sysfs group: %d\n", ret);
+		/* Non-fatal, continue */
+	}
 
 	/* Mailbox client configuration */
 	priv->se_mb_cl.dev		= dev;
