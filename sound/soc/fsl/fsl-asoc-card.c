@@ -981,7 +981,7 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 		priv->card_type = CARD_WM8524;
 	} else if (of_device_is_compatible(np, "fsl,imx-audio-max98090")) {
 		codec_dai_name[0] = "max98090-HiFi";
-		priv->dai_fmt |= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS;
+		priv->dai_fmt |= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBC_CFC;
 		priv->codec_priv[0].fll_id = 0;
 		priv->codec_priv[0].pll_id = 0;
 		priv->card.dapm_routes = NULL;
@@ -1012,7 +1012,7 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 		codec_dai_name[0] = "rt5670-aif1";
 		priv->codec_priv[0].fll_id = 0;
 		priv->codec_priv[0].pll_id = 0;
-		priv->dai_fmt |= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS;
+		priv->dai_fmt |= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBC_CFC;
 		priv->card.dapm_routes = NULL;
 		priv->card.num_dapm_routes = 0;
 		priv->card_type = CARD_ALC5672;
