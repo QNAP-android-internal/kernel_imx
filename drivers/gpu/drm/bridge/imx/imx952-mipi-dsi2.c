@@ -59,7 +59,7 @@ struct imx952_dsi2 {
 	union phy_configure_opts phy_cfg;
 	unsigned long esc_clk_rate;
 	unsigned long mode_flags;
-	bool phy_submode;
+	int phy_submode;
 	bool hs2lp_lp2hs_quirk;
 };
 
@@ -367,6 +367,8 @@ static const struct dmt_mini_mode adv7535_valid_dmt_mini_modes[] = {
 };
 
 static const bool adv7535_dmt_quirks[] = { true, false, true, true, true, };
+/* PHY multiplication factor x10 */
+static const int adv7535_dmt_phy_submodes[] = { 55, 55, 60, 55, 55, };
 
 static bool is_adv7535_valid_cea_mode(const struct drm_display_mode *mode, int *i)
 {
@@ -523,13 +525,14 @@ static int imx952_dsi2_get_target_pclk_rate(struct imx952_dsi2 *dsi,
 static enum drm_mode_status
 imx952_dsi2_mode_valid_downstream_bridge(struct imx952_dsi2 *dsi,
 					 const struct drm_display_mode *mode,
-					 bool *phy_submode,
+					 int *phy_submode,
 					 bool *hs2lp_lp2hs_quirk)
 {
 	struct drm_bridge *bridge, *iter;
 	struct drm_encoder *encoder;
 
-	*phy_submode = false;
+	/* PHY multiplication factor 1.1 */
+	*phy_submode = 11;
 	*hs2lp_lp2hs_quirk = false;
 
 	bridge = dw_mipi_dsi2_get_bridge(dsi->dmd);
@@ -551,23 +554,19 @@ imx952_dsi2_mode_valid_downstream_bridge(struct imx952_dsi2 *dsi,
 
 			if (vic_match) {
 				*hs2lp_lp2hs_quirk = adv7535_vic_quirks[i];
+
+				/* PHY multiplication factor 5.5 */
+				*phy_submode = 55;
 			} else {
 				dmt_match = is_adv7535_valid_dmt_mode(encoder->dev, mode, &i);
-				if (dmt_match)
+				if (dmt_match) {
 					*hs2lp_lp2hs_quirk = adv7535_dmt_quirks[i];
+					*phy_submode = adv7535_dmt_phy_submodes[i];
+				}
 			}
 
 			if (!vic_match && !dmt_match)
 				return MODE_BAD;
-
-			/*
-			 * For display modes with pixel clock running higher
-			 * than or equal to 40MHz, use PHY submode.  The PHY
-			 * submode condition check or the clock rate are subject
-			 * to update if more display modes are supported in the
-			 * future.
-			 */
-			*phy_submode = mode->clock >= 40000;
 		} else if (strcmp(iter->product, "IT6263") == 0) {
 			bool vic_match, dmt_match = false;
 
@@ -605,7 +604,7 @@ imx952_dsi2_mode_valid(void *priv_data, const struct drm_display_mode *mode,
 	struct device *dev = dsi->dev;
 	enum drm_mode_status ret;
 	bool hs2lp_lp2hs_quirk;
-	bool phy_submode;
+	int phy_submode;
 	int err;
 
 	err = imx952_dsi2_get_target_pclk_rate(dsi, mode, &target_pclk_rate);
