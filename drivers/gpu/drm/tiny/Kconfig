@@ -188,6 +188,22 @@ config TINYDRM_PIXPAPER
 
 	  If M is selected, the module will be built as pixpaper.ko.
 
+config TINYDRM_PIXPAPER213M
+        tristate "DRM support for PIXPAPER 2.13 monochrome display panel"
+        depends on DRM && SPI
+        depends on MMU
+        select DRM_CLIENT_SELECTION
+        select DRM_GEM_SHMEM_HELPER
+        select DRM_KMS_HELPER
+        help
+          DRM driver for the Mayqueen Pixpaper 2.13 monochrome e-ink
+          display panel.
+
+          This driver supports SPI-connected 122x250 monochrome panels
+          with an XRGB8888 framebuffer input format.
+
+          If M is selected, the module will be built as pixpaper-213m.ko.
+
 config TINYDRM_PIXPAPER426M
 	tristate "DRM support for PIXPAPER426M display panels"
 	depends on DRM && SPI
