@@ -214,7 +214,7 @@
 		compatible = "lontium,lt9611uxd";
 		reg = <0x41>;
 		interrupts-extended = <&gpio5 1 IRQ_TYPE_EDGE_FALLING>;
-		reset-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
 		vdd-supply = <&lt9611uxd_1v2>;
 		vcc-supply = <&lt9611uxd_3v3>;
 
@@ -654,7 +654,7 @@
 
 	pinctrl_lt9611uxd: lt9611uxdgrp {
 		fsl,pins = <
-			IMX95_PAD_SAI1_TXD0__AONMIX_TOP_GPIO1_IO_BIT13		0x31e
+			IMX95_PAD_SAI1_TXC__AONMIX_TOP_GPIO1_IO_BIT12		0x31e
 			IMX95_PAD_XSPI1_DATA1__GPIO5_IO_BIT1			0x31e
 		>;
 	};
