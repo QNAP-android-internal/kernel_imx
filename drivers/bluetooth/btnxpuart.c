@@ -365,7 +365,7 @@ static u8 crc8_table[CRC8_TABLE_SIZE];
 
 /* Default configurations */
 #define DEFAULT_H2C_WAKEUP_MODE	WAKEUP_METHOD_BREAK
-#define DEFAULT_PS_MODE		PS_MODE_ENABLE
+#define DEFAULT_PS_MODE		PS_MODE_DISABLE
 #define FW_INIT_BAUDRATE	HCI_NXP_PRI_BAUDRATE
 
 static struct sk_buff *nxp_drv_send_cmd(struct hci_dev *hdev, u16 opcode,
@@ -725,7 +725,7 @@ static void ps_init(struct hci_dev *hdev)
 		break;
 	}
 
-	psdata->cur_psmode = PS_MODE_DISABLE;
+	psdata->cur_psmode = PS_MODE_ENABLE;
 	psdata->target_ps_mode = DEFAULT_PS_MODE;
 }
 
