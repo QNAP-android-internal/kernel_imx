@@ -13,10 +13,7 @@
 	compatible = "iei,imx95-smarc", "fsl,imx95-19x19-evk", "fsl,imx95";
 
 	aliases {
-		mmc0 = &usdhc1;
 		mmc1 = &usdhc2;
-		serial0 = &lpuart1;
-		ethernet0 = &enetc_port0;
 	};
 
 	chosen {
