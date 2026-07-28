@@ -20,6 +20,13 @@
 #define BRD_SM_CTRL_BUTTON		0x8004	/*!< PCAL6408A-7 */
 
 / {
+	aliases {
+		ethernet0 = &enetc_port0;
+		ethernet1 = &enetc_port1;
+		mmc0 = &usdhc1;
+		serial0 = &lpuart1;
+	};
+
 	memory@80000000 {
 		device_type = "memory";
 		reg = <0x0 0x80000000 0 0x80000000>;
