@@ -332,8 +332,8 @@
 	pinctrl-0 = <&pinctrl_emdio>;
 	status = "okay";
 
-	ethphy0: ethernet-phy@0 {
-		reg = <0>;
+	ethphy0: ethernet-phy@2 {
+		reg = <2>;
 		compatible = "ethernet-phy-ieee802.3-c22";
 		eee-broken-1000t;
 		reset-gpios = <&i2c2_gpio_expander_20 0 GPIO_ACTIVE_LOW>;
