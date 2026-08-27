@@ -348,6 +348,10 @@
 	memory-region = <&ele_reserved>;
 };
 
+&netc_blk_ctrl {
+	status = "okay";
+};
+
 &netc_timer {
 	status = "okay";
 };
