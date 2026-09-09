@@ -372,8 +372,8 @@
 	memory-region = <&neutron_mem>;
 };
 
-&pcie1 {
-	pinctrl-0 = <&pinctrl_pcie1>;
+&pcie0 {
+	pinctrl-0 = <&pinctrl_pcie0>;
 	pinctrl-names = "default";
 	reset-gpio = <&gpio5 6 GPIO_ACTIVE_LOW>;
 	status = "okay";
@@ -687,9 +687,9 @@
 		>;
 	};
 
-	pinctrl_pcie1: pcie1grp {
+	pinctrl_pcie0: pcie0grp {
 		fsl,pins = <
-			IMX95_PAD_GPIO_IO35__HSIOMIX_TOP_PCIE2_CLKREQ_B		0x4000031e
+			IMX95_PAD_GPIO_IO32__HSIOMIX_TOP_PCIE1_CLKREQ_B		0x4000031e
 			IMX95_PAD_XSPI1_DATA6__GPIO5_IO_BIT6			0x31e
 		>;
 	};
