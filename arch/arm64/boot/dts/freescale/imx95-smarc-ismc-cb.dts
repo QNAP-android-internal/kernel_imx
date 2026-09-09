@@ -274,13 +274,6 @@
 		>;
 	};
 
-	pinctrl_lpuart6: lpuart6grp {
-		fsl,pins = <
-			IMX95_PAD_GPIO_IO32__LPUART6_TX		0x31e
-			IMX95_PAD_GPIO_IO33__LPUART6_RX		0x31e
-		>;
-	};
-
 	pinctrl_lpuart7: lpuart7grp {
 		fsl,pins = <
 			IMX95_PAD_GPIO_IO36__LPUART7_TX		0x31e
@@ -476,13 +469,6 @@
 	/* COM3 - RS232 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lpuart5>;
-	status = "okay";
-};
-
-&lpuart6 {
-	/* COM1 - RS232/RS422/RS485 */
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_lpuart6>;
 	status = "okay";
 };
 
