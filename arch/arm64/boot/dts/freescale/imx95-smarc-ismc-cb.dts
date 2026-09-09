@@ -103,8 +103,10 @@
 		regulator-name = "USB_OTG_VBUS";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
-		gpio = <&i2c2_gpio_expander_20 2 GPIO_ACTIVE_LOW>;
-		enable-active-low;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usb_otg_vbus>;
+		gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
 	};
 
 	sound-alc5672 {
@@ -255,13 +257,13 @@
 };
 
 &usb3_phy {
+	vbus-supply = <&reg_usb_otg_vbus>;
 	status = "okay";
 };
 
 &usb3_dwc3 {
 	dr_mode = "otg";
 	extcon = <&extcon_usb_otg>;
-	vbus-supply = <&reg_usb_otg_vbus>;
 	maximum-speed = "high-speed";
 	status = "okay";
 };
@@ -328,6 +330,12 @@
 	pinctrl_usb_otg: usb_otg_grp {
 		fsl,pins = <
 			IMX95_PAD_XSPI1_DATA2__GPIO5_IO_BIT2		0x31e
+		>;
+	};
+
+	pinctrl_usb_otg_vbus: usb_otg_vbus_grp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO33__GPIO5_IO_BIT13		0x31e
 		>;
 	};
 
