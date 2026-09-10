@@ -181,6 +181,15 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lpi2c7>;
 	status = "okay";
+
+	/* U42, TCA9534A is register compatible with pca9534 */
+	i2c7_gpio_expander_38: i2c7-gpio-expander@38 {
+		compatible = "nxp,pca9534";
+		reg = <0x38>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		vcc-supply = <&reg_1p8v>;
+	};
 };
 
 
