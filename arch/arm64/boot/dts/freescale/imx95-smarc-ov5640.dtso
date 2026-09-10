@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2026 Jason Yang <jasonyang@ieiworld.com>
+ *
+ * OV5640 camera on the CN_CAM connector (CSI1, 2 lanes).
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+&{/} {
+	/* The module carries its own oscillator, CAM_MCK is unused. */
+	cam24m: clock-cam24m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+		clock-output-names = "cam24m";
+	};
+
+	/* CAM1_3V3, switched by U45 whose enable is CAM1_VDD_EN */
+	reg_cam1_vdd: regulator-cam1-vdd {
+		compatible = "regulator-fixed";
+		regulator-name = "CAM1_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&i2c7_gpio_expander_38 2 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+};
+
+&lpi2c3 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	ov5640_mipi: camera@3c {
+		compatible = "ovti,ov5640";
+		reg = <0x3c>;
+		clocks = <&cam24m>;
+		clock-names = "xclk";
+		powerdown-gpios = <&i2c7_gpio_expander_38 0 GPIO_ACTIVE_LOW>;
+		DOVDD-supply = <&reg_cam1_vdd>;
+		AVDD-supply = <&reg_cam1_vdd>;
+		DVDD-supply = <&reg_cam1_vdd>;
+		status = "okay";
+
+		port {
+			ov5640_ep: endpoint {
+				remote-endpoint = <&mipi_csi0_in>;
+				data-lanes = <1 2>;
+				clock-lanes = <0>;
+			};
+		};
+	};
+};
+
+&dphy_rx {
+	status = "okay";
+};
+
+&mipi_csi0 {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			mipi_csi0_in: endpoint {
+				remote-endpoint = <&ov5640_ep>;
+				data-lanes = <1 2>;
+				clock-lanes = <0>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			mipi_csi0_out: endpoint {
+				remote-endpoint = <&formatter_0_in>;
+			};
+		};
+	};
+};
+
+&csi_pixel_formatter_0 {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			formatter_0_in: endpoint {
+				remote-endpoint = <&mipi_csi0_out>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			formatter_0_out: endpoint {
+				remote-endpoint = <&isi_in_2>;
+			};
+		};
+	};
+};
+
+&isi {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@2 {
+			reg = <2>;
+
+			isi_in_2: endpoint {
+				remote-endpoint = <&formatter_0_out>;
+			};
+		};
+	};
+};
