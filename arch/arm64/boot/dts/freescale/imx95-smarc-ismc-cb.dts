@@ -278,6 +278,13 @@
 };
 
 &scmi_iomuxc {
+	pinctrl_lpuart3: lpuart3grp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO14__LPUART3_TX		0x31e
+			IMX95_PAD_GPIO_IO15__LPUART3_RX		0x31e
+		>;
+	};
+
 	pinctrl_lpuart5: lpuart5grp {
 		fsl,pins = <
 			IMX95_PAD_GPIO_IO00__LPUART5_TX		0x31e
@@ -480,6 +487,13 @@
 		};
 
 	};
+};
+
+&lpuart3 {
+	/* COM1 - RS232/RS422/RS485 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_lpuart3>;
+	status = "okay";
 };
 
 &lpuart5 {
