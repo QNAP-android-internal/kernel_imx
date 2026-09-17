@@ -272,6 +272,8 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i2c3_pcal6408>;
 		reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+		gpio-line-names = "DOUT0", "DOUT1", "DOUT2", "DOUT3",
+			"DOUT4", "DOUT5", "", "";
 	};
 
 	eeprom_som: eeprom@50 {
