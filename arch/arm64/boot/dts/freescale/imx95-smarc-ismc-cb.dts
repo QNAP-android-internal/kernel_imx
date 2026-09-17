@@ -174,6 +174,17 @@
 		clocks = <&scmi_clk IMX95_CLK_SAI3>;
 		clock-names = "mclk";
 	};
+
+	/* U69, TCA9534A on I2C_GP, DIN0..DIN5 */
+	i2c5_gpio_expander_38: i2c5-gpio-expander@38 {
+		compatible = "nxp,pca9534";
+		reg = <0x38>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		vcc-supply = <&reg_1p8v>;
+		gpio-line-names = "DIN0", "DIN1", "DIN2", "DIN3",
+			"DIN4", "DIN5", "", "";
+	};
 };
 
 &lpi2c7 {
