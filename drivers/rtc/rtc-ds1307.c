@@ -132,6 +132,7 @@ enum ds_type {
 #define MCP794XX_REG_CONTROL		0x07
 #	define MCP794XX_BIT_ALM0_EN	0x10
 #	define MCP794XX_BIT_ALM1_EN	0x20
+#define MCP794XX_REG_OSCTRIM		0x08
 #define MCP794XX_REG_ALARM0_BASE	0x0a
 #define MCP794XX_REG_ALARM0_CTRL	0x0d
 #define MCP794XX_REG_ALARM1_BASE	0x11
@@ -1881,6 +1882,20 @@ static int ds1307_probe(struct i2c_client *client)
 
 			regmap_write(ds1307->regmap,
 				     DS1307_REG_HOUR << 4 | 0x08, hour);
+		}
+		break;
+	case mcp794xx:
+		err = regmap_read(ds1307->regmap, MCP794XX_REG_OSCTRIM, &tmp);
+		if (err) {
+			dev_dbg(ds1307->dev, "read error %d\n", err);
+			goto exit;
+		}
+
+		if (tmp) {
+			dev_warn(ds1307->dev,
+				 "clearing stale oscillator trim 0x%02x\n",
+				 tmp);
+			regmap_write(ds1307->regmap, MCP794XX_REG_OSCTRIM, 0);
 		}
 		break;
 	case ds_1388:
