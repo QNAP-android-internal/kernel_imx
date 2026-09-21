@@ -294,7 +294,6 @@
 		compatible = "atmel,24c64";
 		reg = <0x50>;
 		pagesize = <32>;
-		read-only;
 		wp-gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_eeprom_wp>;
