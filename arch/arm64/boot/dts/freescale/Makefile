@@ -1524,3 +1524,6 @@ dtb-$(CONFIG_ARCH_MXC) += imx95-smarc-mipi2hdmi-lt9611uxd-4k.dtb
 
 imx95-smarc-mipi2hdmi-lt9611-dtbs := imx95-smarc-ismc-cb.dtb imx95-smarc-mipi2hdmi-lt9611.dtbo
 imx95-smarc-mipi2hdmi-lt9611uxd-4k-dtbs := imx95-smarc-ismc-cb.dtb imx95-smarc-mipi2hdmi-lt9611uxd-4k.dtbo
+
+dtb-$(CONFIG_ARCH_MXC) += imx95-smarc-neutron-12g.dtb
+imx95-smarc-neutron-12g-dtbs := imx95-smarc-ismc-cb.dtb imx95-smarc-neutron-12g.dtbo

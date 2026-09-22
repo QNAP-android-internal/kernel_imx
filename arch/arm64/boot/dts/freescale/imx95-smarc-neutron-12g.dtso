@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2026 Wig Cheng <wigcheng@ieiworld.com>
+ */
+
+/dts-v1/;
+/plugin/;
+
+&{/reserved-memory} {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	neutron_memory@100000000 {
+		/* base 0x1_00000000, size 0x3_00000000 = 12 GiB */
+		reg = <0x1 0x00000000 0x3 0x00000000>;
+	};
+};
