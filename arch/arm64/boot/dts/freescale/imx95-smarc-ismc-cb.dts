@@ -65,6 +65,14 @@
 		gpio = <&i2c7_gpio_expander_38 6 GPIO_ACTIVE_LOW>;
 	};
 
+	reg_can5_stby: regulator-can5-stby {
+		compatible = "regulator-fixed";
+		regulator-name = "can5-stby";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&i2c7_gpio_expander_38 7 GPIO_ACTIVE_LOW>;
+	};
+
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -136,6 +144,13 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_flexcan2>;
 	xceiver-supply = <&reg_can2_stby>;
+	status = "okay";
+};
+
+&flexcan5 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_flexcan5>;
+	xceiver-supply = <&reg_can5_stby>;
 	status = "okay";
 };
 
@@ -323,6 +338,13 @@
 		fsl,pins = <
 			IMX95_PAD_GPIO_IO25__CAN2_TX			0x39e
 			IMX95_PAD_GPIO_IO27__CAN2_RX			0x39e
+		>;
+	};
+
+	pinctrl_flexcan5: flexcan5grp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO30__CAN5_TX			0x39e
+			IMX95_PAD_GPIO_IO31__CAN5_RX			0x39e
 		>;
 	};
 
