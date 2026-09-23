@@ -35,6 +35,18 @@
 		id-gpios = <&gpio5 2 GPIO_ACTIVE_HIGH>;
 	};
 
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpio_keys>;
+
+		key-force-recovery {
+			label = "force-recovery";
+			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
+			linux,code = <BTN_0>;
+		};
+	};
+
 	reg_audio_pwr: regulator-audio-pwr {
 		compatible = "regulator-fixed";
 		regulator-name = "audio-pwr";
@@ -336,6 +348,12 @@
 		fsl,pins = <
 			IMX95_PAD_GPIO_IO08__LPI2C7_SDA			0x40000b9e
 			IMX95_PAD_GPIO_IO09__LPI2C7_SCL			0x40000b9e
+		>;
+	};
+
+	pinctrl_gpio_keys: gpiokeysgrp {
+		fsl,pins = <
+			IMX95_PAD_SD3_DATA3__GPIO3_IO_BIT25		0x31e
 		>;
 	};
 
