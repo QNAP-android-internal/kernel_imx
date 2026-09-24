@@ -281,7 +281,6 @@
 &usb3_dwc3 {
 	dr_mode = "otg";
 	extcon = <&extcon_usb_otg>;
-	maximum-speed = "high-speed";
 	status = "okay";
 };
 
