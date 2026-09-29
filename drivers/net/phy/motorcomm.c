@@ -1756,7 +1756,7 @@ static int yt8521_led_hw_control_set(struct phy_device *phydev, u8 index,
 	if (test_bit(TRIGGER_NETDEV_RX, &rules))
 		val |= YT8521_LED_RXACT_BLK_EN;
 
-	return ytphy_write_ext(phydev, YT8521_LED0_CFG_REG + index, val);
+	return ytphy_write_ext_with_lock(phydev, YT8521_LED0_CFG_REG + index, val);
 }
 
 static int yt8521_led_hw_control_get(struct phy_device *phydev, u8 index,
@@ -1767,7 +1767,7 @@ static int yt8521_led_hw_control_get(struct phy_device *phydev, u8 index,
 	if (index >= YT8521_MAX_LEDS)
 		return -EINVAL;
 
-	val = ytphy_read_ext(phydev, YT8521_LED0_CFG_REG + index);
+	val = ytphy_read_ext_with_lock(phydev, YT8521_LED0_CFG_REG + index);
 	if (val < 0)
 		return val;
 
