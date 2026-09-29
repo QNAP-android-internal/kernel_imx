@@ -242,13 +242,13 @@
 				 <&scmi_clk IMX95_CLK_AUDIOPLL1>;
 	assigned-clock-rates = <3932160000>,
 			       <3612672000>, <393216000>,
-			       <361267200>, <12288000>;
+			       <361267200>, <24576000>;
 	clocks = <&scmi_clk IMX95_CLK_BUSWAKEUP>, <&dummy>,
 		 <&scmi_clk IMX95_CLK_SAI3>, <&dummy>,
 		 <&dummy>, <&scmi_clk IMX95_CLK_AUDIOPLL1>,
 		 <&scmi_clk IMX95_CLK_AUDIOPLL2>;
 	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
-	pll-max-freq-MHz = <50>;
+	pll-max-freq-MHz = <40>;
 	fsl,sai-mclk-direction-output;
 	status = "okay";
 };
