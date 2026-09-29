@@ -283,6 +283,7 @@ struct fsl_sai {
 	struct clk *mclk_clk[FSL_SAI_MCLK_MAX];
 	struct clk *pll8k_clk;
 	struct clk *pll11k_clk;
+	unsigned int pll_max_freq;
 	struct resource *res;
 
 	bool is_consumer_mode[2];
