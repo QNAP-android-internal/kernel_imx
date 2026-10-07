@@ -327,13 +327,6 @@
 		>;
 	};
 
-	pinctrl_lpi2c1: lpi2c1grp {
-		fsl,pins = <
-			IMX95_PAD_I2C1_SCL__AONMIX_TOP_LPI2C1_SCL	0x40000b9e
-			IMX95_PAD_I2C1_SDA__AONMIX_TOP_LPI2C1_SDA	0x40000b9e
-		>;
-	};
-
 	pinctrl_lpi2c5: lpi2c5grp {
 		fsl,pins = <
 			IMX95_PAD_GPIO_IO22__LPI2C5_SDA                 0x40000b9e
