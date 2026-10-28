@@ -1,0 +1,144 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2026 Jason Yang <jasonyang@ieiworld.com>
+ *
+ * IMX219 camera on the CN_CAM connector (CSI1, 2 lanes), RAW frames
+ * processed by the NEO ISP.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+&{/} {
+	cam24m: clock-cam24m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+		clock-output-names = "cam24m";
+	};
+
+	reg_cam1_vdd: regulator-cam1-vdd {
+		compatible = "regulator-fixed";
+		regulator-name = "CAM1_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&i2c7_gpio_expander_38 2 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+	reg_cam1_pwr: regulator-cam1-pwr {
+		compatible = "regulator-fixed";
+		regulator-name = "CAM1_PWR";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&i2c7_gpio_expander_38 0 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&reg_cam1_vdd>;
+		startup-delay-us = <70000>;
+		off-on-delay-us = <30000>;
+	};
+};
+
+&lpi2c3 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	imx219: camera@10 {
+		compatible = "sony,imx219";
+		reg = <0x10>;
+		clocks = <&cam24m>;
+		VANA-supply = <&reg_cam1_pwr>;
+		VDIG-supply = <&reg_cam1_pwr>;
+		VDDL-supply = <&reg_cam1_pwr>;
+		status = "okay";
+
+		port {
+			imx219_ep: endpoint {
+				remote-endpoint = <&mipi_csi0_in>;
+				data-lanes = <1 2>;
+				clock-noncontinuous;
+				link-frequencies = /bits/ 64 <456000000>;
+			};
+		};
+	};
+};
+
+&dphy_rx {
+	status = "okay";
+};
+
+&mipi_csi0 {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			mipi_csi0_in: endpoint {
+				remote-endpoint = <&imx219_ep>;
+				data-lanes = <1 2>;
+				clock-lanes = <0>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			mipi_csi0_out: endpoint {
+				remote-endpoint = <&formatter_0_in>;
+			};
+		};
+	};
+};
+
+&csi_pixel_formatter_0 {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			formatter_0_in: endpoint {
+				remote-endpoint = <&mipi_csi0_out>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			formatter_0_out: endpoint {
+				remote-endpoint = <&isi_in_2>;
+			};
+		};
+	};
+};
+
+&isi {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@2 {
+			reg = <2>;
+
+			isi_in_2: endpoint {
+				remote-endpoint = <&formatter_0_out>;
+			};
+		};
+	};
+};
+
+&neoisp0 {
+	status = "okay";
+};
