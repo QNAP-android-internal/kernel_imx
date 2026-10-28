@@ -603,10 +603,10 @@
 	assigned-clock-rates = <2730000000>, <455000000>;
 	status = "okay";
 
-	channel@0 {
+	channel@1 {
 		#address-cells = <1>;
 		#size-cells = <0>;
-		reg = <0>;
+		reg = <1>;
 		status = "okay";
 
 		port@1 {
@@ -619,7 +619,7 @@
 	};
 };
 
-&ldb0_phy {
+&ldb1_phy {
 	status = "okay";
 };
 
