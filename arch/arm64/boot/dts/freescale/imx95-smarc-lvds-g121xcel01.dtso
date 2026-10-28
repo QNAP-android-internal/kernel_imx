@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2026 IEI
+ *
+ * Innolux G121XCE-L01 LVDS panel on LVDS0.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "imx95-clock.h"
+#include "imx95-pinfunc.h"
+
+&{/} {
+	backlight0: backlight-0 {
+		compatible = "pwm-backlight";
+		pwms = <&tpm3 3 5000000 0>;
+		enable-gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
+		brightness-levels = <0 4 8 16 32 64 128 255>;
+		default-brightness-level = <6>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_lcd_bklt_en>;
+	};
+
+	reg_lcd_vdd: regulator-lcd-vdd {
+		compatible = "regulator-fixed";
+		regulator-name = "LCD_VDD";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio2 18 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_lcd_vdd_en>;
+	};
+
+	panel_lvds0: panel-lvds0 {
+		compatible = "innolux,g121xce-l01";
+		backlight = <&backlight0>;
+		power-supply = <&reg_lcd_vdd>;
+
+		port {
+			panel_lvds0_in: endpoint {
+				remote-endpoint = <&lvds0_out>;
+			};
+		};
+	};
+};
+
+&tpm3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_lcd_bklt_pwm>;
+	status = "okay";
+};
+
+&ldb {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	assigned-clocks = <&scmi_clk IMX95_CLK_LDBPLL_VCO>,
+			  <&scmi_clk IMX95_CLK_LDBPLL>;
+	assigned-clock-rates = <2730000000>, <455000000>;
+	status = "okay";
+
+	channel@0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+		status = "okay";
+
+		port@1 {
+			reg = <1>;
+
+			lvds0_out: endpoint {
+				remote-endpoint = <&panel_lvds0_in>;
+			};
+		};
+	};
+};
+
+&ldb0_phy {
+	status = "okay";
+};
+
+&pixel_interleaver {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@1 {
+		reg = <1>;
+		status = "okay";
+	};
+};
+
+&scmi_iomuxc {
+	pinctrl_lcd_bklt_pwm: lcdbkltpwmgrp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO24__TPM3_CH3			0x51e
+		>;
+	};
+
+	pinctrl_lcd_bklt_en: lcdbkltengrp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO19__GPIO2_IO_BIT19		0x31e
+		>;
+	};
+
+	pinctrl_lcd_vdd_en: lcdvddengrp {
+		fsl,pins = <
+			IMX95_PAD_GPIO_IO18__GPIO2_IO_BIT18		0x31e
+		>;
+	};
+};
