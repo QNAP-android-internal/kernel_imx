@@ -66,14 +66,6 @@
 #define IMX708_DGTL_GAIN_DEFAULT	0x0100
 #define IMX708_DGTL_GAIN_STEP		1
 
-/* Colour balance controls */
-#define IMX708_REG_COLOUR_BALANCE_RED   0x0b90
-#define IMX708_REG_COLOUR_BALANCE_BLUE	0x0b92
-#define IMX708_COLOUR_BALANCE_MIN	0x01
-#define IMX708_COLOUR_BALANCE_MAX	0xffff
-#define IMX708_COLOUR_BALANCE_STEP	0x01
-#define IMX708_COLOUR_BALANCE_DEFAULT	0x100
-
 /* Test Pattern Control */
 #define IMX708_REG_TEST_PATTERN		0x0600
 #define IMX708_TEST_PATTERN_DISABLE	0
@@ -1033,7 +1025,6 @@ struct imx708 {
 	struct v4l2_ctrl *hblank;
 	struct v4l2_ctrl *red_balance;
 	struct v4l2_ctrl *blue_balance;
-	struct v4l2_ctrl *notify_gains;
 	struct v4l2_ctrl *hdr_mode;
 
 	/* Current mode */
@@ -1377,16 +1368,6 @@ static int imx708_set_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_VBLANK:
 		ret = imx708_set_frame_length(imx708,
 					      imx708->mode->height + ctrl->val);
-		break;
-	case V4L2_CID_NOTIFY_GAINS:
-		ret = imx708_write_reg(imx708, IMX708_REG_COLOUR_BALANCE_BLUE,
-				       IMX708_REG_VALUE_16BIT,
-				       imx708->notify_gains->p_new.p_u32[0]);
-		if (ret)
-			break;
-		ret = imx708_write_reg(imx708, IMX708_REG_COLOUR_BALANCE_RED,
-				       IMX708_REG_VALUE_16BIT,
-				       imx708->notify_gains->p_new.p_u32[3]);
 		break;
 	case V4L2_CID_WIDE_DYNAMIC_RANGE:
 		get_mode_table(imx708, &mode_list, &num_modes, ctrl->val);
@@ -1863,18 +1844,6 @@ static const struct v4l2_subdev_internal_ops imx708_internal_ops = {
 	.open = imx708_open,
 };
 
-static const struct v4l2_ctrl_config imx708_notify_gains_ctrl = {
-	.ops = &imx708_ctrl_ops,
-	.id = V4L2_CID_NOTIFY_GAINS,
-	.type = V4L2_CTRL_TYPE_U32,
-	.min = IMX708_COLOUR_BALANCE_MIN,
-	.max = IMX708_COLOUR_BALANCE_MAX,
-	.step = IMX708_COLOUR_BALANCE_STEP,
-	.def = IMX708_COLOUR_BALANCE_DEFAULT,
-	.dims = { 4 },
-	.elem_size = sizeof(u32),
-};
-
 /* Initialize control handlers */
 static int imx708_init_controls(struct imx708 *imx708)
 {
@@ -1955,10 +1924,6 @@ static int imx708_init_controls(struct imx708 *imx708)
 				  IMX708_TEST_PATTERN_COLOUR_MAX);
 		/* The "Solid color" pattern is white by default */
 	}
-
-	imx708->notify_gains = v4l2_ctrl_new_custom(ctrl_hdlr,
-						    &imx708_notify_gains_ctrl,
-						    NULL);
 
 	imx708->hdr_mode = v4l2_ctrl_new_std(ctrl_hdlr, &imx708_ctrl_ops,
 					     V4L2_CID_WIDE_DYNAMIC_RANGE,
