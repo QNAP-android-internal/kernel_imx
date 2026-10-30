@@ -5,6 +5,7 @@
 
 /dts-v1/;
 
+#include <dt-bindings/phy/phy-imx8-pcie.h>
 #include <dt-bindings/usb/pd.h>
 #include "imx8mp.dtsi"
 #include "imx8mp-nxp-capture.dtsi"
@@ -138,16 +139,24 @@
 	status = "okay";
 };
 
-&gpio2 {
-	lte_disable {
-		gpio-hog;
-		gpios = <6 GPIO_ACTIVE_HIGH>;
-		line-name = "lte_disable";
-		output-high;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_lte_dis_en>;
-	};
+&pcie_phy {
+	fsl,refclk-pad-mode = <IMX8_PCIE_REFCLK_PAD_OUTPUT>;
+	clocks = <&hsio_blk_ctrl>;
+	clock-names = "ref";
+	fsl,clkreq-unsupported;
+	status = "okay";
+};
 
+&pcie0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_lte_rst_en>, <&pinctrl_lte_dis_en>;
+	reset-gpio = <&gpio2 6 GPIO_ACTIVE_LOW>;
+	/* F81601 is Gen1. CLKREQ# is not routed to the SoC. */
+	fsl,max-link-speed = <1>;
+	status = "okay";
+};
+
+&gpio2 {
 	lte_reset {
 		gpio-hog;
 		gpios = <7 GPIO_ACTIVE_HIGH>;
