@@ -194,6 +194,7 @@
 		reg = <0x50>;
 		pagesize = <16>;
 		wp-gpios = <&i2c7_gpio_expander_38 3 GPIO_ACTIVE_HIGH>;
+		read-only;
 		vcc-supply = <&reg_1p8v>;
 	};
 };
