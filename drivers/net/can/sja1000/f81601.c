@@ -64,6 +64,14 @@ static void f81601_pci_write_reg(const struct sja1000_priv *priv, int port,
 	struct f81601_pci_card *card = priv->priv;
 	unsigned long flags;
 
+	if (port == SJA1000_FI && priv->can.bittiming.bitrate) {
+		unsigned int us = 12 * USEC_PER_SEC /
+				  priv->can.bittiming.bitrate + 20;
+
+		while ((readb(priv->reg_base + SJA1000_SR) & SR_TS) && us--)
+			udelay(1);
+	}
+
 	spin_lock_irqsave(&card->lock, flags);
 	writeb(val, priv->reg_base + port);
 	readb(priv->reg_base);
