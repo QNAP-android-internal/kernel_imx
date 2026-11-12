@@ -36,6 +36,9 @@ struct f81601_pci_card {
 	spinlock_t lock;	/* use this spin lock only for write access */
 	struct pci_dev *dev;
 	struct net_device *net_dev[F81601_PCI_MAX_CHAN];
+	/* TX request in flight per channel, protected by lock */
+	bool tx_pending[F81601_PCI_MAX_CHAN];
+	ktime_t tx_start[F81601_PCI_MAX_CHAN];
 };
 
 static const struct pci_device_id f81601_pci_tbl[] = {
@@ -53,8 +56,43 @@ static unsigned int external_clk;
 module_param(external_clk, uint, 0444);
 MODULE_PARM_DESC(external_clk, "External clock when internal_clk disabled");
 
+static u8 f81601_pci_read_ir(const struct sja1000_priv *priv)
+{
+	struct f81601_pci_card *card = priv->priv;
+	int ch = priv->dev->dev_id;
+	unsigned long flags;
+	u8 ir, sr;
+
+	spin_lock_irqsave(&card->lock, flags);
+	ir = readb(priv->reg_base + SJA1000_IR);
+
+	if (!card->tx_pending[ch]) {
+		ir &= ~IRQ_TI;
+	} else if (ir & IRQ_TI) {
+		card->tx_pending[ch] = false;
+	} else if (!(priv->can.ctrlmode & CAN_CTRLMODE_ONE_SHOT) &&
+		   priv->can.bittiming.bitrate) {
+		/* a frame takes at least ~47 bit times on the bus */
+		s64 min_ns = 40LL * NSEC_PER_SEC / priv->can.bittiming.bitrate;
+
+		sr = readb(priv->reg_base + SJA1000_SR);
+		if ((sr & (SR_TBS | SR_TCS | SR_TS)) == (SR_TBS | SR_TCS) &&
+		    ktime_to_ns(ktime_sub(ktime_get(), card->tx_start[ch])) >
+		    min_ns) {
+			card->tx_pending[ch] = false;
+			ir |= IRQ_TI;
+		}
+	}
+	spin_unlock_irqrestore(&card->lock, flags);
+
+	return ir;
+}
+
 static u8 f81601_pci_read_reg(const struct sja1000_priv *priv, int port)
 {
+	if (port == SJA1000_IR)
+		return f81601_pci_read_ir(priv);
+
 	return readb(priv->reg_base + port);
 }
 
@@ -75,6 +113,13 @@ static void f81601_pci_write_reg(const struct sja1000_priv *priv, int port,
 	spin_lock_irqsave(&card->lock, flags);
 	writeb(val, priv->reg_base + port);
 	readb(priv->reg_base);
+
+	if (port == SJA1000_CMR && (val & (CMD_TR | CMD_SRR))) {
+		card->tx_pending[priv->dev->dev_id] = true;
+		card->tx_start[priv->dev->dev_id] = ktime_get();
+	} else if (port == SJA1000_MOD && (val & MOD_RM)) {
+		card->tx_pending[priv->dev->dev_id] = false;
+	}
 	spin_unlock_irqrestore(&card->lock, flags);
 }
 
