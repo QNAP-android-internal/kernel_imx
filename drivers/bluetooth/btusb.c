@@ -4600,6 +4600,57 @@ done:
 
 	return err;
 }
+
+static int btusb_reset_resume(struct usb_interface *intf)
+{
+	struct btusb_data *data = usb_get_intfdata(intf);
+	struct hci_dev *hdev = data->hdev;
+	struct urb *urb;
+
+	BT_DBG("intf %p", intf);
+
+	if (!data->setup_on_usb) {
+		intf->needs_binding = 1;
+		return 0;
+	}
+
+	if (--data->suspend_count)
+		return 0;
+
+	if (test_and_clear_bit(BTUSB_OOB_WAKE_ENABLED, &data->flags)) {
+		disable_irq(data->oob_wake_irq);
+		disable_irq_wake(data->oob_wake_irq);
+	}
+
+	while ((urb = usb_get_from_anchor(&data->deferred))) {
+		kfree(urb->setup_packet);
+		kfree_skb(urb->context);
+		usb_free_urb(urb);
+	}
+	clear_bit(BTUSB_ISOC_RUNNING, &data->flags);
+
+	if (test_bit(HCI_RUNNING, &hdev->flags)) {
+		if (test_bit(BTUSB_INTR_RUNNING, &data->flags) &&
+		    btusb_submit_intr_urb(hdev, GFP_NOIO) < 0)
+			clear_bit(BTUSB_INTR_RUNNING, &data->flags);
+
+		if (test_bit(BTUSB_BULK_RUNNING, &data->flags)) {
+			if (btusb_submit_bulk_urb(hdev, GFP_NOIO) < 0)
+				clear_bit(BTUSB_BULK_RUNNING, &data->flags);
+			else
+				btusb_submit_bulk_urb(hdev, GFP_NOIO);
+		}
+	}
+
+	spin_lock_irq(&data->txlock);
+	clear_bit(BTUSB_SUSPENDING, &data->flags);
+	spin_unlock_irq(&data->txlock);
+
+	if (test_bit(HCI_RUNNING, &hdev->flags))
+		hci_reset_dev(hdev);
+
+	return 0;
+}
 #endif
 
 #ifdef CONFIG_DEV_COREDUMP
@@ -4620,6 +4671,7 @@ static struct usb_driver btusb_driver = {
 #ifdef CONFIG_PM
 	.suspend	= btusb_suspend,
 	.resume		= btusb_resume,
+	.reset_resume	= btusb_reset_resume,
 #endif
 	.id_table	= btusb_table,
 	.supports_autosuspend = 1,
