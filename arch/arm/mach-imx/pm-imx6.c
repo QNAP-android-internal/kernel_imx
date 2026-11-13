@@ -4,6 +4,8 @@
  * Copyright 2011 Linaro Ltd.
  */
 
+#include <linux/build_bug.h>
+#include <linux/cfi.h>
 #include <linux/clk/imx.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -598,6 +600,15 @@ struct imx6_cpu_pm_info {
 	u32 mmdc_num; /* Number of MMDC registers which need saved/restored. */
 	u32 mmdc_val[MX6_MAX_MMDC_NUM][2];
 } __aligned(8);
+
+/*
+ * The ocram copy of imx6_suspend() starts right after struct imx6_cpu_pm_info,
+ * and the CFI check on the indirect call reads the kCFI type hash from the
+ * four bytes preceding the function entry, so cfi_type must occupy the last
+ * four bytes of the struct, i.e. fit into its tail padding.
+ */
+static_assert(offsetofend(struct imx6_cpu_pm_info, cfi_type) ==
+	      sizeof(struct imx6_cpu_pm_info));
 
 void imx6_set_int_mem_clk_lpm(bool enable)
 {

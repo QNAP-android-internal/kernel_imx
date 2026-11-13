@@ -319,6 +319,8 @@ static void imx95_pcie_phy_write(struct imx_pcie *imx_pcie, int addr, u16 data)
 
 static int imx95_pcie_init_phy(struct imx_pcie *imx_pcie)
 {
+	bool ext = imx_pcie->enable_ext_refclk;
+
 	/*
 	 * ERR051624: The Controller Without Vaux Cannot Exit L23 Ready
 	 * Through Beacon or PERST# De-assertion

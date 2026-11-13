@@ -7862,6 +7862,7 @@ static int nfs4_add_lease(struct file *file, int arg, struct file_lease **lease,
 {
 	struct inode *inode = file_inode(file);
 	fmode_t type = arg == F_RDLCK ? FMODE_READ : FMODE_WRITE;
+	fl_owner_t owner = (*lease)->c.flc_owner;
 	int ret;
 
 	/* No delegation, no lease */
@@ -7871,7 +7872,8 @@ static int nfs4_add_lease(struct file *file, int arg, struct file_lease **lease,
 	if (ret || nfs4_have_delegation(inode, type, 0))
 		return ret;
 	/* We raced with a delegation return */
-	nfs4_delete_lease(file, priv);
+	dprintk("%s: raced with a delegation return\n", __func__);
+	nfs4_delete_lease(file, &owner);
 	return -EAGAIN;
 }
 
@@ -9934,6 +9936,14 @@ nfs4_layoutget_handle_exception(struct rpc_task *task,
 	 */
 	case -NFS4ERR_BADLAYOUT:
 		status = -EOVERFLOW;
+		goto out;
+	/*
+	 * NFS4ERR_TOOSMALL means the layout for the requested range
+	 * exceeds what the client advertised in loga_maxcount (see
+	 * RFC8881 section 18.43.3).
+	 */
+	case -ETOOSMALL:
+		status = -EMSGSIZE;
 		goto out;
 	/*
 	 * NFS4ERR_LAYOUTTRYLATER is a conflict with another client

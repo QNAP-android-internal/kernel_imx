@@ -1127,6 +1127,10 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 			return error;
 	}
 
+	error = fsl_mc_firmware_check(pdev);
+	if (error)
+		return error;
+
 	/*
 	 * Get physical address of MC portal for the root DPRC:
 	 */

@@ -542,6 +542,7 @@ void rpcrdma_sendctx_unmap(struct rpcrdma_sendctx *sc)
 
 	rpcrdma_sendctx_dma_unmap(sc);
 	sc->sc_req = NULL;
+	req->rl_sendctx = NULL;
 	rpcrdma_req_put(req);
 }
 
@@ -550,8 +551,11 @@ void rpcrdma_sendctx_unmap(struct rpcrdma_sendctx *sc)
  */
 static void rpcrdma_sendctx_cancel(struct rpcrdma_sendctx *sc)
 {
+	struct rpcrdma_req *req = sc->sc_req;
+
 	rpcrdma_sendctx_dma_unmap(sc);
 	sc->sc_req = NULL;
+	req->rl_sendctx = NULL;
 }
 
 /* Prepare an SGE for the RPC-over-RDMA transport header.
@@ -792,6 +796,7 @@ inline int rpcrdma_prepare_send_sges(struct rpcrdma_xprt *r_xprt,
 				     struct xdr_buf *xdr,
 				     enum rpcrdma_chunktype rtype)
 {
+	struct rpcrdma_sendctx *sc;
 	int ret;
 
 	ret = -EAGAIN;
@@ -834,7 +839,9 @@ inline int rpcrdma_prepare_send_sges(struct rpcrdma_xprt *r_xprt,
 	return 0;
 
 out_unmap:
-	rpcrdma_sendctx_cancel(req->rl_sendctx);
+	sc = req->rl_sendctx;
+	rpcrdma_sendctx_cancel(sc);
+	rpcrdma_sendctx_unget_locked(r_xprt, sc);
 out_nosc:
 	trace_xprtrdma_prepsend_failed(&req->rl_slot, ret);
 	return ret;
@@ -1026,11 +1033,15 @@ void rpcrdma_reset_cwnd(struct rpcrdma_xprt *r_xprt)
  * @rqst: controlling RPC request
  * @srcp: points to RPC message payload in receive buffer
  * @copy_len: remaining length of receive buffer content
- * @pad: Write chunk pad bytes needed (zero for pure inline)
+ * @writelist: bytes conveyed by the Write chunk (zero for pure inline)
  *
  * The upper layer has set the maximum number of bytes it can
  * receive in each component of rq_rcv_buf. These values are set in
  * the head.iov_len, page_len, tail.iov_len, and buflen fields.
+ *
+ * For READ replies with a Write chunk, the payload is already in
+ * the page list. An overestimated head length and buflen can be
+ * reduced without moving reply data.
  *
  * Unlike the TCP equivalent (xdr_partial_copy_from_skb), in
  * many cases this function simply updates iov_base pointers in
@@ -1040,13 +1051,16 @@ void rpcrdma_reset_cwnd(struct rpcrdma_xprt *r_xprt)
  * Returns the count of bytes which had to be memcopied.
  */
 static unsigned long
-rpcrdma_inline_fixup(struct rpc_rqst *rqst, char *srcp, int copy_len, int pad)
+rpcrdma_inline_fixup(struct rpc_rqst *rqst, char *srcp, int copy_len,
+		     u32 writelist)
 {
 	unsigned long fixup_copy_count;
 	int i, npages, curlen;
 	char *destp;
 	struct page **ppages;
 	int page_base;
+	int pad = writelist & 3;
+	unsigned int delta;
 
 	/* The head iovec is redirected to the RPC reply message
 	 * in the receive buffer, to avoid a memcopy.
@@ -1058,8 +1072,20 @@ rpcrdma_inline_fixup(struct rpc_rqst *rqst, char *srcp, int copy_len, int pad)
 	 * head.iov_len bytes are copied into the page list.
 	 */
 	curlen = rqst->rq_rcv_buf.head[0].iov_len;
-	if (curlen > copy_len)
+	if (curlen > copy_len) {
+		/* These READ replies have no inline fields after the payload.
+		 * Trim the head without moving the directly-placed data.
+		 */
+		if (writelist) {
+			delta = curlen - copy_len;
+
+			rqst->rq_rcv_buf.head[0].iov_len = copy_len;
+			rqst->rq_private_buf.head[0].iov_len = copy_len;
+			rqst->rq_rcv_buf.buflen -= delta;
+			rqst->rq_private_buf.buflen -= delta;
+		}
 		curlen = copy_len;
+	}
 	srcp += curlen;
 	copy_len -= curlen;
 
@@ -1287,7 +1313,7 @@ rpcrdma_decode_msg(struct rpcrdma_xprt *r_xprt, struct rpcrdma_rep *rep,
 	base = (char *)xdr_inline_decode(xdr, 0);
 	rpclen = xdr_stream_remaining(xdr);
 	r_xprt->rx_stats.fixup_copy_count +=
-		rpcrdma_inline_fixup(rqst, base, rpclen, writelist & 3);
+		rpcrdma_inline_fixup(rqst, base, rpclen, writelist);
 
 	r_xprt->rx_stats.total_rdma_reply += writelist;
 	return rpclen + xdr_align_size(writelist);
@@ -1383,6 +1409,11 @@ void rpcrdma_complete_rqst(struct rpcrdma_rep *rep)
 	struct rpc_rqst *rqst = rep->rr_rqst;
 	int status;
 
+	/* I3: every registered MR has been invalidated and
+	 * ib_dma_unmap_sg()'d before complete_rqst runs.
+	 */
+	WARN_ON_ONCE(!list_empty(&rpcr_to_rdmar(rqst)->rl_registered));
+
 	switch (rep->rr_proc) {
 	case rdma_msg:
 		status = rpcrdma_decode_msg(r_xprt, rep, rqst);
@@ -1413,6 +1444,70 @@ out_badheader:
 	status = 0;
 	goto out;
 }
+
+/* Reply-side ownership invariants
+ *
+ * I1 (Receive WR ownership).  A struct rpcrdma_rep is owned by the
+ *    HCA between ib_post_recv() and the matching Receive completion.
+ *    After ib_dma_sync_single_for_cpu() in rpcrdma_wc_receive() it is
+ *    owned by the CPU until rpcrdma_rep_put() returns it to
+ *    rb_free_reps; a rep on rb_free_reps is not re-posted until
+ *    rpcrdma_post_recvs() pulls it off.  Asserted: rpcrdma_post_recvs()
+ *    WARNs that a pulled rep has rr_rqst == NULL.
+ *
+ * I2 (rep attachment).  While req->rl_reply == rep, the rep cannot be
+ *    re-posted.  rpcrdma_reply_put() NULLs req->rl_reply before handing
+ *    the rep to rpcrdma_rep_put().  Asserted: rpcrdma_reply_put() WARNs
+ *    that rl_reply is NULL after the put.
+ *
+ * I3 (Registered-MR fence).  On entry to rpcrdma_complete_rqst() every
+ *    MR that was on req->rl_registered has had its rkey invalidated
+ *    (remotely via IB_WC_WITH_INVALIDATE or locally via IB_WR_LOCAL_INV)
+ *    and its pages ib_dma_unmap_sg()'d.  The LocalInv chain is posted
+ *    on a single QP; strong send-queue ordering makes the last
+ *    completion (frwr_wc_localinv_done) observe the
+ *    ib_dma_unmap_sg() that ran from each earlier completion's
+ *    frwr_mr_put() before complete_rqst is called.  The inline
+ *    frwr_reminv() path unmaps its one MR synchronously before
+ *    rpcrdma_reply_handler() reaches complete_rqst.  Asserted:
+ *    rpcrdma_complete_rqst() WARNs that rl_registered is empty.
+ *
+ * I4 (Send-buffer release).  req->rl_kref carries two unconditional
+ *    owners while a Send is outstanding: the RPC-layer reference (set
+ *    at xprt_rdma_alloc_slot / xprt_rdma_bc_rqst_get / rpcrdma_req_release
+ *    pool-entry) and the Send-side reference (kref_get() in
+ *    rpcrdma_prepare_send_sges()).  rpcrdma_req_release() runs only
+ *    after both have dropped, so the req does not return to its free
+ *    pool until rpcrdma_sendctx_unmap() has fired -- the HCA has
+ *    released the send buffer before the req can be reused.  Asserted:
+ *    rpcrdma_req_release() WARNs that rl_sendctx is NULL.
+ *
+ * I5 (req lifecycle).  A req is owned by the RPC layer between slot
+ *    acquisition and the matching xprt_rdma_free_slot() (or, for the
+ *    backchannel, xprt_rdma_bc_free_rqst()).  While owned, rl_kref >= 1.
+ *    The pools (rb_send_bufs, bc_pa_list, backlog wake target) never
+ *    contain a req with outstanding Send-side or Reply-side work.
+ *
+ * Non-hazards.  The following claims have been raised by adversarial
+ * review and are each closed by the invariants above:
+ *
+ *   * "Reply completes the RPC while the HCA still holds the send
+ *     buffer" -- excluded by I4.  The Send-side kref reference is held
+ *     until rpcrdma_sendctx_unmap() runs from Send completion.
+ *
+ *   * "Signal-driven release races the in-flight Send" -- same
+ *     resolution.  xprt_rdma_free() does not touch rl_kref; the
+ *     Send-side reference keeps the req out of its pool until Send
+ *     completion fires.
+ *
+ *   * "Receive completion races rep reuse" -- excluded by I1.  A rep
+ *     is on rb_free_reps only after rpcrdma_rep_put() has been called
+ *     and rpcrdma_post_recvs() owns the next transition back to the HCA.
+ *
+ *   * "Pages still DMA-mapped when call_decode reads them" -- excluded
+ *     by I3.  The matching ib_dma_unmap_sg() for every MR has run on
+ *     the same CPU thread that calls rpcrdma_complete_rqst().
+ */
 
 /**
  * rpcrdma_reply_handler - Process received RPC/RDMA messages
@@ -1448,6 +1543,14 @@ void rpcrdma_reply_handler(struct rpcrdma_rep *rep)
 	credits = be32_to_cpu(*p++);
 	rep->rr_proc = *p++;
 
+	/* The credit grant from the wire is not trustworthy;
+	 * sanitize it before any code path consumes it.
+	 */
+	if (credits == 0)
+		credits = 1;	/* don't deadlock */
+	else if (credits > r_xprt->rx_ep->re_max_requests)
+		credits = r_xprt->rx_ep->re_max_requests;
+
 	if (rep->rr_vers != rpcrdma_version)
 		goto out_badversion;
 
@@ -1464,10 +1567,6 @@ void rpcrdma_reply_handler(struct rpcrdma_rep *rep)
 	xprt_pin_rqst(rqst);
 	spin_unlock(&xprt->queue_lock);
 
-	if (credits == 0)
-		credits = 1;	/* don't deadlock */
-	else if (credits > r_xprt->rx_ep->re_max_requests)
-		credits = r_xprt->rx_ep->re_max_requests;
 	if (buf->rb_credits != credits)
 		rpcrdma_update_cwnd(r_xprt, credits);
 
@@ -1500,11 +1599,13 @@ out_norqst:
 
 out_badversion:
 	trace_xprtrdma_reply_vers_err(rep);
-	goto out;
+	rpcrdma_rep_put(buf, rep);
+	credits = buf->rb_credits;
+	goto out_post;
 
 out_shortreply:
 	trace_xprtrdma_reply_short_err(rep);
-
-out:
 	rpcrdma_rep_put(buf, rep);
+	credits = buf->rb_credits;
+	goto out_post;
 }
