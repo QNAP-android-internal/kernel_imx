@@ -112,6 +112,9 @@
 		model = "max98090-audio";
 		audio-cpu = <&sai3>;
 		audio-codec = <&max98090>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_hp_det>;
+		hp-det-gpios = <&gpio4 1 GPIO_ACTIVE_HIGH>;
 		audio-routing =
 			"Headphone Jack", "HPL",
 			"Headphone Jack", "HPR",
@@ -357,6 +360,12 @@
 	pinctrl_usb_otg_vbus: usb_otg_vbus_grp {
 		fsl,pins = <
 			IMX95_PAD_GPIO_IO33__GPIO5_IO_BIT13		0x31e
+		>;
+	};
+
+	pinctrl_hp_det: hpdetgrp {
+		fsl,pins = <
+			IMX95_PAD_ENET1_MDIO__GPIO4_IO_BIT1             0x31e
 		>;
 	};
 
