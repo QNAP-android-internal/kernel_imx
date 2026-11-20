@@ -726,6 +726,71 @@ static struct notifier_block mic_jack_nb = {
 	.notifier_call = mic_jack_event,
 };
 
+static void fsl_asoc_card_free_jack(struct snd_soc_card *card)
+{
+	struct fsl_asoc_card_priv *priv = snd_soc_card_get_drvdata(card);
+
+	/*
+	 * snd_soc_jack_add_gpios() also frees the jack GPIOs through a devres
+	 * action on card->dev. When the card was rebound after
+	 * devm_snd_soc_register_card(), that action runs before the card is
+	 * unregistered, and it clears gpio.jack. Free the GPIOs here only if
+	 * they are still held, so they are never freed twice.
+	 */
+	if (priv->hp_jack.gpio.desc) {
+		snd_soc_jack_notifier_unregister(&priv->hp_jack.jack, &hp_jack_nb);
+		if (priv->hp_jack.gpio.jack)
+			snd_soc_jack_free_gpios(&priv->hp_jack.jack, 1, &priv->hp_jack.gpio);
+		priv->hp_jack.gpio.desc = NULL;
+	}
+
+	if (priv->mic_jack.gpio.desc) {
+		snd_soc_jack_notifier_unregister(&priv->mic_jack.jack, &mic_jack_nb);
+		if (priv->mic_jack.gpio.jack)
+			snd_soc_jack_free_gpios(&priv->mic_jack.jack, 1, &priv->mic_jack.gpio);
+		priv->mic_jack.gpio.desc = NULL;
+	}
+}
+
+/*
+ * fsl_asoc_card_init_jack - register optional headphone and mic jacks.
+ *
+ * Called from late_probe() once per card bind cycle.
+ */
+static int fsl_asoc_card_init_jack(struct snd_soc_card *card)
+{
+	struct fsl_asoc_card_priv *priv = snd_soc_card_get_drvdata(card);
+	struct device_node *np = priv->pdev->dev.of_node;
+	int ret;
+
+	/*
+	 * Properties "hp-det-gpios" and "mic-det-gpios" are optional.
+	 * simple_util_init_jack() checks for the GPIO property and
+	 * does nothing if it is absent.
+	 */
+	if (of_property_present(np, "hp-det-gpios") ||
+	    of_property_present(np, "hp-det-gpio") /* deprecated */) {
+		ret = simple_util_init_jack(card, &priv->hp_jack,
+					    1, NULL, "Headphone Jack");
+		if (ret)
+			return ret;
+
+		snd_soc_jack_notifier_register(&priv->hp_jack.jack, &hp_jack_nb);
+	}
+
+	if (of_property_present(np, "mic-det-gpios") ||
+	    of_property_present(np, "mic-det-gpio") /* deprecated */) {
+		ret = simple_util_init_jack(card, &priv->mic_jack,
+					    0, NULL, "Mic Jack");
+		if (ret)
+			return ret;
+
+		snd_soc_jack_notifier_register(&priv->mic_jack.jack, &mic_jack_nb);
+	}
+
+	return 0;
+}
+
 static int fsl_asoc_card_late_probe(struct snd_soc_card *card)
 {
 	struct fsl_asoc_card_priv *priv = snd_soc_card_get_drvdata(card);
@@ -736,6 +801,10 @@ static int fsl_asoc_card_late_probe(struct snd_soc_card *card)
 	struct device *dev = card->dev;
 	int codec_idx;
 	int ret;
+
+	ret = fsl_asoc_card_init_jack(card);
+	if (ret)
+		goto jack_fail;
 
 	if (fsl_asoc_card_is_ac97(priv)) {
 #if IS_ENABLED(CONFIG_SND_AC97_CODEC)
@@ -761,12 +830,23 @@ static int fsl_asoc_card_late_probe(struct snd_soc_card *card)
 					codec_priv->mclk_freq, SND_SOC_CLOCK_IN);
 		if (ret && ret != -ENOTSUPP) {
 			dev_err(dev, "failed to set sysclk in %s\n", __func__);
-			return ret;
+			goto jack_fail;
 		}
 
 		if (!IS_ERR_OR_NULL(codec_priv->mclk))
 			clk_prepare_enable(codec_priv->mclk);
 	}
+
+	return 0;
+
+jack_fail:
+	fsl_asoc_card_free_jack(card);
+	return ret;
+}
+
+static int fsl_asoc_card_card_remove(struct snd_soc_card *card)
+{
+	fsl_asoc_card_free_jack(card);
 
 	return 0;
 }
@@ -1136,6 +1216,7 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 	}
 	priv->card.dai_link = priv->dai_link;
 	priv->card.late_probe = fsl_asoc_card_late_probe;
+	priv->card.remove = fsl_asoc_card_card_remove;
 	priv->card.dapm_widgets = fsl_asoc_card_dapm_widgets;
 	priv->card.num_dapm_widgets = ARRAY_SIZE(fsl_asoc_card_dapm_widgets);
 
@@ -1237,34 +1318,6 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err_probe(&pdev->dev, ret, "snd_soc_register_card failed\n");
 		goto asrc_fail;
-	}
-
-	/*
-	 * Properties "hp-det-gpios" and "mic-det-gpios" are optional, and
-	 * simple_util_init_jack() uses these properties for creating
-	 * Headphone Jack and Microphone Jack.
-	 *
-	 * The notifier is initialized in snd_soc_card_jack_new(), then
-	 * snd_soc_jack_notifier_register can be called.
-	 */
-	if (of_property_present(np, "hp-det-gpios") ||
-	    of_property_present(np, "hp-det-gpio") /* deprecated */) {
-		ret = simple_util_init_jack(&priv->card, &priv->hp_jack,
-					    1, NULL, "Headphone Jack");
-		if (ret)
-			goto asrc_fail;
-
-		snd_soc_jack_notifier_register(&priv->hp_jack.jack, &hp_jack_nb);
-	}
-
-	if (of_property_present(np, "mic-det-gpios") ||
-	    of_property_present(np, "mic-det-gpio") /* deprecated */) {
-		ret = simple_util_init_jack(&priv->card, &priv->mic_jack,
-					    0, NULL, "Mic Jack");
-		if (ret)
-			goto asrc_fail;
-
-		snd_soc_jack_notifier_register(&priv->mic_jack.jack, &mic_jack_nb);
 	}
 
 asrc_fail:
