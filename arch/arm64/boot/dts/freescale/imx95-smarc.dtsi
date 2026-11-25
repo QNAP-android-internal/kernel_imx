@@ -493,10 +493,6 @@
 	};
 };
 
-&gpio1 {
-	status = "okay";
-};
-
 &displaymix_irqsteer {
 	status = "okay";
 };
